@@ -121,7 +121,10 @@ func _run_autotest(args: PackedStringArray) -> void:
 
 
 func _process(delta: float) -> void:
-	simulate(delta)
+	# at high speed, break the frame into steps of at most ~1/15 of a game minute
+	var steps := clampi(int(ceil(delta * GameState.sim_speed() / 0.07)), 1, 8)
+	for i in steps:
+		simulate(delta / steps)
 	slow_timer -= delta
 	if slow_timer <= 0.0:
 		slow_timer = 0.25
@@ -597,6 +600,7 @@ func start_next_day() -> void:
 		s.jobs_today = 0
 	GameState.roll_candidates()
 	GameState.set_phase(GameState.Phase.PLANNING)
+	Shifts.morning_view()
 	GameState.staff_changed.emit()
 	save_game()
 	if GameState.money < 0:
@@ -910,6 +914,7 @@ func load_game(from: String = "") -> bool:
 			if lot.dirt[lot.idx(Vector2i(x, y))] >= Data.DIRT_JOB:
 				lot.post_sweep(Vector2i(x, y))
 	GameState.set_phase(GameState.Phase.PLANNING)
+	Shifts.morning_view()
 	GameState.money_changed.emit(GameState.money)
 	GameState.rating_changed.emit(GameState.rating)
 	GameState.grade_changed.emit(GameState.grade)

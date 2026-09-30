@@ -15,7 +15,7 @@ const PAGES := {
 	"goals": {"title": "Goals", "icon": "star"},
 }
 const SLIDE := 0.22
-const PANEL_W := 358.0
+const PANEL_W := 330.0
 
 var main
 var is_open := true

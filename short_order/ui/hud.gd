@@ -26,7 +26,22 @@ var game_menu
 var _speed_before_event := 1
 
 
+## Draws the whole interface at the chosen size (Settings > Interface):
+## the layer is scaled and the root stretched to fill the window.
+func apply_ui_scale() -> void:
+	var s: float = Sfx.ui_scale
+	scale = Vector2(s, s)
+	var root: Control = $Root
+	root.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	root.position = Vector2.ZERO
+	root.size = get_viewport().get_visible_rect().size / s
+	_place_overlay_bar.call_deferred()
+
+
 func _ready() -> void:
+	apply_ui_scale()
+	get_viewport().size_changed.connect(apply_ui_scale)
+	Sfx.settings_changed.connect(apply_ui_scale)
 	for n in [checklist, today_card, inspect_card]:
 		n.main = main
 	# the ticket rail sits under the Today card
@@ -109,6 +124,7 @@ func _ready() -> void:
 
 func show_selection(thing) -> void:
 	inspect_card.show_thing(thing)
+	_fit_left_column.call_deferred()
 
 
 func on_tool_changed(t: String) -> void:
@@ -236,6 +252,19 @@ func _process(_delta: float) -> void:
 	# the side panel slides in and out: keep the overlay buttons beside it
 	if overlay_bar != null and Engine.get_process_frames() % 10 == 0:
 		_place_overlay_bar()
+		_fit_left_column()
+
+
+## The cards on the left must stay above the build bar: if the inspect card
+## (a plot's Buy button, a person's details) would run under it, the morning
+## checklist folds into its pill to make room.
+func _fit_left_column() -> void:
+	var col: Control = checklist.get_parent()
+	var limit: float = build_menu.position.y - 8.0
+	var bottom: float = col.position.y + col.get_combined_minimum_size().y
+	if bottom > limit and checklist.visible and not checklist.collapsed:
+		checklist.collapsed = true
+		checklist.refresh()
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
@@ -271,6 +300,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			set_speed(2)
 		KEY_3:
 			set_speed(4)
+		KEY_4:
+			set_speed(8)
 		KEY_V:
 			main.heatmap.cycle()
 			show_overlay(main.heatmap.mode)

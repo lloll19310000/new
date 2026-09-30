@@ -9,7 +9,7 @@ signal help_pressed
 signal menu_pressed
 signal inbox_pressed
 
-const SPEEDS := [0, 1, 2, 4]
+const SPEEDS := [0, 1, 2, 4, 8]
 const SOUND_ON := preload("res://ui/icons/sound_on.svg")
 const SOUND_OFF := preload("res://ui/icons/sound_off.svg")
 const ICON_SUN := preload("res://ui/icons/sun.svg")
@@ -32,6 +32,7 @@ const GRADE_COLORS := {"A": Color("6cc3a0"), "B": Color("f2c14e"), "C": Color("e
 @onready var level: Label = %Level
 @onready var open_button: Button = %OpenButton
 @onready var speed_buttons: Array = [%Pause, %Play, %Fast, %Faster]
+var fastest_button: Button
 @onready var sound_button: Button = %SoundButton
 @onready var help_button: Button = %HelpButton
 
@@ -52,6 +53,21 @@ func _ready() -> void:
 	GameState.grade_changed.connect(func(_g): refresh())
 	GameState.level_changed.connect(func(_l): refresh())
 	open_button.pressed.connect(open_pressed.emit)
+	# a fifth speed: 8x, for quiet afternoons
+	var faster: Button = speed_buttons[3]
+	fastest_button = faster.duplicate() as Button
+	fastest_button.name = "Fastest"
+	fastest_button.tooltip_text = "Fastest, 8x (4)"
+	faster.tooltip_text = "Faster, 4x (3)"
+	faster.get_parent().add_child(fastest_button)
+	faster.get_parent().move_child(fastest_button, faster.get_index() + 1)
+	var chevs := Label.new()
+	chevs.text = "8x"
+	chevs.add_theme_font_size_override("font_size", 9)
+	chevs.position = Vector2(19, 21)
+	chevs.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	fastest_button.add_child(chevs)
+	speed_buttons.append(fastest_button)
 	for i in speed_buttons.size():
 		var b: Button = speed_buttons[i]
 		b.pressed.connect(speed_chosen.emit.bind(SPEEDS[i]))

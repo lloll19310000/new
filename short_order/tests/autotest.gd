@@ -1762,7 +1762,7 @@ static func snap(main, name: String, prefix: String) -> void:
 
 ## Checks that nothing in the interface pokes out of the window.
 static func check_fits(main, what: String) -> void:
-	var view: Vector2 = main.get_viewport().get_visible_rect().size
+	var view: Vector2 = main.get_viewport().get_visible_rect().size / main.hud.scale.x
 	var bad := []
 	for n in [main.hud.top_bar, main.hud.build_menu, main.hud.side_panel, main.hud.checklist, main.hud.today_card, main.hud.tickets_card, main.hud.inspect_card]:
 		if not n.is_visible_in_tree():
@@ -2183,7 +2183,7 @@ static func run_ui(main, args: PackedStringArray) -> void:
 	hud.show_report(busy)
 	for i in 6:
 		await tree.process_frame
-	var view: Vector2 = main.get_viewport().get_visible_rect().size
+	var view: Vector2 = main.get_viewport().get_visible_rect().size / hud.scale.x
 	var cr: Rect2 = hud.report.card.get_global_rect()
 	check(cr.position.y >= 0 and cr.end.y <= view.y, "a busy day's report still fits on screen (%s in %s)" % [cr, view])
 	await snap(main, "report_busy", prefix)

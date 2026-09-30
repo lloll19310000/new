@@ -6,6 +6,7 @@ extends VBoxContainer
 var volume: HSlider
 var sound: CheckButton
 var fullscreen: CheckButton
+var size_buttons := {}
 
 
 func _init() -> void:
@@ -40,11 +41,32 @@ func _ready() -> void:
 	fullscreen.button_pressed = Sfx.fullscreen
 	fullscreen.toggled.connect(Sfx.set_fullscreen)
 	add_child(fullscreen)
+	# how big the interface is drawn
+	var srow := HBoxContainer.new()
+	srow.add_theme_constant_override("separation", 6)
+	var sl := Label.new()
+	sl.text = "Interface"
+	sl.theme_type_variation = &"BodyLabel"
+	sl.custom_minimum_size = Vector2(90, 0)
+	srow.add_child(sl)
+	var group := ButtonGroup.new()
+	for opt in Sfx.UI_SCALES:
+		var b := Button.new()
+		b.text = opt[1]
+		b.toggle_mode = true
+		b.button_group = group
+		b.theme_type_variation = &"SmallButton"
+		b.button_pressed = is_equal_approx(Sfx.ui_scale, opt[0])
+		var v: float = opt[0]
+		b.pressed.connect(func(): Sfx.set_ui_scale(v))
+		srow.add_child(b)
+		size_buttons[v] = b
+	add_child(srow)
 	var note := Label.new()
 	note.theme_type_variation = &"MutedLabel"
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	note.custom_minimum_size = Vector2(200, 0)
-	note.text = "Keys: Space pauses, 1 2 3 set the speed, R turns things, Tab hides the side panel, Esc opens this menu."
+	note.text = "Keys: Space pauses, 1 2 3 4 set the speed, R turns things, Tab hides the side panel, Esc opens this menu."
 	add_child(note)
 
 
@@ -54,3 +76,5 @@ func refresh() -> void:
 	sound.set_pressed_no_signal(Sfx.sound_on)
 	volume.set_value_no_signal(Sfx.volume)
 	fullscreen.set_pressed_no_signal(Sfx.fullscreen)
+	for v in size_buttons:
+		size_buttons[v].set_pressed_no_signal(is_equal_approx(Sfx.ui_scale, v))

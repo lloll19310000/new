@@ -91,6 +91,7 @@ func scheduler():
 func replan() -> void:
 	if GameState.phase == GameState.Phase.PLANNING:
 		plan_schedule(GameState.day, true)
+		morning_view()
 
 
 ## Writes the schedule for `day`: who has the day off, and who works the day
@@ -285,6 +286,7 @@ func morning() -> void:
 		s.clock_out = false
 		s.heading_home = false
 		s.arriving = false
+		s.stayed_late = false
 		s.late_by = 0.0
 		s.no_show = false
 		s.exposure = 0.0
@@ -344,6 +346,20 @@ func morning() -> void:
 		if s.late_by > 0.0:
 			today["late"].append([s.person_name, int(s.late_by)])
 			GameState.toast.emit("%s is running %d minutes late." % [s.person_name, int(s.late_by)], "")
+	# who's in when, so nobody seems to vanish
+	var now_in := 0
+	var later: Array = []
+	var off := 0
+	for s in GameState.staff:
+		if s.at_work:
+			now_in += 1
+		elif s.arrive_at > 0.0 and not s.no_show and not s.away:
+			later.append("%s at %s" % [s.person_name.split(" ")[0], DayTimeline.clock(s.arrive_at)])
+		else:
+			off += 1
+	if GameState.staff.size() > 1 and (not later.is_empty() or off > 0):
+		GameState.toast.emit("Today: %d in for prep%s%s." % [now_in, (", " + ", ".join(later.slice(0, 3)) + ("…" if later.size() > 3 else "") + " later") if not later.is_empty() else "",
+			(", %d off" % off) if off > 0 else ""], "")
 	warn_gaps()
 
 
@@ -410,10 +426,18 @@ func tick(minutes: float) -> void:
 			continue
 		if not s.at_work:
 			continue
-		# an opener's shift is over: they finish what they're doing and go home
+		# an opener's shift is over: they finish what they're doing and go home,
+		# unless the floor is swamped and nobody else in their role is here yet:
+		# then they stay on (up to STAY_LATE_MAX minutes) to help
 		var end := shift_end(s)
 		if end >= 0.0 and now >= end and not s.clock_out:
-			s.clock_out = true
+			if now < end + Data.STAY_LATE_MAX and must_stay(s):
+				if not s.stayed_late:
+					s.stayed_late = true
+					Crew.log_line("%s's shift is over, but it's busy and nobody's here to take over. They're staying on." % s.person_name, "clock", [s])
+			else:
+				s.clock_out = true
+				Crew.log_line("%s's shift is over (%s). Heading home." % [s.person_name, hours_text(s)], "sun", [s])
 		# a long day gets harder after 10 hours
 		if s.came_at >= 0.0 and now - s.came_at > 600.0:
 			s.add_stress(Data.LONG_DAY_STRESS * minutes, "a long day")
@@ -430,6 +454,32 @@ func tick(minutes: float) -> void:
 		if tr != null:
 			tr._training = true
 			s.train_today += minutes
+
+
+## Would leaving now leave their role with nobody, or the floor swamped?
+func must_stay(s) -> bool:
+	var others := 0
+	for o in Crew.present():
+		if o != s and o.role == s.role and not o.clock_out and not o.heading_home:
+			others += 1
+	if others == 0 and s.role in ESSENTIAL:
+		return true
+	return JobBoard.waiting_count() >= Data.STAY_LATE_BUSY and others <= 1
+
+
+## In the morning, before you start the day: only the people in for prep are
+## in the building. Anyone off today, or due in later, is at home (their row
+## on the Staff page says when they're in), so nobody walks out when you start.
+func morning_view() -> void:
+	if GameState.phase != GameState.Phase.PLANNING:
+		return
+	for s in GameState.staff:
+		if not is_instance_valid(s):
+			continue
+		var home: bool = s.away or works_off(s, GameState.day) or shift_start(s) > GameState.prep_min()
+		if home == s.at_work or (not home and not s.visible):
+			s.set_at_work(not home)
+	GameState.staff_changed.emit()
 
 
 func arrive(s) -> void:

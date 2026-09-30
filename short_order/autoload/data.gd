@@ -299,6 +299,11 @@ const GOALS := [
 	{"key": "crew12", "name": "Full crew", "desc": "Have 12 people on staff.", "reward": {"money": 400}},
 ]
 
+## Staying on: at the end of a shift, someone stays (up to this many minutes)
+## if nobody else in their role is here yet, or this many customer jobs wait.
+const STAY_LATE_MAX := 90.0
+const STAY_LATE_BUSY := 5
+
 ## Crew moments (see Moments).
 const YEAR_DAYS := 364
 const SHIFT_MILESTONES := [10, 50, 100, 250]

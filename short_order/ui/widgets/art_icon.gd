@@ -31,14 +31,20 @@ func _draw() -> void:
 			var tiles := Vector2(s[0], s[1]) if dir % 2 == 0 else Vector2(s[1], s[0])
 			var cell := minf(size.x / tiles.x, size.y / tiles.y)
 			cell = minf(cell, size.y * 0.8)
-			if Data.FURNITURE[key]["floor"] == "wall":
-				cell = minf(cell, size.x / 3.0)
+			var on_wall: bool = Data.FURNITURE[key]["floor"] == "wall"
+			var run := int(tiles.x) + 2          # a run of wall one tile wider each side
+			if on_wall:
+				cell = minf(cell, minf(size.x / run, size.y / 1.6))
 			var r := Rect2((size - tiles * cell) / 2.0, tiles * cell)
-			if Data.FURNITURE[key]["floor"] == "wall":
-				var wr := Rect2(r.position - Vector2(cell, 0), Vector2(cell * 3, cell))
-				Art.floor_tile(self, Rect2(wr.position + Vector2(0, cell * 0.5), Vector2(cell * 3, cell * 0.5)), 1, 0.5)
-				for i in 3:
-					Art.wall_rect(self, Rect2(wr.position + Vector2(cell * i, 0), Vector2(cell, cell)), false, false, i > 0, i < 2)
+			if on_wall:
+				r.position.y -= cell * 0.25   # room for the strip of floor below the wall
+				var wr := Rect2(r.position - Vector2(cell, 0), Vector2(cell * run, cell))
+				# the diner floor on the room side of the wall, one tile per cell, kept inside the icon
+				for i in run:
+					var ft := Rect2(wr.position + Vector2(cell * i, cell * 0.5), Vector2(cell, cell * 0.5))
+					draw_rect(ft, Color("efe8dc") if i % 2 == 0 else Color("b4bcbf"))
+				for i in run:
+					Art.wall_rect(self, Rect2(wr.position + Vector2(cell * i, 0), Vector2(cell, cell)), false, false, i > 0, i < run - 1)
 			Art.furniture_in(self, key, r, dir, null, 2)
 		"floor":
 			var n := int(key)

@@ -72,6 +72,7 @@ var shift := "double"           # "open", "close" or "double"
 var at_work := true             # in the building today (walking in counts)
 var arriving := false           # walking in from the street
 var heading_home := false       # walking out at the end of their shift
+var stayed_late := false        # stayed past their shift to help out today
 var clock_out := false          # their shift is over: finish up and go home
 var arrive_at := -1.0           # game minute they're due in today
 var came_at := -1.0             # when they actually got here

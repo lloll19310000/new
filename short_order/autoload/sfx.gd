@@ -16,6 +16,8 @@ var music: AudioStreamPlayer
 var sound_on := true
 var volume := 0.8                # 0..1
 var fullscreen := false
+var ui_scale := 0.85             # the interface's size (0.7 to 1.1)
+const UI_SCALES := [[0.72, "Small"], [0.85, "Medium"], [1.0, "Large"]]
 
 signal settings_changed
 
@@ -109,6 +111,7 @@ func load_settings() -> void:
 		sound_on = cfg.get_value("audio", "sound_on", true)
 		volume = cfg.get_value("audio", "volume", 0.8)
 		fullscreen = cfg.get_value("display", "fullscreen", false)
+		ui_scale = clampf(float(cfg.get_value("display", "ui_scale", 0.85)), 0.6, 1.2)
 	AudioServer.set_bus_volume_db(0, linear_to_db(maxf(volume, 0.0001)))
 	if fullscreen and DisplayServer.get_name() != "headless":
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
@@ -120,7 +123,13 @@ func save_settings() -> void:
 	cfg.set_value("audio", "sound_on", sound_on)
 	cfg.set_value("audio", "volume", volume)
 	cfg.set_value("display", "fullscreen", fullscreen)
+	cfg.set_value("display", "ui_scale", ui_scale)
 	cfg.save(SETTINGS_PATH)
+
+
+func set_ui_scale(v: float) -> void:
+	ui_scale = clampf(v, 0.6, 1.2)
+	save_settings()
 
 
 func set_fullscreen(on: bool) -> void:
