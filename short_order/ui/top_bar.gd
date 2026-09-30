@@ -6,6 +6,7 @@ extends PanelContainer
 signal open_pressed
 signal speed_chosen(speed: int)
 signal help_pressed
+signal menu_pressed
 
 const SPEEDS := [0, 1, 2, 4]
 const SOUND_ON := preload("res://ui/icons/sound_on.svg")
@@ -56,6 +57,18 @@ func _ready() -> void:
 		Sfx.set_sound_on(not muted)
 		sound_button.icon = SOUND_OFF if muted else SOUND_ON)
 	help_button.pressed.connect(help_pressed.emit)
+	# the pause menu: save, load, settings, main menu
+	var menu_button := Button.new()
+	menu_button.name = "MenuButton"
+	menu_button.theme_type_variation = help_button.theme_type_variation
+	menu_button.icon = UiKit.icon("bars")
+	menu_button.tooltip_text = "Menu: save, load, settings (Esc)"
+	menu_button.custom_minimum_size = help_button.custom_minimum_size
+	menu_button.pressed.connect(menu_pressed.emit)
+	help_button.get_parent().add_child(menu_button)
+	Sfx.settings_changed.connect(func():
+		sound_button.set_pressed_no_signal(not Sfx.sound_on)
+		sound_button.icon = SOUND_OFF if not Sfx.sound_on else SOUND_ON)
 	_last_money = GameState.money
 	refresh()
 

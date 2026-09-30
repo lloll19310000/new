@@ -6,6 +6,7 @@ var main
 var thing = null
 var _t := 0.0
 var upgrade_button: Button
+var buy_button: Button
 
 @onready var portrait: Portrait = %Portrait
 @onready var art: ArtIcon = %Art
@@ -40,6 +41,20 @@ func _ready() -> void:
 			thing.tier = 1
 			GameState.toast.emit("The %s is now Pro: 25%% faster, and it wears out half as fast." % thing.info()["name"].to_lower(), "good")
 			Sfx.play("repair", -4.0)
+			main.lot.queue_redraw()
+			refresh())
+	# clicking a plot that's for sale: buy it right here
+	buy_button = Button.new()
+	buy_button.theme_type_variation = &"PrimaryButton"
+	buy_button.icon = UiKit.icon("money")
+	buy_button.visible = false
+	rotate_button.get_parent().add_child(buy_button)
+	buy_button.pressed.connect(func():
+		if not (thing is Vector2i):
+			return
+		var p := GameState.plot_at(thing)
+		if not p.is_empty() and GameState.buy_plot(p["id"]):
+			Sfx.play("cash")
 			main.lot.queue_redraw()
 			refresh())
 	rotate_button.pressed.connect(func():
@@ -81,6 +96,7 @@ func refresh() -> void:
 	art.visible = false
 	rotate_button.visible = false
 	upgrade_button.visible = false
+	buy_button.visible = false
 	var sub := ""
 	var text := ""
 	if t is Vector2i:
@@ -92,7 +108,20 @@ func refresh() -> void:
 		var i: int = lot.idx(c)
 		art.visible = true
 		art.what = "floor:%d" % lot.floor_type[i]
-		if c.y > Data.SIDEWALK_Y:
+		var plot := GameState.plot_at(c)
+		if not plot.is_empty() and not GameState.owned.has(plot["id"]):
+			# land for sale
+			art.what = "land"
+			title.text = plot["name"]
+			var r2: Rect2i = plot["rect"]
+			sub = "For sale: $%s" % UiKit.thousands(plot["cost"])
+			text = "%d by %d tiles. Buy it to build on it; it adds $%d a week to the rent." % [r2.size.x, r2.size.y, plot.get("rent", 0)]
+			buy_button.visible = true
+			buy_button.text = "Buy this plot  ($%s)" % UiKit.thousands(plot["cost"])
+			buy_button.disabled = not GameState.is_building_allowed() or not GameState.can_afford(plot["cost"])
+			buy_button.tooltip_text = "You can buy land in the morning, before you start the day." if not GameState.is_building_allowed() \
+				else ("You need $%s." % UiKit.thousands(plot["cost"]) if not GameState.can_afford(plot["cost"]) else "Buy the %s." % plot["name"].to_lower())
+		elif c.y > Data.SIDEWALK_Y:
 			title.text = "The street"
 		elif c.y == Data.SIDEWALK_Y:
 			title.text = "The sidewalk"
@@ -105,7 +134,7 @@ func refresh() -> void:
 			art.what = "door"
 			text = "Customers come in here." if c == lot.entry_door else "Staff can use this door."
 		elif lot.floor_type[i] > 0:
-			title.text = Data.BUILD[["", "floor_diner", "floor_kitchen", "floor_staff"][lot.floor_type[i]]]["name"]
+			title.text = Data.BUILD[["", "floor_diner", "floor_kitchen", "floor_staff", "floor_restroom"][lot.floor_type[i]]]["name"]
 			var d: float = lot.dirt[i]
 			sub = "Dirt %d%%" % int(d * 100)
 			if d >= Data.DIRT_SHOW:

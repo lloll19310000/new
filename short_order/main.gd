@@ -12,8 +12,16 @@ const Group = preload("res://people/group.gd")
 const HudScene = preload("res://ui/hud.tscn")
 const Autotest = preload("res://tests/autotest.gd")
 const ArtPreview = preload("res://tests/art_preview.gd")
-const SAVE_PATH := "user://short_order_save.json"
+var save_dir := "user://saves"                   # the tests use their own folder
+var OLD_SAVE := "user://short_order_save.json"   # version 5 and earlier kept one save here
 const SAVE_VERSION := 6
+
+## Each diner lives in its own save slot ("slot_1", "slot_2"...) and saves
+## itself there every morning. You can also save to another slot from the menu.
+var slot := ""
+var SAVE_PATH: String:
+	get:
+		return save_path(slot if slot != "" else "slot_1")
 
 var lot
 var people: Node2D
@@ -73,6 +81,10 @@ func _ready() -> void:
 	lot.layout_changed.connect(func(): GameState.seats = lot.seats())
 	GameState.land_changed.connect(lot.queue_redraw)
 	var args := OS.get_cmdline_user_args()
+	if "--autotest" in args or "--shot" in args or "--uitest" in args or "--balance" in args or "--art" in args:
+		# the tests never touch your real saves
+		save_dir = "user://test_saves"
+		OLD_SAVE = "user://test_old_save.json"
 	if "--autotest" in args or "--shot" in args:
 		_run_autotest.call_deferred(args)
 		return
@@ -82,7 +94,7 @@ func _ready() -> void:
 	if "--balance" in args:
 		(func(): await Autotest.run_balance(self, args)).call_deferred()
 		return
-	hud.show_start(FileAccess.file_exists(SAVE_PATH))
+	hud.show_start()
 	if "--uitest" in args:
 		_run_uitest.call_deferred(args)
 		return
@@ -610,7 +622,75 @@ func fire(s) -> void:
 
 # ------------------------------------------------------------------ saving
 
-func save_game() -> void:
+func save_path(s: String) -> String:
+	return "%s/%s.json" % [save_dir, s]
+
+
+## The first free slot name.
+func new_slot() -> String:
+	DirAccess.make_dir_recursive_absolute(save_dir)
+	var i := 1
+	while FileAccess.file_exists(save_path("slot_%d" % i)):
+		i += 1
+	return "slot_%d" % i
+
+
+## A save from before save slots becomes the first slot.
+func migrate_old_save() -> void:
+	DirAccess.make_dir_recursive_absolute(save_dir)
+	if FileAccess.file_exists(OLD_SAVE) and not FileAccess.file_exists(save_path("slot_1")):
+		var text := FileAccess.get_file_as_string(OLD_SAVE)
+		var f := FileAccess.open(save_path("slot_1"), FileAccess.WRITE)
+		if f != null:
+			f.store_string(text)
+			f.close()
+			DirAccess.rename_absolute(OLD_SAVE, OLD_SAVE + ".bak")
+
+
+## Every save, newest first: {"slot", "name", "day", "money", "rating", "staff", "time", "when"}.
+func list_saves() -> Array:
+	migrate_old_save()
+	var out: Array = []
+	var d := DirAccess.open(save_dir)
+	if d == null:
+		return out
+	for fname in d.get_files():
+		if not fname.ends_with(".json"):
+			continue
+		var sl := fname.get_basename()
+		var data = JSON.parse_string(FileAccess.get_file_as_string(save_path(sl)))
+		if typeof(data) != TYPE_DICTIONARY or not data.has("floor"):
+			continue
+		var reviews: Array = data.get("reviews", [])
+		var rating := 3.0
+		if not reviews.is_empty():
+			rating = 0.0
+			for r in reviews:
+				rating += float(r)
+			rating /= reviews.size()
+		out.append({"slot": sl, "name": str(data.get("name", "")) if str(data.get("name", "")) != "" else "My diner",
+			"day": int(data.get("day", 1)), "money": float(data.get("money", 0.0)), "rating": rating,
+			"staff": (data.get("staff", []) as Array).size(), "time": FileAccess.get_modified_time(save_path(sl)),
+			"when": str(data.get("saved_at", ""))})
+	out.sort_custom(func(a, b): return a["time"] > b["time"])
+	return out
+
+
+func delete_save(sl: String) -> void:
+	if FileAccess.file_exists(save_path(sl)):
+		DirAccess.remove_absolute(save_path(sl))
+	if sl == slot:
+		slot = ""
+
+
+## Saves this diner (to its own slot, or to `to`). Only mornings are saved:
+## the game saves itself at the start of every day.
+func save_game(to: String = "") -> bool:
+	if to != "":
+		slot = to
+	if slot == "":
+		slot = new_slot()
+	DirAccess.make_dir_recursive_absolute(save_dir)
 	var furn := []
 	for f in lot.furniture:
 		furn.append({"type": f.type, "x": f.cell.x, "y": f.cell.y, "dir": f.dir, "wear": f.wear, "broken": f.broken, "tier": f.tier})
@@ -626,7 +706,7 @@ func save_game() -> void:
 	for f in lot.furniture:
 		plates += f.dirty_plates + f.dirty
 	var data := {
-		"version": SAVE_VERSION, "day": GameState.day, "money": GameState.money, "reviews": GameState.reviews,
+		"version": SAVE_VERSION, "name": GameState.diner_name, "saved_at": Time.get_datetime_string_from_system(false, true), "day": GameState.day, "money": GameState.money, "reviews": GameState.reviews,
 		"review_count": GameState.review_count,
 		"menu": GameState.menu, "stock": GameState.stock, "target": GameState.target,
 		"plates_total": GameState.plates_total, "plates": plates, "totals": GameState.totals,
@@ -644,12 +724,21 @@ func save_game() -> void:
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f == null:
 		GameState.toast.emit("Couldn't save the game.", "bad")
-		return
+		return false
 	f.store_string(JSON.stringify(data))
 	f.close()
+	return true
 
 
-func load_game() -> bool:
+## Loads a save (this diner's own slot, or `from`).
+func load_game(from: String = "") -> bool:
+	if from != "":
+		slot = from
+	elif slot == "":
+		var saves := list_saves()
+		if saves.is_empty():
+			return false
+		slot = saves[0]["slot"]
 	if not FileAccess.file_exists(SAVE_PATH):
 		return false
 	var f := FileAccess.open(SAVE_PATH, FileAccess.READ)
@@ -660,6 +749,7 @@ func load_game() -> bool:
 	var version := int(data.get("version", 1))
 	clear_world()
 	GameState.reset()
+	GameState.diner_name = str(data.get("name", ""))
 	GameState.day = int(data["day"])
 	GameState.money = float(data["money"])
 	GameState.reviews = data["reviews"]
@@ -773,9 +863,12 @@ func load_game() -> bool:
 	return true
 
 
-func new_game() -> void:
+## A fresh diner in a new save slot.
+func new_game(diner_name: String = "") -> void:
 	clear_world()
 	GameState.reset()
+	GameState.diner_name = diner_name if diner_name.strip_edges() != "" else Data.DINER_NAMES.pick_random()
+	slot = new_slot()
 	lot.init_grid()
 	GameState.money_changed.emit(GameState.money)
 	GameState.rating_changed.emit(GameState.rating)

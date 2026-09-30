@@ -26,6 +26,7 @@ static func run(main) -> void:
 	await money_checks(main)
 	await wear_checks(main)
 	await stain_checks(main)
+	await save_checks(main)
 
 
 # ------------------------------------------------------------------ roles and pay
@@ -307,3 +308,25 @@ static func stain_checks(main) -> void:
 	lot.update_cleaners()
 	check(lot.cleaner_on_shift and not lot.dirt_visible(c), "with a busser or porter on shift, small spills are cleaned up before anyone sees them")
 	lot.dirt[lot.idx(c)] = 0.0
+
+
+# ------------------------------------------------------------------ saves
+
+static func save_checks(main) -> void:
+	# a version 5 save (one file, no slots) becomes the first slot
+	main.save_game()
+	var text := FileAccess.get_file_as_string(main.SAVE_PATH)
+	for sv in main.list_saves():
+		main.delete_save(sv["slot"])
+	check(main.list_saves().is_empty(), "saves can be deleted")
+	var f := FileAccess.open(main.OLD_SAVE, FileAccess.WRITE)
+	f.store_string(text)
+	f.close()
+	var saves: Array = main.list_saves()
+	check(saves.size() == 1 and saves[0]["slot"] == "slot_1" and not FileAccess.file_exists(main.OLD_SAVE), "an old single save becomes the first slot")
+	check(main.load_game("slot_1") and GameState.staff.size() > 0, "and it loads")
+	GameState.diner_name = "Second Diner"
+	check(main.save_game(main.new_slot()) and main.list_saves().size() == 2 and main.slot == "slot_2", "saving to a new slot keeps both")
+	var names: Array = main.list_saves().map(func(x): return x["name"])
+	check(names.has("Second Diner"), "saves remember the diner's name (%s)" % [names])
+	DirAccess.remove_absolute(main.OLD_SAVE + ".bak")

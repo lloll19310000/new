@@ -2,7 +2,7 @@
 
 [ext_resource type="Theme" path="res://ui/theme.tres" id="0_theme"]
 [ext_resource type="Script" path="res://ui/crew_page.gd" id="1_script"]
-[ext_resource type="Script" path="res://ui/widgets/opinion_grid.gd" id="2_grid"]
+[ext_resource type="Script" path="res://ui/widgets/relation_web.gd" id="2_grid"]
 
 [node name="CrewPage" type="ScrollContainer"]
 theme = ExtResource("0_theme")
@@ -18,7 +18,7 @@ theme_override_constants/separation = 8
 [node name="Intro" type="Label" parent="Box"]
 layout_mode = 2
 theme_type_variation = &"MutedLabel"
-text = "How everyone feels about each other. Each row is how that person feels about each column. Hover a square to see why."
+text = "Who gets along. Green lines are friends, red are rivals, orange is tension. Hover a face to see only theirs, or a line to see why."
 autowrap_mode = 3
 
 [node name="Legend" type="HFlowContainer" parent="Box"]
@@ -29,9 +29,14 @@ theme_override_constants/v_separation = 4
 
 [node name="Grid" type="Control" parent="Box"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 60)
+custom_minimum_size = Vector2(0, 300)
 layout_mode = 2
 script = ExtResource("2_grid")
+
+[node name="Glance" type="VBoxContainer" parent="Box"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 4
 
 [node name="EmptyNote" type="Label" parent="Box"]
 unique_name_in_owner = true

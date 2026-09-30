@@ -610,6 +610,8 @@ static func money_checks(main) -> void:
 	check(pricey < 0.9 and cheap_menu > 1.05, "prices change how many come (30%% up: x%.2f, 20%% down: x%.2f)" % [pricey, cheap_menu])
 	var saved_served: int = GameState.totals["served"]
 	var saved_rating: float = GameState.rating
+	var saved_level: int = GameState.rep_level
+	GameState.rep_level = 0
 	GameState.totals["served"] = 150
 	GameState.rating = 3.6
 	check(GameState.check_level_up() and GameState.rep_level == 1 and GameState.level_info()["name"] == "Local spot", "150 customers at 3.6 stars: the diner becomes a Local spot")
@@ -628,7 +630,7 @@ static func money_checks(main) -> void:
 	check(not tourists_before and tourists_after and GameState.rep_level == 2, "tourists only come once you're a Town favourite")
 	GameState.totals["served"] = saved_served
 	GameState.rating = saved_rating
-	GameState.rep_level = 0
+	GameState.rep_level = saved_level
 
 
 ## Health: restrooms, trash, mice, hand-washing, and what the inspector makes of it.
@@ -1786,11 +1788,17 @@ static func run_ui(main, args: PackedStringArray) -> void:
 			prefix = a.substr(8)
 	var hud = main.hud
 	print("UITEST: start, window %s, view %s" % [main.get_window().size, main.get_viewport().get_visible_rect().size])
-	check(hud.start.visible, "the start screen shows")
+	check(hud.start.visible, "the main menu shows")
 	await snap(main, "start", prefix)
 	hud.start.new_button.pressed.emit()
 	await tree.process_frame
-	check(hud.help.visible, "help opens for a new game")
+	check(hud.start.pages["new"].visible, "New diner asks what it's called")
+	hud.start.name_edit.text = "Test Kitchen"
+	await snap(main, "start_new", prefix)
+	hud.start.start_button.pressed.emit()
+	await tree.process_frame
+	check(hud.help.visible and GameState.diner_name == "Test Kitchen" and main.slot != "" and FileAccess.file_exists(main.SAVE_PATH),
+		"a new diner opens, with its name, in its own save slot (%s)" % main.slot)
 	await snap(main, "help", prefix)
 	find_buttons(hud.help, "Got it")[0].pressed.emit()
 	check(not hud.help.visible, "help closes")
@@ -1806,6 +1814,18 @@ static func run_ui(main, args: PackedStringArray) -> void:
 	var before_land := GameState.money
 	await click(main, Vector2i(33, 18))
 	check(GameState.owned.has("east") and GameState.money == before_land - 8000.0, "the Buy land tool buys the east lot for $8,000")
+	# or just click a plot for sale and buy it from the card
+	hud.build_menu.choose("select")
+	main.cam.position = main.lot.cell_center(Vector2i(3, 18))
+	await tree.process_frame
+	await click(main, Vector2i(3, 18))
+	await tree.process_frame
+	check(hud.inspect_card.visible and hud.inspect_card.buy_button.visible and not hud.inspect_card.buy_button.disabled,
+		"clicking land for sale offers to buy it (%s)" % hud.inspect_card.buy_button.text)
+	await snap(main, "land_click", prefix)
+	var before_west := GameState.money
+	hud.inspect_card.buy_button.pressed.emit()
+	check(GameState.owned.has("west") and GameState.money == before_west - 4000.0 and not hud.inspect_card.buy_button.visible, "and the Buy button buys it")
 	frame_build_area(main)
 	await tree.process_frame
 	check_fits(main, "in the morning")
@@ -1901,58 +1921,93 @@ static func run_ui(main, args: PackedStringArray) -> void:
 	hud.inspect_card.upgrade_button.pressed.emit()
 	check(grill.tier == 1 and GameState.money == cash_up - int(Data.FURNITURE["grill"]["cost"] * Data.UPGRADE_COST), "upgrading makes the grill Pro")
 	await snap(main, "inspect_pro", prefix)
-	# hire two people through the Hire buttons
+	# hire a cook and a server from the Hire tab, picking the role first
 	var staff_page = hud.side_panel.pages["staff"]
-	for i in 2:
-		var hires := find_buttons(staff_page, "Hire")
+	staff_page.show_tab("hire")
+	await tree.process_frame
+	check(staff_page.candidates_box.get_child_count() >= Data.CANDIDATES_PER_DAY, "the Hire tab lists %d people" % staff_page.candidates_box.get_child_count())
+	await snap(main, "hire", prefix)
+	for r in ["cook", "server"]:
+		staff_page.filter_buttons[r].pressed.emit()
+		await tree.process_frame
+		await tree.process_frame
+		var hires := find_buttons(staff_page.candidates_box, "Hire")
+		check(not hires.is_empty() and staff_page.candidates_box.get_children().all(func(c): return not c.has_method("setup") or c.data["role"] == r),
+			"the Hire tab shows only %ss when you pick that role" % r)
 		hires[0].pressed.emit()
 		await tree.process_frame
 		await tree.process_frame
-	check(GameState.staff.size() == 2, "hired two people with the Hire buttons")
+	check(GameState.staff.size() == 2 and GameState.staff[0].role == "cook" and GameState.staff[1].role == "server", "hired a cook and a server with the Hire buttons")
+	staff_page.filter_buttons[""].pressed.emit()
+	await tree.process_frame
+	await tree.process_frame
 	var cand_cards: Array = staff_page.candidates_box.get_children().filter(func(c): return c.has_method("setup"))
-	check(not cand_cards.is_empty() and cand_cards[0].bio_label.visible and cand_cards[0].bio_label.text.length() > 30
-		and cand_cards[0].origin_label.text.begins_with("From "), "hiring cards show a hometown and a life story")
-	# set priorities by clicking: make sure one cooks and one serves
-	var cards: Array = staff_page.cards.values()
-	var a = cards[0]
-	var b = cards[1]
-	while a.who.priorities["cook"] != 1:
-		a.priority_buttons["cook"].pressed.emit()
-	while b.who.priorities["serve"] != 1:
-		b.priority_buttons["serve"].pressed.emit()
+	check(not cand_cards.is_empty() and cand_cards[0].bio_label.text.length() > 30 and cand_cards[0].origin_label.text.begins_with("From ")
+		and cand_cards[0].tooltip_text.contains(cand_cards[0].bio_label.text.substr(0, 20)), "hiring rows show a hometown and a life story on hover")
+	staff_page.show_tab("crew")
+	await tree.process_frame
+	await tree.process_frame
+	var a = staff_page.cards[GameState.staff[0]]
+	var b = staff_page.cards[GameState.staff[1]]
+	check(not a.details.visible, "staff rows start closed and compact")
+	var click := InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.pressed = true
+	a.gui_input.emit(click)
+	await tree.process_frame
+	check(a.details.visible, "clicking a row opens the details")
+	b.set_open(true)
+	await tree.process_frame
+	check(b.details.visible and not a.details.visible, "only one row is open at a time")
+	check(a.who.priorities["cook"] == 1 and b.who.priorities["serve"] == 1 and a.who.priorities["serve"] == 0, "a line cook cooks, a server serves, straight away")
 	while b.who.priorities["host"] != 1:
 		b.priority_buttons["host"].pressed.emit()
-	check(b.priority_buttons.size() == 6 and b.who.priorities["host"] == 1, "staff cards have a Host priority too")
+	check(b.priority_buttons.size() == 6 and b.who.priorities["host"] == 1, "staff rows have a Host priority too")
 	var right := InputEventMouseButton.new()
 	right.button_index = MOUSE_BUTTON_RIGHT
 	right.pressed = true
 	var was: int = b.who.priorities["wash"]
 	b.priority_buttons["wash"].gui_input.emit(right)
 	check(b.who.priorities["wash"] == (was + 4) % 5, "right-click lowers a priority")
+	a.set_open(true)
 	await tree.process_frame
 	check(a.priority_buttons["cook"].text == "1", "priority buttons show their number")
-	check(a.stress_bar.visible, "staff cards show a stress bar")
-	check(a.who.shift == "double" and a.shift_button.text.begins_with("Double"), "new hires work doubles until you say otherwise (%s)" % a.shift_button.text)
+	check(a.bars["stress"][0].is_visible_in_tree(), "staff rows show a stress bar")
+	check(a.who.shift == "double" and a.shift_button.text == "Double", "the only cook works a double (%s)" % a.shift_button.text)
 	a.shift_button.pressed.emit()
 	await tree.process_frame
-	check(a.who.shift == "open" and a.shift_button.text == "Opening" and a.shift_button.tooltip_text.contains("09:00–17:00"), "the shift button switches them to the opening shift, 09:00–17:00")
+	check(a.who.shift == "open" and a.who.shift_locked and a.shift_button.text == "Day" and a.shift_button.tooltip_text.contains("09:00–17:00"),
+		"the shift button sets them to the day shift, 09:00–17:00, by hand")
 	a.shift_button.pressed.emit()
 	a.shift_button.pressed.emit()
-	check(a.who.shift == "double", "and round again to a double")
-	check(a.train_button.visible, "staff cards have a training button")
-	check(a.origin_label.text == Data.hometown(a.who.origin) and a.info_box.tooltip_text.contains(a.who.bio), "staff cards show the hometown, and the life story on hover")
-	var wage_before: int = a.who.wage
+	a.shift_button.pressed.emit()
+	check(a.who.shift == "double" and a.who.shift_locked, "then mid, night and double")
+	a.shift_button.pressed.emit()
+	check(not a.who.shift_locked and a.who.shift == "double", "and once more hands it back to the schedule")
+	check(a.train_button.visible, "staff rows have a training button")
+	check(a.origin_label.text.contains(Data.hometown(a.who.origin)) and a.origin_label.text.contains(a.who.bio), "staff rows show the hometown and life story")
+	var wage_before: float = a.who.wage
 	a.manager_button.button_pressed = true
 	await tree.process_frame
-	check(a.who.manager and a.who.wage == wage_before + Data.MANAGER_WAGE, "the star makes someone a manager (+$%d a day)" % Data.MANAGER_WAGE)
+	check(a.who.manager and a.who.wage > wage_before, "the Make manager button promotes them ($%.2f to $%.2f an hour)" % [wage_before, a.who.wage])
+	a.role_button.select(Data.ROLE_ORDER.find("cook"))
+	a.role_button.item_selected.emit(Data.ROLE_ORDER.find("cook"))
+	await tree.process_frame
+	check(a.who.role == "cook" and a.who.priorities["cook"] == 1, "the role list puts them back on the line")
 	await snap(main, "staff", prefix)
+	staff_page.show_tab("schedule")
+	await tree.process_frame
+	await tree.process_frame
+	check(staff_page.board.get_child_count() >= 2 and staff_page.auto_switch.button_pressed, "the Schedule tab shows today's shifts")
+	await snap(main, "schedule", prefix)
+	staff_page.show_tab("crew")
 	# menu, supplies and goals pages
 	hud.side_panel.tabs["menu"].pressed.emit()
 	await tree.process_frame
 	var menu_page = hud.side_panel.pages["menu"]
-	menu_page.rows["burger"].price.value = 16.0
+	menu_page.rows["burger"].price.value = 20.0
 	menu_page.rows["coffee"].on_switch.button_pressed = false
-	check(GameState.menu["burger"]["price"] == 16.0 and not GameState.menu["coffee"]["on"], "menu price and switch work")
+	check(GameState.menu["burger"]["price"] == 20.0 and not GameState.menu["coffee"]["on"], "menu price and switch work")
 	check(not menu_page.rows["pancakes"].on_switch.disabled, "pancakes are on the menu from day 1")
 	menu_page.rows["meatloaf"].special_button.button_pressed = true
 	await tree.process_frame
@@ -1968,8 +2023,11 @@ static func run_ui(main, args: PackedStringArray) -> void:
 	hud.side_panel.tabs["supplies"].pressed.emit()
 	await tree.process_frame
 	var sup = hud.side_panel.pages["supplies"]
-	sup.rows["meat"].keep.value = 70
-	sup.rows["bread"].keep.value = 120
+	sup.rows["meat"].set_keep(70)
+	sup.rows["bread"].set_keep(120)
+	sup.rows["bread"].more.pressed.emit()
+	check(GameState.target["bread"] == 125 and sup.rows["bread"].amount.text == "125", "the + button keeps 5 more")
+	sup.rows["bread"].less.pressed.emit()
 	var plates_before := GameState.plates_total
 	sup.buy_plates.pressed.emit()
 	check(GameState.target["meat"] == 70 and GameState.plates_total == plates_before + 6, "supplies target and plate buying work")
@@ -2012,7 +2070,7 @@ static func run_ui(main, args: PackedStringArray) -> void:
 	await tree.process_frame
 	var crew_page = hud.side_panel.pages["crew"]
 	check(crew_page.visible and crew_page.grid.visible and crew_page.log_text.get_parsed_text().contains("joined the crew"),
-		"the Crew tab shows the opinion grid and the staff log")
+		"the Crew tab shows who gets along and the staff log")
 	await snap(main, "crew_morning", prefix)
 	hud.side_panel.tabs["crew"].pressed.emit()
 	await tree.process_frame
@@ -2082,6 +2140,7 @@ static func run_ui(main, args: PackedStringArray) -> void:
 	await snap(main, "service", prefix)
 	check_fits(main, "while open")
 	print("UITEST: %s served=%d left=%d rating=%.2f" % [GameState.clock_text(), GameState.today["served"], GameState.today["left"], GameState.rating])
+	Events.auto_choice = 0   # answer anything else that comes up this afternoon
 	while GameState.minute < 20.5 * 60 and GameState.phase == GameState.Phase.SERVICE:
 		main.simulate(0.1)
 	await snap(main, "evening", prefix)
@@ -2120,10 +2179,34 @@ static func run_ui(main, args: PackedStringArray) -> void:
 	fire_btn.pressed.emit()
 	await tree.process_frame
 	check(GameState.staff.size() == n_staff - 1, "a second click lets them go")
-	hud.show_start(true)
-	hud.start.continue_button.pressed.emit()
+	# the pause menu: Esc first lets go of what's selected, then opens the menu, which saves to a new slot
+	main.build.set_tool("select")
+	main.build.selection = GameState.staff[0]
+	await key(main, KEY_ESCAPE)
+	check(main.build.selection == null and not hud.game_menu.visible, "Esc lets go of the selection first")
+	await key(main, KEY_ESCAPE)
+	check(hud.game_menu.visible and GameState.speed == 0, "Esc opens the pause menu, and the game waits")
+	await snap(main, "pause", prefix)
+	var saves_before: int = main.list_saves().size()
+	var first_slot: String = main.slot
+	hud.game_menu.save_button.pressed.emit()
 	await tree.process_frame
-	check(GameState.staff.size() == n_staff and not hud.start.visible, "Continue loads the saved diner")
+	await snap(main, "pause_save", prefix)
+	hud.game_menu.save_list.new_slot_picked.emit()
+	await tree.process_frame
+	check(main.list_saves().size() == saves_before + 1 and not hud.game_menu.visible, "Save in a new slot adds a save (%d)" % main.list_saves().size())
+	main.slot = first_slot
+	# the main menu: Continue loads the diner as it was this morning
+	hud.show_start()
+	await tree.process_frame
+	await snap(main, "start_again", prefix)
+	hud.start.load_button.pressed.emit()
+	await tree.process_frame
+	check(hud.start.pages["load"].visible and hud.start.save_list.get_child_count() >= 2, "Load a diner lists your saves")
+	await snap(main, "load", prefix)
+	hud.start.load_requested.emit(first_slot)
+	await tree.process_frame
+	check(GameState.staff.size() == n_staff and not hud.start.visible and GameState.diner_name == "Test Kitchen", "loading brings the diner back as it was this morning")
 	print("UITEST: after continue staff=%d furniture=%d day=%d" % [GameState.staff.size(), main.lot.furniture.size(), GameState.day])
 	print("UITEST: done")
 	Sfx.quit_game()

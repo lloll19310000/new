@@ -18,6 +18,7 @@ signal level_changed(level: int)
 ## the day goes PLANNING -> PREP (staff in, doors shut) -> SERVICE -> CLEANUP -> REPORT.
 enum Phase { PLANNING, SERVICE, CLEANUP, REPORT, PREP }
 
+var diner_name := ""               # what you called your diner (shown on saves)
 var phase: int = Phase.PLANNING
 var day: int = 1
 var minute: float = 540.0

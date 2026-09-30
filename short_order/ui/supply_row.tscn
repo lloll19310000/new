@@ -1,4 +1,4 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Theme" path="res://ui/theme.tres" id="0_theme"]
 [ext_resource type="Script" path="res://ui/supply_row.gd" id="1_script"]
@@ -11,10 +11,11 @@ script = ExtResource("1_script")
 
 [node name="Row" type="HBoxContainer" parent="."]
 layout_mode = 2
+theme_override_constants/separation = 6
 
 [node name="Icon" type="Control" parent="Row"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(32, 32)
+custom_minimum_size = Vector2(26, 26)
 layout_mode = 2
 size_flags_vertical = 4
 mouse_filter = 2
@@ -24,7 +25,7 @@ what = "ingredient:meat"
 [node name="Info" type="VBoxContainer" parent="Row"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_constants/separation = 3
+theme_override_constants/separation = 2
 
 [node name="Top" type="HBoxContainer" parent="Row/Info"]
 layout_mode = 2
@@ -34,35 +35,57 @@ unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 theme_type_variation = &"StatLabel"
+theme_override_font_sizes/font_size = 13
 text = "Meat"
+clip_text = true
 
-[node name="Have" type="Label" parent="Row/Info/Top"]
+[node name="Have" type="Label" parent="Row/Info"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_type_variation = &"MutedLabel"
+theme_override_font_sizes/font_size = 11
 text = "50 left"
+clip_text = true
 
 [node name="Bar" type="ProgressBar" parent="Row/Info"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 6)
+custom_minimum_size = Vector2(0, 5)
 layout_mode = 2
 value = 50.0
 show_percentage = false
 
-[node name="KeepBox" type="VBoxContainer" parent="Row"]
+[node name="Keep" type="HBoxContainer" parent="Row"]
+unique_name_in_owner = true
 layout_mode = 2
-theme_override_constants/separation = 0
+size_flags_vertical = 4
+theme_override_constants/separation = 2
 
-[node name="KeepLabel" type="Label" parent="Row/KeepBox"]
+[node name="KeepLabel" type="Label" parent="Row/Keep"]
 layout_mode = 2
 theme_type_variation = &"MutedLabel"
+theme_override_font_sizes/font_size = 11
 text = "Keep"
 
-[node name="Keep" type="SpinBox" parent="Row/KeepBox"]
+[node name="Less" type="Button" parent="Row/Keep"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(84, 0)
+custom_minimum_size = Vector2(24, 24)
 layout_mode = 2
-tooltip_text = "Every night the fridge is topped up to this many. You pay when it's delivered."
-max_value = 300.0
-step = 5.0
-value = 50.0
+theme_type_variation = &"SmallButton"
+text = "−"
+
+[node name="Amount" type="LineEdit" parent="Row/Keep"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(46, 24)
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "50"
+alignment = 1
+max_length = 3
+select_all_on_focus = true
+
+[node name="More" type="Button" parent="Row/Keep"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(24, 24)
+layout_mode = 2
+theme_type_variation = &"SmallButton"
+text = "+"

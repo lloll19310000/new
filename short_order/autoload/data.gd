@@ -17,6 +17,9 @@ const PLAN_MIN := 9 * 60         # the clock shows 09:00 while you plan
 const PREP_MINUTES := 60         # staff come in this long before the doors open, to prep
 
 const START_MONEY := 25000.0
+## Suggestions for a new diner's name.
+const DINER_NAMES := ["Rosie's Diner", "The Blue Plate", "Sunny Side Up", "Route 66 Grill", "The Busy Bee", "Moonlight Diner",
+	"Starlite Diner", "The Short Stack", "Main Street Diner", "The Chrome Spoon", "Mel's Corner", "The Golden Griddle"]
 const PLATE_COST := 6.0
 const START_PLATES := 40
 const PLATES_LOW := 6               # fewer clean plates than this and washing up comes first

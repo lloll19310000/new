@@ -67,6 +67,8 @@ func open_tray(key: String) -> void:
 		for item in c["items"]:
 			var card = BuildCard.instantiate()
 			card.setup(item)
+			if c["items"].size() > 11:
+				card.custom_minimum_size.x = 80   # a long tray: narrower cards so it still fits
 			card.chosen.connect(func(k: String): tool_chosen.emit(k))
 			cards.add_child(card)
 			card_buttons[item] = card

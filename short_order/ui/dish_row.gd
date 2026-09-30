@@ -47,13 +47,17 @@ func refresh(lot = null) -> void:
 	special_button.tooltip_text = "Today's special: customers pick it %d times as often, and like getting it." % Data.SPECIAL_PICKS if not is_special else "This is today's special. Click to stop."
 	on_switch.set_pressed_no_signal(GameState.menu[dish]["on"])
 	var station: String = info["station"]
-	var text := "Usual price $%d" % int(info["price"])
+	var usual: float = info["price"]
+	var text := "Usual price $%s" % (str(int(usual)) if is_equal_approx(usual, roundf(usual)) else "%.2f" % usual)
 	var col := UiKit.MUTED
 	if is_special:
 		text = "Today's special"
 		col = UiKit.GOLD
 	if lot != null and not lot.has_type(station):
 		text = "Needs a " + Data.FURNITURE[station]["name"].to_lower()
+		col = UiKit.CHERRY
+	elif lot != null and info.get("ice", false) and not lot.has_type("ice"):
+		text = "Needs an ice machine"
 		col = UiKit.CHERRY
 	elif Stock.sold_out.has(dish):
 		text = "Sold out: nothing left to make it"

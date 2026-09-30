@@ -184,7 +184,7 @@ func refresh() -> void:
 		if people.is_empty():
 			continue
 		lines.append("%s %s: %s" % [Data.SHIFTS[sh]["name"], Shifts.hours_text(people[0]), ", ".join(people.map(func(s): return s.person_name))])
-	shifts_note.text = ("Shifts (change them on each staff card):\n" + "\n".join(lines)) if not lines.is_empty() else "Hire some staff, then set their shifts on their cards."
+	shifts_note.text = ("Shifts today (see Staff > Schedule):\n" + "\n".join(lines)) if not lines.is_empty() else "Hire some staff: the schedule gives them their shifts (Staff > Schedule)."
 	shifts_note.add_theme_font_size_override("font_size", 12)
 	meal_switch.set_pressed_no_signal(GameState.staff_meal)
 	# money

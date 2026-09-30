@@ -15,6 +15,9 @@ var sizzle: AudioStreamPlayer
 var music: AudioStreamPlayer
 var sound_on := true
 var volume := 0.8                # 0..1
+var fullscreen := false
+
+signal settings_changed
 
 
 func _ready() -> void:
@@ -105,14 +108,26 @@ func load_settings() -> void:
 	if cfg.load(SETTINGS_PATH) == OK:
 		sound_on = cfg.get_value("audio", "sound_on", true)
 		volume = cfg.get_value("audio", "volume", 0.8)
+		fullscreen = cfg.get_value("display", "fullscreen", false)
 	AudioServer.set_bus_volume_db(0, linear_to_db(maxf(volume, 0.0001)))
+	if fullscreen and DisplayServer.get_name() != "headless":
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
 
 
 func save_settings() -> void:
+	settings_changed.emit()
 	var cfg := ConfigFile.new()
 	cfg.set_value("audio", "sound_on", sound_on)
 	cfg.set_value("audio", "volume", volume)
+	cfg.set_value("display", "fullscreen", fullscreen)
 	cfg.save(SETTINGS_PATH)
+
+
+func set_fullscreen(on: bool) -> void:
+	fullscreen = on
+	if DisplayServer.get_name() != "headless":
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if on else DisplayServer.WINDOW_MODE_WINDOWED)
+	save_settings()
 
 
 func _on_node_added(n: Node) -> void:

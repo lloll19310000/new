@@ -16,7 +16,13 @@ const PRIORITY_COLORS := {1: Color("ff7a6b"), 2: Color("f5a445"), 3: Color("e9d5
 
 const JOB_ICONS := {"cook": "cook", "serve": "serve", "host": "host", "wash": "wash", "clean": "clean", "fix": "fix"}
 
+## A colour for each role, used on chips, rows and the schedule.
+const ROLE_COLORS := {"manager": Color("f2c14e"), "cook": Color("ef8a3a"), "server": Color("6aa6d9"), "host": Color("6cc3a0"),
+	"busser": Color("c9a06a"), "dishwasher": Color("8fa8bd"), "porter": Color("b48ad9")}
+const SHIFT_COLORS := {"open": Color("f2c14e"), "mid": Color("ef8a3a"), "close": Color("8a7cc2"), "double": Color("e75a4e"), "off": Color("6d5f55")}
+
 static var _icons := {}
+static var _styles := {}
 
 
 static func icon(n: String) -> Texture2D:
@@ -106,3 +112,52 @@ static func thousands(n: int) -> String:
 		if count % 3 == 0 and i > 0:
 			out = "," + out
 	return ("-" if n < 0 else "") + out
+
+
+
+## A flat, compact background for list rows (no heavy card border).
+static func row_style(fill: Color = Color("2c231e"), border: Color = Color(0, 0, 0, 0), margin: int = 6) -> StyleBoxFlat:
+	var key := "%s|%s|%d" % [fill.to_html(), border.to_html(), margin]
+	if _styles.has(key):
+		return _styles[key]
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = fill
+	sb.set_corner_radius_all(6)
+	sb.set_content_margin_all(margin)
+	sb.content_margin_top = margin - 2
+	sb.content_margin_bottom = margin - 2
+	if border.a > 0.0:
+		sb.border_color = border
+		sb.set_border_width_all(1)
+	_styles[key] = sb
+	return sb
+
+
+static func label(text: String, size: int = 13, color: Color = INK, variation: StringName = &"BodyLabel") -> Label:
+	var l := Label.new()
+	l.text = text
+	l.theme_type_variation = variation
+	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_color_override("font_color", color)
+	l.mouse_filter = Control.MOUSE_FILTER_PASS
+	return l
+
+
+## "Line cook" in the role's colour, with its icon.
+static func role_chip(role: String, short: bool = false) -> Control:
+	var info: Dictionary = Data.ROLES.get(role, Data.ROLES["server"])
+	var col: Color = ROLE_COLORS.get(role, MUTED)
+	var chip := tag_chip(info["name"] if not short else info["name"].split(" ")[-1], info["icon"], col, info["desc"])
+	return chip
+
+
+static func shift_name(s) -> String:
+	if s.day_off_today() or (GameState.phase == GameState.Phase.PLANNING and Shifts.works_off(s, GameState.day)):
+		return "Off"
+	return Data.SHIFTS.get(s.shift, {"name": "?"})["name"]
+
+
+static func shift_key(s) -> String:
+	if s.day_off_today() or (GameState.phase == GameState.Phase.PLANNING and Shifts.works_off(s, GameState.day)):
+		return "off"
+	return s.shift

@@ -74,12 +74,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		var k := (event as InputEventKey).keycode
 		if k == KEY_R:
 			rotate_pressed()
-		elif k == KEY_ESCAPE:
-			if tool != "select":
-				set_tool("select")
-			else:
-				selection = null
-				selected.emit(null)
 
 
 func rotate_pressed() -> void:

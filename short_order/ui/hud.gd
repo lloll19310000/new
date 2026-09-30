@@ -18,6 +18,7 @@ var main
 @onready var start = %Start
 @onready var event_card = %EventCard
 var tickets_card
+var game_menu
 var _speed_before_event := 1
 
 
@@ -31,6 +32,20 @@ func _ready() -> void:
 	today_card.get_parent().add_child(tickets_card)
 	today_card.get_parent().move_child(tickets_card, today_card.get_index() + 1)
 	side_panel.setup(main)
+	# the pause menu sits over everything
+	game_menu = preload("res://ui/game_menu.gd").new()
+	game_menu.name = "GameMenu"
+	game_menu.main = main
+	start.get_parent().add_child(game_menu)
+	game_menu.save_requested.connect(func(sl: String):
+		if main.save_game(sl if sl != "" else main.new_slot()):
+			show_toast("Saved %s." % GameState.diner_name, "good"))
+	game_menu.load_requested.connect(_load)
+	game_menu.delete_requested.connect(main.delete_save)
+	game_menu.main_menu_requested.connect(func():
+		set_speed(0)
+		start.open(main.list_saves(), GameState.diner_name))
+	top_bar.menu_pressed.connect(game_menu.open)
 	top_bar.open_pressed.connect(func():
 		if GameState.phase == GameState.Phase.PREP:
 			main.open_doors()
@@ -44,13 +59,17 @@ func _ready() -> void:
 	side_panel.fire_requested.connect(main.fire)
 	report.next_pressed.connect(main.start_next_day)
 	start.continue_pressed.connect(func():
-		if main.load_game():
-			start.visible = false
-			refresh_all()
-		else:
-			show_toast("That save couldn't be loaded.", "bad"))
-	start.new_pressed.connect(func():
-		main.new_game()
+		var saves: Array = main.list_saves()
+		if not saves.is_empty():
+			_load(saves[0]["slot"]))
+	start.load_requested.connect(_load)
+	start.delete_requested.connect(func(sl: String):
+		main.delete_save(sl)
+		start.open(main.list_saves()))
+	start.resume_pressed.connect(func(): set_speed(1))
+	start.new_requested.connect(func(n: String):
+		main.new_game(n)
+		main.save_game()
 		start.visible = false
 		refresh_all()
 		help.visible = true)
@@ -82,8 +101,18 @@ func refresh_checklist() -> void:
 	checklist.refresh()
 
 
-func show_start(has_save: bool) -> void:
-	start.open(has_save)
+func show_start() -> void:
+	start.open(main.list_saves())
+
+
+func _load(sl: String) -> void:
+	if main.load_game(sl):
+		start.visible = false
+		game_menu.visible = false
+		refresh_all()
+		show_toast("Welcome back to %s. Day %d." % [GameState.diner_name if GameState.diner_name != "" else "your diner", GameState.day], "good")
+	else:
+		show_toast("That save couldn't be loaded.", "bad")
 
 
 ## An event needs you to choose: pause and show the card.
@@ -124,6 +153,24 @@ func place_toasts() -> void:
 func _unhandled_key_input(event: InputEvent) -> void:
 	var k := event as InputEventKey
 	if k == null or not k.pressed or k.echo:
+		return
+	if k.keycode == KEY_ESCAPE:
+		# Esc: stop building, then let go of the selection, then the pause menu
+		if start.visible:
+			return
+		if game_menu.visible:
+			game_menu.close()
+		elif main.build.tool != "select":
+			main.build.set_tool("select")
+		elif main.build.selection != null:
+			main.build.selection = null
+			main.build.selected.emit(null)
+			main.build.queue_redraw()
+		else:
+			game_menu.open()
+		get_viewport().set_input_as_handled()
+		return
+	if game_menu.visible or start.visible:
 		return
 	match k.keycode:
 		KEY_SPACE:

@@ -627,7 +627,7 @@ func pay(on_table: bool = false) -> float:
 		table.cash_server = main_server()
 		table.cash_servers = served_by.duplicate()
 		GameState.today["cash_left"] = GameState.today.get("cash_left", 0) + 1
-		lot.fx.add(at, "Left $%d on the table" % int(round(charged + tip)), Color("8ae596"))
+		lot.fx.add(at, "$%d left" % int(round(charged + tip)), Color("8ae596"))
 		if not JobBoard.has_open("collect", "furniture", table):
 			JobBoard.post("serve", "collect", {"furniture": table})
 		return score
