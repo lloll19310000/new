@@ -52,6 +52,9 @@ func _ready() -> void:
 	build.name = "BuildTool"
 	build.lot = lot
 	lot.add_child(build)
+	var street := preload("res://world/street.gd").new()
+	street.name = "Street"
+	lot.add_child(street)
 	var fx := Fx.new()
 	fx.name = "Fx"
 	lot.add_child(fx)
@@ -80,6 +83,9 @@ func _ready() -> void:
 	lot.layout_changed.connect(hud.refresh_checklist)
 	lot.layout_changed.connect(func(): GameState.seats = lot.seats())
 	GameState.land_changed.connect(lot.queue_redraw)
+	# the storefront shows OPEN or CLOSED, whether you're hiring, and lights up at night
+	GameState.staff_changed.connect(lot.queue_redraw)
+	GameState.phase_changed.connect(func(_p): lot.queue_redraw())
 	var args := OS.get_cmdline_user_args()
 	if "--autotest" in args or "--shot" in args or "--uitest" in args or "--balance" in args or "--art" in args:
 		# the tests never touch your real saves
@@ -127,6 +133,8 @@ func update_loops() -> Array:
 	var playing := GameState.sim_speed() > 0.0
 	var sizzle := cooking and playing
 	var music: bool = GameState.is_open() and playing and lot.has_type("jukebox")
+	if GameState.is_active() and GameState.minute >= 18.0 * 60.0 and int(GameState.minute) % 10 == 0:
+		lot.queue_redraw()   # the sign warms up as it gets dark
 	Sfx.set_loops(sizzle, music)
 	return [sizzle, music]
 
@@ -432,8 +440,8 @@ func start_staff_meal() -> void:
 func free_meal_seat(s):
 	var best = null
 	var best_d := 1 << 30
-	for ch in lot.of_type("chair"):
-		if ch.table == null or _meal_chairs.has(ch) or ch.occupant != null:
+	for ch in lot.furniture:
+		if not ch.is_seat() or ch.table == null or _meal_chairs.has(ch) or ch.occupant != null:
 			continue
 		var d: int = lot.distance(s.current_cell(), ch.cell)
 		if d < best_d:
@@ -500,6 +508,7 @@ func end_day() -> void:
 		s.set_at_work(true)
 	Crew.nightly()
 	Front.nightly()
+	lot.fade_scuffs()
 	# tomorrow's schedule: days off and who works days or nights
 	Shifts.plan_schedule(GameState.day + 1)
 	var level_up := GameState.check_level_up()
@@ -714,7 +723,7 @@ func save_game(to: String = "") -> bool:
 		"supplier": GameState.supplier, "special": GameState.special, "owned": GameState.owned, "rep_level": GameState.rep_level,
 		"buzz_until": Events.buzz_until_day, "last_inspection": GameState.last_inspection_day, "next_inspection": GameState.next_inspection_day,
 		"kitchen": Stock.save_data(), "staff_meal": GameState.staff_meal, "books": Books.save_data(), "schedule_auto": Shifts.auto, "front": Front.save_data(), "health": Health.save_data(), "hours": GameState.hours,
-		"floor": Array(lot.floor_type), "wall": Array(lot.wall), "dirt": Array(lot.dirt), "furniture": furn, "staff": team,
+		"floor": Array(lot.floor_type), "wall": Array(lot.wall), "dirt": Array(lot.dirt), "scuff": Array(lot.scuff), "furniture": furn, "staff": team,
 		"candidates": GameState.candidates.map(func(c):
 			var d: Dictionary = c.duplicate()
 			d["skin"] = c["skin"].to_html()
@@ -803,6 +812,8 @@ func load_game(from: String = "") -> bool:
 		lot.wall[i] = int(data["wall"][i])
 		if data.has("dirt"):
 			lot.dirt[i] = float(data["dirt"][i])
+		if data.has("scuff"):
+			lot.scuff[i] = float(data["scuff"][i])
 	for fd in data["furniture"]:
 		if not Data.FURNITURE.has(fd["type"]):
 			continue

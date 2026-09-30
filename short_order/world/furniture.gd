@@ -24,6 +24,7 @@ var dirty_plates: int = 0
 var food_on_table: Array = []           # dishes being eaten
 var chairs: Array = []                  # chairs next to this table
 var reserved = null                     # the booking this table is held for (a Dictionary), or null
+var join: int = 0                       # counters: which sides join another counter (bit per Data.DIRS)
 var cash: float = 0.0                   # money a table left behind, waiting to be picked up
 var cash_tip: float = 0.0               # ...and the tip in it, for whoever served them
 var cash_server = null                 # the table's own server (who took the order)
@@ -80,6 +81,14 @@ func on_wall() -> bool:
 
 func beauty() -> int:
 	return info().get("beauty", 0)
+
+
+func is_seat() -> bool:
+	return info().get("seat", false)
+
+
+func is_counter() -> bool:
+	return info().get("counter", false)
 
 
 func is_table() -> bool:

@@ -35,6 +35,7 @@ const GRADE_COLORS := {"A": Color("6cc3a0"), "B": Color("f2c14e"), "C": Color("e
 @onready var help_button: Button = %HelpButton
 
 var _last_money := 0.0
+var today_label: Label
 var _clock_t := 0.0
 var _chip_style: StyleBoxFlat
 
@@ -69,6 +70,10 @@ func _ready() -> void:
 	Sfx.settings_changed.connect(func():
 		sound_button.set_pressed_no_signal(not Sfx.sound_on)
 		sound_button.icon = SOUND_OFF if not Sfx.sound_on else SOUND_ON)
+	# today's takings, beside the cash
+	today_label = UiKit.label("", 11, Color("8ae596"), &"SmallLabel")
+	today_label.tooltip_text = "Sales so far today (tips go to the staff)."
+	money.get_parent().add_child(today_label)
 	_last_money = GameState.money
 	refresh()
 
@@ -84,6 +89,9 @@ func _process(delta: float) -> void:
 		return
 	_clock_t = 0.2
 	clock.text = GameState.clock_text()
+	var rev: float = GameState.today.get("revenue", 0.0)
+	today_label.visible = GameState.phase != GameState.Phase.PLANNING and rev >= 1.0
+	today_label.text = "+$%s today" % format_int(int(rev))
 	refresh_phase()
 
 
@@ -113,7 +121,7 @@ func refresh() -> void:
 	var g := GameState.grade
 	grade.text = g if g != "" else "?"
 	grade.add_theme_color_override("font_color", GRADE_COLORS.get(g, Color("b9a797")))
-	grade_chip.tooltip_text = "Health grade: %s.\nThe inspector drops by every few days, unannounced. A brings more customers, C scares them off." % (g if g != "" else "not inspected yet")
+	grade_chip.tooltip_text = "Health grade: %s.\nThe inspector comes unannounced, soon after you open and then two to four times a year. A brings more customers, C scares them off." % (g if g != "" else "not inspected yet")
 	var lv: Dictionary = GameState.level_info()
 	var wide := get_viewport_rect().size.x >= 1400.0 or GameState.phase != GameState.Phase.PLANNING
 	level.text = lv["name"] if wide else "Level %d" % (GameState.rep_level + 1)

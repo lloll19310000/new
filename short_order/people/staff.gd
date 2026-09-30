@@ -140,11 +140,18 @@ func setup(d: Dictionary, lot_ref) -> void:
 	if d.has("priorities"):
 		for k in d["priorities"]:
 			priorities[k] = int(d["priorities"][k])
-	shirt = Data.UNIFORM
+	dress()
 	is_staff = true
 	customer_nav = false
 	mess = 2.0 if has_trait("clumsy") else (0.5 if has_trait("tidy") else 1.0)
 	name = "Staff_" + person_name
+
+
+## Their uniform goes with their role.
+func dress() -> void:
+	shirt = Data.ROLE_UNIFORM.get(role, Data.UNIFORM)
+	look = "role:" + role
+	queue_redraw()
 
 
 func has_trait(t: String) -> bool:
@@ -267,7 +274,7 @@ func tick(dt: float, minutes: float) -> void:
 	if job != null:
 		run_steps(minutes)
 	move_tick(dt)
-	wears_hat = job != null and job.type == "cook"
+	wears_hat = false
 	# a bag of trash carried through the dining room: customers notice
 	if carry.has("trash") and lot.floor_at(current_cell()) == Data.FLOOR_DINER:
 		for g in Crew.groups_near(position, 3.0):

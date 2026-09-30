@@ -15,6 +15,7 @@ var H: int = Data.LOT_H
 var floor_type := PackedByteArray()   # Data.FLOOR_NONE, _DINER, _KITCHEN or _STAFF
 var wall := PackedByteArray()         # 0 none, 1 wall, 2 door
 var dirt := PackedFloat32Array()
+var scuff := PackedFloat32Array()     # worn paths where people walk a lot (just for looks)
 var noise := PackedFloat32Array()     # fixed per-tile variation for grass
 var furn_at: Array = []
 var furniture: Array = []
@@ -39,6 +40,8 @@ func init_grid() -> void:
 	wall.resize(n)
 	dirt = PackedFloat32Array()
 	dirt.resize(n)
+	scuff = PackedFloat32Array()
+	scuff.resize(n)
 	noise = PackedFloat32Array()
 	noise.resize(n)
 	var rng := RandomNumberGenerator.new()
@@ -222,7 +225,7 @@ func access_cells(f) -> Array:
 	if f.is_table():
 		var no_chairs := out.filter(func(n):
 			var o = furniture_at(n)
-			return o == null or o.type != "chair")
+			return o == null or not o.is_seat())
 		if not no_chairs.is_empty():
 			return no_chairs
 	return out
@@ -296,12 +299,12 @@ func link_tables() -> void:
 	for f in furniture:
 		if f.is_table():
 			f.chairs = []
-		elif f.type == "chair":
+		elif f.is_seat():
 			f.table = null
 	# chairs facing a table sit at it first; any other chair joins a table beside it
 	for pass_n in 2:
 		for f in furniture:
-			if f.type != "chair" or f.table != null:
+			if not f.is_seat() or f.table != null:
 				continue
 			var dirs: Array = [f.facing()] if pass_n == 0 else Data.DIRS
 			for d in dirs:
@@ -310,6 +313,16 @@ func link_tables() -> void:
 					f.table = t
 					t.chairs.append(f)
 					break
+
+
+	# counters join up with their neighbours
+	for f in furniture:
+		if f.is_counter():
+			f.join = 0
+			for i in 4:
+				var n = furniture_at(f.cell + Data.DIRS[i])
+				if n != null and n.is_counter():
+					f.join |= 1 << i
 
 
 ## The way a chair placed here should face so it looks at a table, or -1.
@@ -638,6 +651,23 @@ func dirt_visible(c: Vector2i) -> bool:
 	return dirt[idx(c)] >= (Data.DIRT_SHOW_CLEANER if cleaner_on_shift else Data.DIRT_SHOW)
 
 
+## Someone walked across c: busy paths wear in.
+func wear_path(c: Vector2i) -> void:
+	if not indoors(c):
+		return
+	var i := idx(c)
+	var before := scuff[i]
+	scuff[i] = minf(1.0, scuff[i] + Data.SCUFF_PER_STEP)
+	if int(before * 5) != int(scuff[i] * 5):
+		queue_redraw()
+
+
+## Overnight the worn paths fade a little.
+func fade_scuffs() -> void:
+	for i in scuff.size():
+		scuff[i] *= Data.SCUFF_FADE
+
+
 func add_dirt(c: Vector2i, amount: float) -> void:
 	if not indoors(c) or wall[idx(c)] == 1:
 		return
@@ -805,6 +835,8 @@ func _draw() -> void:
 			var c := Vector2i(x, y)
 			var i := idx(c)
 			Art.ground(self, c, floor_type[i], noise[i])
+			if scuff[i] > 0.2 and floor_type[i] > 0:
+				Art.scuff(self, c, scuff[i], noise[i])
 			if dirt_visible(c):
 				var d := dirt[i]
 				var p := cell_center(c) + Vector2(noise[i] * 8 - 4, noise[(i + 7) % noise.size()] * 8 - 4)
@@ -837,6 +869,9 @@ func _draw() -> void:
 			Art.table_food(self, f)
 	if has_entry() and GameState.grade != "":
 		Art.grade_sign(self, entry_door, entry_outside, GameState.grade)
+	if has_entry():
+		var lit := clampf((GameState.minute - 18.0 * 60.0) / 120.0, 0.0, 1.0) if GameState.phase != GameState.Phase.PLANNING else 0.0
+		Art.storefront(self, entry_door, entry_outside, GameState.diner_name, GameState.is_open(), lit, GameState.staff.size() < 4, GameState.rep_level)
 
 
 ## For wall-hung things: which side the room is on (0-3), so they face into it.

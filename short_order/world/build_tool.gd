@@ -94,7 +94,7 @@ func rotate_pressed() -> void:
 func dir_for(t: String, c: Vector2i) -> int:
 	if rot_touched:
 		return rot
-	if t == "chair":
+	if t in ["chair", "booth", "stool"]:
 		var auto: int = lot.chair_dir_toward_table(c)
 		if auto >= 0:
 			return auto
@@ -232,7 +232,7 @@ func _draw() -> void:
 		Art.furniture(self, ghost, lot.inside_dir(ghost) if ghost.on_wall() else -1)
 		draw_rect(ghost.rect_px(), tint)
 		# a small arrow showing which way it faces
-		if tool in ["chair", "sofa"] or tool in Art.TURNS:
+		if tool in ["chair", "booth", "stool", "sofa"] or tool in Art.TURNS:
 			var c := ghost.center_px()
 			var f := Vector2(Data.DIRS[d])
 			var side := Vector2(-f.y, f.x)

@@ -146,7 +146,7 @@ func collect_table(t, _by = null) -> bool:
 	GameState.totals["earned"] += bill
 	add_tip(t.cash_tip, t.cash_servers, t.cash_server)
 	if main != null:
-		main.lot.fx.add(t.center_px() + Vector2(0, -8), "+$%d" % int(round(bill)), Color("8ae596"))
+		main.lot.fx.money(t.center_px() + Vector2(0, -8), bill, false, t.cash_tip)
 	Sfx.play("cash", -6.0)
 	t.cash = 0.0
 	t.cash_tip = 0.0

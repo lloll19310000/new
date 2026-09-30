@@ -285,7 +285,8 @@ func try_seat() -> void:
 				continue
 			if t.reserved != null and t.reserved != booking:
 				continue
-			if best == null or t.chairs.size() < best.chairs.size() or (t.chairs.size() == best.chairs.size() and lot.distance(t.cell, lot.entry_inside) < lot.distance(best.cell, lot.entry_inside)):
+			if best == null or t.chairs.size() < best.chairs.size() or (t.chairs.size() == best.chairs.size() and \
+					(int(likes_seat(t)) > int(likes_seat(best)) or (likes_seat(t) == likes_seat(best) and lot.distance(t.cell, lot.entry_inside) < lot.distance(best.cell, lot.entry_inside)))):
 				best = t
 	if best == null:
 		if booking != null and waited > 8.0:
@@ -293,6 +294,8 @@ func try_seat() -> void:
 		return
 	table = best
 	table.group = self
+	if likes_seat(best):
+		review_bonus += Data.SEAT_LIKED_REVIEW
 	if booking != null:
 		Front.release(booking)
 		if waited < 4.0:
@@ -308,6 +311,21 @@ func try_seat() -> void:
 			return
 	t_table = waited
 	state = "to_table"
+
+
+## Couples and families love a booth; people on their own (truckers, regulars) like the counter.
+func likes_seat(t) -> bool:
+	if t == null:
+		return false
+	if members.size() == 1 and kind in Data.COUNTER_KINDS:
+		return t.is_counter()
+	if members.size() >= 2:
+		var booths := 0
+		for ch in t.chairs:
+			if ch.type == "booth":
+				booths += 1
+		return booths >= mini(members.size(), t.chairs.size())
+	return false
 
 
 func sit_down() -> void:
@@ -627,7 +645,6 @@ func pay(on_table: bool = false) -> float:
 		table.cash_server = main_server()
 		table.cash_servers = served_by.duplicate()
 		GameState.today["cash_left"] = GameState.today.get("cash_left", 0) + 1
-		lot.fx.add(at, "$%d left" % int(round(charged + tip)), Color("8ae596"))
 		if not JobBoard.has_open("collect", "furniture", table):
 			JobBoard.post("serve", "collect", {"furniture": table})
 		return score
@@ -636,9 +653,10 @@ func pay(on_table: bool = false) -> float:
 	Books.add_tip(tip, served_by, main_server())
 	GameState.today["revenue"] += charged
 	GameState.totals["earned"] += charged
-	lot.fx.add(at, "+$%d" % int(round(charged)) if not comped else "On the house", Color("8ae596"))
-	if tip >= 1.0:
-		lot.fx.add(at + Vector2(0, -12), "tip $%d" % int(round(tip)), Color("f2c14e"))
+	if comped:
+		lot.fx.add(at, "On the house", Color("8ae596"))
+	else:
+		lot.fx.money(at, charged, false, tip)
 	Sfx.play("cash", -4.0)
 	return score
 
@@ -667,7 +685,7 @@ func pay_app() -> void:
 	GameState.today["app_fees"] += fee
 	GameState.today["app_done"] += 1
 	GameState.totals["earned"] += bill - fee
-	lot.fx.add(where(), "+$%d (app)" % int(round(bill - fee)), Color("8ae596"))
+	lot.fx.money(where(), bill - fee)
 	Sfx.play("cash", -8.0)
 	leave(0.0, "", true)
 
@@ -1004,8 +1022,7 @@ func leave(score: float, complaint: String, paid: bool) -> void:
 		var weight: int = info().get("review_weight", 1)
 		GameState.add_review(score, complaint, weight)
 		var p: Vector2 = members[0].position if not members.is_empty() else Vector2.ZERO
-		var color := Color("f0c24f") if score >= 3.0 else Color("ff8f7a")
-		lot.fx.add(p, "%d/5 stars" % int(round(score)), color)
+		lot.fx.stars(p, score)
 		if kind == "celebrity":
 			Events.celebrity_review(score)
 		if kind == "critic":

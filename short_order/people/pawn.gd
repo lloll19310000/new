@@ -92,6 +92,7 @@ func move_tick(dt: float) -> void:
 
 
 func on_enter_cell(c: Vector2i) -> void:
+	lot.wear_path(c)
 	if lot.indoors(c) and randf() < 0.015 * mess:
 		lot.add_dirt(c, 0.1)
 

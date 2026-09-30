@@ -58,14 +58,16 @@ static func person(ci: CanvasItem, p: Vector2, facing: Vector2, shirt: Color, sk
 		# a big insulated delivery bag on their back
 		rbox(ci, Rect2(p - f * 9.0 * s - Vector2(7, 6) * s, Vector2(14, 12) * s), Color("e2703a"), Color("a84e22"), 3, 1)
 		ci.draw_rect(Rect2(p - f * 9.0 * s - Vector2(5, 1) * s, Vector2(10, 2) * s), Color("fbe3cf"))
+	var role := look.substr(5) if look.begins_with("role:") else ""
 	var swing := 0.0 if sitting else sin(step) * 3.0
-	ci.draw_circle(p + (side * 8.5 + f * (2.0 + swing)) * s, 3.0 * s, skin)
-	ci.draw_circle(p + (-side * 8.5 + f * (2.0 - swing)) * s, 3.0 * s, skin)
+	var hands := Color("f2c14e") if role == "dishwasher" else skin
+	ci.draw_circle(p + (side * 8.5 + f * (2.0 + swing)) * s, 3.0 * s, hands)
+	ci.draw_circle(p + (-side * 8.5 + f * (2.0 - swing)) * s, 3.0 * s, hands)
 	var body := Color("f4f4f0") if look == "coat" else shirt
 	ellipse(ci, p, Vector2(10, 7) * s, body.darkened(0.25), side.angle())
 	ellipse(ci, p - Vector2(0, 1) * s, Vector2(9, 6) * s, body, side.angle())
 	if staff:
-		ellipse(ci, p + f * 3.0 * s, Vector2(5.5, 3.5) * s, Color("f4f1ea"), side.angle())
+		uniform(ci, p, f, side, role, s)
 	if look == "coat":
 		# clipboard held in front
 		var cb := p + f * 9.0 * s
@@ -82,9 +84,19 @@ static func person(ci: CanvasItem, p: Vector2, facing: Vector2, shirt: Color, sk
 	var hp := p + (f * 1.5 - Vector2(0, 2)) * s
 	ci.draw_circle(hp, 6.3 * s, skin)
 	ci.draw_circle(hp - f * 1.9 * s, 5.7 * s, hair)
-	if hat:
-		ci.draw_circle(hp - f * 0.8 * s, 5.4 * s, Color("fbfbf8"))
-		ci.draw_arc(hp - f * 0.8 * s, 5.4 * s, 0, TAU, 16, Color("d6d3cc"), 1.2, true)
+	if hat or role == "cook":
+		# a chef's toque, puffed at the top
+		ci.draw_circle(hp - f * 0.8 * s, 5.6 * s, Color("fbfbf8"))
+		ci.draw_arc(hp - f * 0.8 * s, 5.6 * s, 0, TAU, 16, Color("d6d3cc"), 1.2, true)
+		ci.draw_circle(hp - f * 1.6 * s + side * 1.5 * s, 2.6 * s, Color("ffffff"))
+		ci.draw_circle(hp - f * 1.6 * s - side * 1.5 * s, 2.6 * s, Color("f4f2ec"))
+	elif role == "busser" or role == "porter":
+		var capc := Color("2e2e34") if role == "busser" else Color("2f6db0")
+		ci.draw_circle(hp - f * 1.2 * s, 5.8 * s, capc)
+		ellipse(ci, hp + f * 4.0 * s, Vector2(2.6, 4.8) * s, capc.darkened(0.3), f.angle())
+	elif role == "dishwasher":
+		# a hairnet
+		ci.draw_arc(hp - f * 1.9 * s, 5.2 * s, 0, TAU, 14, Color(1, 1, 1, 0.55), 1.0 * s, true)
 	match look:
 		"cap":
 			ci.draw_circle(hp - f * 1.2 * s, 5.8 * s, Color("2f6db0"))
@@ -101,6 +113,34 @@ static func person(ci: CanvasItem, p: Vector2, facing: Vector2, shirt: Color, sk
 			ellipse(ci, hp + f * 3.2 * s, Vector2(2.4, 5.0) * s, Color("2b2b30"), f.angle())
 
 
+## The uniform on top of the shirt, seen from above: the chef's buttons, an
+## apron, a vest, the manager's tie.
+static func uniform(ci: CanvasItem, p: Vector2, f: Vector2, side: Vector2, role: String, s: float) -> void:
+	match role:
+		"cook":
+			for k in [-1.0, 1.0]:
+				ci.draw_circle(p + f * 3.0 * s + side * 2.2 * k * s, 0.9 * s, Color("8d949c"))
+				ci.draw_circle(p + f * 0.0 + side * 2.2 * k * s, 0.9 * s, Color("8d949c"))
+		"server":
+			ellipse(ci, p + f * 3.5 * s, Vector2(5.5, 3.6) * s, Color("fbfbf5"), side.angle())
+			ci.draw_rect(Rect2(p + f * 1.5 * s + side * 3.0 * s - Vector2(1.2, 1.2) * s, Vector2(2.4, 2.4) * s), Color("f2c14e"))
+		"host":
+			ellipse(ci, p + f * 3.0 * s, Vector2(3.0, 3.4) * s, Color("f4f1ea"), side.angle())
+			ci.draw_line(p + f * 1.0 * s, p + f * 6.0 * s, Color("2b1d17"), 1.2 * s)
+		"busser":
+			ellipse(ci, p + f * 3.5 * s, Vector2(5.5, 3.6) * s, Color("f4f1ea"), side.angle())
+		"dishwasher":
+			ellipse(ci, p + f * 3.5 * s, Vector2(6.0, 4.0) * s, Color("c9d6e2"), side.angle())
+		"porter":
+			ci.draw_line(p - side * 6.0 * s + f * 1.0 * s, p + side * 6.0 * s + f * 1.0 * s, Color("8b5a2b"), 1.6 * s)
+			ci.draw_circle(p + side * 4.0 * s + f * 1.5 * s, 1.5 * s, Color("b8bec4"))
+		"manager":
+			ci.draw_line(p + f * 0.5 * s, p + f * 6.5 * s, Color("c8403a"), 2.2 * s)
+			ci.draw_circle(p + f * 0.5 * s, 1.4 * s, Color("c8403a"))
+		_:
+			ellipse(ci, p + f * 3.0 * s, Vector2(5.5, 3.5) * s, Color("f4f1ea"), side.angle())
+
+
 ## A head-and-shoulders picture for the interface, filling rect r.
 static func portrait(ci: CanvasItem, r: Rect2, skin: Color, hair: Color, shirt: Color, staff: bool, look: String = "") -> void:
 	var c := r.get_center()
@@ -109,9 +149,21 @@ static func portrait(ci: CanvasItem, r: Rect2, skin: Color, hair: Color, shirt: 
 	# shoulders
 	ellipse(ci, c + Vector2(0, 20) * u, Vector2(17, 11) * u, shirt.darkened(0.2))
 	ellipse(ci, c + Vector2(0, 21) * u, Vector2(15.5, 10) * u, shirt)
+	var role := look.substr(5) if look.begins_with("role:") else ""
 	if staff:
 		var col := PackedVector2Array([c + Vector2(-6, 11) * u, c + Vector2(6, 11) * u, c + Vector2(0, 19) * u])
 		ci.draw_colored_polygon(col, Color("f4f1ea"))
+		match role:
+			"manager":
+				ci.draw_colored_polygon(PackedVector2Array([c + Vector2(-1.6, 12) * u, c + Vector2(1.6, 12) * u, c + Vector2(2.2, 21) * u, c + Vector2(0, 23) * u, c + Vector2(-2.2, 21) * u]), Color("c8403a"))
+			"host":
+				ci.draw_colored_polygon(PackedVector2Array([c + Vector2(-2.5, 12) * u, c + Vector2(0, 14) * u, c + Vector2(2.5, 12) * u, c + Vector2(0, 16) * u]), Color("2b1d17"))
+			"server", "busser":
+				ci.draw_rect(Rect2(c + Vector2(-9, 19) * u, Vector2(18, 7) * u), Color("fbfbf5"))
+			"cook":
+				for k in [-1.0, 1.0]:
+					ci.draw_circle(c + Vector2(4.0 * k, 17) * u, 1.1 * u, Color("8d949c"))
+					ci.draw_circle(c + Vector2(4.0 * k, 21) * u, 1.1 * u, Color("8d949c"))
 	ci.draw_rect(Rect2(c + Vector2(-3, 5) * u, Vector2(6, 7) * u), skin.darkened(0.08))
 	# head
 	ci.draw_circle(c + Vector2(0, -2) * u, 10.5 * u, skin)
@@ -127,11 +179,21 @@ static func portrait(ci: CanvasItem, r: Rect2, skin: Color, hair: Color, shirt: 
 	ci.draw_circle(c + Vector2(-3.8, 0) * u, 1.3 * u, Color("2a1d17"))
 	ci.draw_circle(c + Vector2(3.8, 0) * u, 1.3 * u, Color("2a1d17"))
 	ci.draw_arc(c + Vector2(0, 3) * u, 3.4 * u, 0.25, PI - 0.25, 10, Color("2a1d17"), maxf(1.0, 1.2 * u), true)
-	if staff:
+	if role == "cook":
+		# a tall chef's toque
+		ci.draw_rect(Rect2(c + Vector2(-8, -16) * u, Vector2(16, 8) * u), Color("fbfbf8"))
+		for k in [-5.0, 0.0, 5.0]:
+			ci.draw_circle(c + Vector2(k, -17) * u, 5.0 * u, Color("fbfbf8"))
+		ci.draw_rect(Rect2(c + Vector2(-8, -10) * u, Vector2(16, 1.5) * u), Color("d6d3cc"))
+	elif role == "busser" or role == "porter":
+		var capc := Color("2e2e34") if role == "busser" else Color("2f6db0")
+		ellipse(ci, c + Vector2(0, -10) * u, Vector2(11, 5) * u, capc)
+		ellipse(ci, c + Vector2(6, -7) * u, Vector2(7, 2.5) * u, capc.darkened(0.3))
+	elif staff and role in ["server", "host", ""]:
 		# a little paper diner cap
 		var cap := PackedVector2Array([c + Vector2(-9, -9) * u, c + Vector2(9, -9) * u, c + Vector2(6, -15) * u, c + Vector2(-6, -15) * u])
 		ci.draw_colored_polygon(cap, Color("fbfbf8"))
-		ci.draw_rect(Rect2(c + Vector2(-9, -10) * u, Vector2(18, 2) * u), Color("c8403a"))
+		ci.draw_rect(Rect2(c + Vector2(-9, -10) * u, Vector2(18, 2) * u), Color("c8403a") if role != "server" else Color("3fa89a"))
 	match look:
 		"cap":
 			ellipse(ci, c + Vector2(0, -10) * u, Vector2(11, 5) * u, Color("2f6db0"))
@@ -406,7 +468,7 @@ static func for_sale_sign(ci: CanvasItem, c: Vector2, price: String, s: float = 
 
 ## Things with a front: they're drawn facing up (the front toward the top of
 ## the tile, the back against the wall below), then turned to face their way.
-const TURNS := ["sink", "jukebox", "drinks", "oven", "fridge", "freezer", "handsink", "host", "till", "ice"]
+const TURNS := ["sink", "jukebox", "drinks", "oven", "fridge", "freezer", "handsink", "host", "till", "ice", "booth"]
 
 
 ## Draws a piece of furniture of this type filling rect r. f may be null (for icons).
@@ -448,6 +510,38 @@ static func furniture_in(ci: CanvasItem, type: String, r: Rect2, dir: int, f = n
 			else:
 				bar = Rect2(Vector2(r.position.x + 6 * s, r.position.y + (r.size.y - 7 * s if b.y > 0 else 4 * s)), Vector2(r.size.x / s - 12, 3) * s)
 			ci.draw_rect(bar, Color("6e4a2b"))
+		"booth":
+			# red vinyl bench with a high back on the side away from the table
+			var bk: Vector2i = -Data.DIRS[dir]
+			var bench := r.grow(-3 * s)
+			rbox(ci, bench, Color("b8332f"), Color("7a2020"), 4, 1)
+			rbox(ci, bench.grow(-3 * s), Color("d9463b"), Color("b8332f"), 3, 0)
+			var back := axis_rect(r.get_center() + Vector2(bk) * 10.0 * s, Vector2(absf(bk.y), absf(bk.x)), 28 * s, 7 * s)
+			rbox(ci, back, Color("8f2522"), Color("5e1614"), 3, 1)
+			for k in [-6.0, 0.0, 6.0]:
+				ci.draw_circle(r.get_center() + Vector2(absf(bk.y), absf(bk.x)) * k * s + Vector2(bk) * 1.0 * s, 0.9 * s, Color("f5b0a6"))
+		"counter":
+			var jn: int = f.join if f != null else 0
+			var top := r.grow(-3 * s)
+			# stretch toward joined neighbours so a row reads as one counter
+			if jn & 1: top = top.grow_side(SIDE_TOP, 3 * s)
+			if jn & 2: top = top.grow_side(SIDE_RIGHT, 3 * s)
+			if jn & 4: top = top.grow_side(SIDE_BOTTOM, 3 * s)
+			if jn & 8: top = top.grow_side(SIDE_LEFT, 3 * s)
+			# a laminate top with a chrome edge, speckled like an old diner counter
+			ci.draw_rect(Rect2(top.position + Vector2(1.5, 2) * s, top.size), Color(0, 0, 0, 0.2))
+			ci.draw_rect(top, Color("8d949c"))
+			ci.draw_rect(top.grow(-2 * s), Color("d8566a"))
+			for k in 5:
+				ci.draw_circle(top.position + Vector2(4 + fmod(k * 7.3, 20.0), 5 + fmod(k * 5.1, 16.0)) * s, 0.8 * s, Color("f3b0bb"))
+			if f != null and f.dirty_plates > 0:
+				plate(ci, top.get_center(), 0.8 * s, true)
+		"stool":
+			var sc := r.get_center()
+			ci.draw_circle(sc + Vector2(1, 1.5) * s, 8.5 * s, Color(0, 0, 0, 0.18))
+			ci.draw_circle(sc, 8.5 * s, Color("b8bec4"))
+			ci.draw_circle(sc, 7.0 * s, Color("d9463b"))
+			ci.draw_circle(sc + Vector2(-2, -2) * s, 2.5 * s, Color(1, 1, 1, 0.3))
 		"grill":
 			rbox(ci, inner, Color("3a3d42"), Color("25272b"), 4)
 			var g := inner.grow(-5 * s)
@@ -899,6 +993,92 @@ static func van(ci: CanvasItem, p: Vector2, s: float = 1.0) -> void:
 	for x in [-24.0, 26.0]:
 		ci.draw_circle(p + Vector2(x, 14) * s, 5.5 * s, Color("25252b"))
 		ci.draw_circle(p + Vector2(x, 14) * s, 2.2 * s, Color("9aa1a8"))
+
+
+## A worn path across a floor tile: faint scuffs that get darker with use.
+static func scuff(ci: CanvasItem, c: Vector2i, amount: float, v: float) -> void:
+	var r := Rect2(Vector2(c) * T, Vector2(T, T))
+	var a := clampf((amount - 0.2) * 0.35, 0.0, 0.22)
+	ci.draw_rect(r.grow(-2), Color(0.25, 0.2, 0.15, a * 0.5))
+	for k in 3:
+		var p := r.position + Vector2(6 + fmod(v * 97.0 + k * 11.0, 20.0), 6 + fmod(v * 53.0 + k * 7.0, 20.0))
+		ci.draw_line(p, p + Vector2(5, 1.5), Color(0.2, 0.16, 0.12, a), 1.2)
+
+
+## A car (or a bus) seen from above, driving right (dir 1) or left (-1).
+static func car(ci: CanvasItem, p: Vector2, dir: int, col: Color, bus: bool = false) -> void:
+	var l := 86.0 if bus else 48.0
+	var w := 24.0 if bus else 22.0
+	var r := Rect2(p - Vector2(l, w) / 2.0, Vector2(l, w))
+	rbox(ci, Rect2(r.position + Vector2(2, 3), r.size), Color(0, 0, 0, 0.25), Color(0, 0, 0, 0), 6, 0)
+	rbox(ci, r, col, col.darkened(0.35), 6, 2)
+	if bus:
+		for i in 6:
+			ci.draw_rect(Rect2(r.position + Vector2(8 + i * 12, 4), Vector2(9, w - 8)), Color("9fd4f0"))
+		ci.draw_rect(Rect2(r.position + Vector2(0, w / 2 - 1), Vector2(l, 2)), col.darkened(0.2))
+		return
+	# roof and windscreens, the front one toward where it's going
+	var front := 1.0 if dir > 0 else -1.0
+	var roof := Rect2(p - Vector2(12, 8), Vector2(24, 16))
+	rbox(ci, roof, col.darkened(0.12), col.darkened(0.12), 4, 0)
+	ci.draw_rect(Rect2(p + Vector2(front * 12 - (4 if front < 0 else 0), -8), Vector2(4, 16)), Color("9fd4f0"))
+	ci.draw_rect(Rect2(p + Vector2(-front * 12 - (3 if front > 0 else 0), -7), Vector2(3, 14)), Color("7fb4d6"))
+	for k in [-1.0, 1.0]:
+		ci.draw_circle(p + Vector2(front * (l / 2 - 2), k * (w / 2 - 4)), 2.2, Color("fff4c2"))
+
+
+## The front of the diner: its name on a sign over the door (lit at night),
+## a striped awning, an OPEN or CLOSED sign, and a "Now hiring" card.
+static func storefront(ci: CanvasItem, door: Vector2i, outside: Vector2i, name_: String, open: bool, lit: float, hiring: bool, level: int = 0) -> void:
+	var out := Vector2(outside - door)
+	var along := Vector2(absf(out.y), absf(out.x))
+	var dc := (Vector2(door) + Vector2(0.5, 0.5)) * T
+	# the awning over the door
+	var awn := axis_rect(dc + out * 12.0, along, 44, 12)
+	ci.draw_rect(awn, Color("fbf3e0"))
+	for i in 5:
+		if i % 2 == 0:
+			ci.draw_rect(axis_rect(dc + out * 12.0 + along * (-17.6 + i * 8.8), along, 8.8, 12), Color("c8403a"))
+	# the name sign, above the awning along the wall
+	var f := font()
+	var text: String = name_ if name_ != "" else "DINER"
+	var fs := 13
+	var tw := f.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+	while tw > 150.0 and fs > 9:
+		fs -= 1
+		tw = f.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+	var sc := dc + out * 27.0
+	var sr := Rect2(sc - Vector2(tw / 2.0 + 9, 10), Vector2(tw + 18, 20))
+	if absf(out.x) > 0.5:
+		sr = Rect2(sc - Vector2(10, tw / 2.0 + 9), Vector2(20, tw + 18))
+	if lit > 0.0:
+		ci.draw_rect(sr.grow(5), Color(1.0, 0.45, 0.35, 0.18 * lit))
+	rbox(ci, sr, Color("c8403a"), Color("7a2020"), 4, 2)
+	ci.draw_rect(sr.grow(-3), Color(1, 0.95, 0.85, 0.25 + 0.4 * lit), false, 1.0)
+	var ink := Color("fff4dc").lerp(Color("fffbe8"), lit)
+	if absf(out.x) > 0.5:
+		ci.draw_set_transform(sc, -PI / 2.0 if out.x < 0 else PI / 2.0, Vector2.ONE)
+		ci.draw_string(f, Vector2(-tw / 2.0, fs * 0.36), text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, ink)
+		ci.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	else:
+		ci.draw_string(f, Vector2(sc.x - tw / 2.0, sc.y + fs * 0.36), text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, ink)
+	# OPEN / CLOSED beside the door, on the other side from the health grade
+	var op := dc + out * 12.0 - along * 40.0
+	rbox(ci, Rect2(op - Vector2(15, 6), Vector2(30, 12)), Color("1f1a24"), Color("15121a"), 3, 1)
+	var oc := Color("7df29a") if open else Color("ff6f6f")
+	ci.draw_string(f, op + Vector2(-13, 4), "OPEN" if open else "CLOSED", HORIZONTAL_ALIGNMENT_CENTER, 26, 8, oc)
+	# a brass plaque by the door for each step up in reputation
+	if level > 0:
+		var pp := dc + out * 12.0 + along * 50.0
+		rbox(ci, Rect2(pp - Vector2(10, 8), Vector2(20, 16)), Color("d8a63a"), Color("8a6414"), 2, 1)
+		for i in level:
+			var sp := pp + Vector2((i - (level - 1) / 2.0) * 4.2, 0)
+			ci.draw_circle(sp, 1.6, Color("fff4c2"))
+	if hiring:
+		var hp := dc + out * 12.0 - along * 72.0
+		rbox(ci, Rect2(hp - Vector2(13, 7), Vector2(26, 14)), Color("fbfbf5"), Color("c8403a"), 2, 1)
+		ci.draw_string(f, hp + Vector2(-12, -0.5), "NOW", HORIZONTAL_ALIGNMENT_CENTER, 24, 6, Color("c8403a"))
+		ci.draw_string(f, hp + Vector2(-12, 5.5), "HIRING", HORIZONTAL_ALIGNMENT_CENTER, 24, 6, Color("3a2c25"))
 
 
 static func wrench(ci: CanvasItem, p: Vector2, s: float, color: Color) -> void:

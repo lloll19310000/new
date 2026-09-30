@@ -229,7 +229,10 @@ const REP_LEVELS := [
 const FURNITURE := {
 	"table":    {"name": "Table",          "size": [2, 1], "cost": 150, "solid": true,  "cat": "dining",  "floor": "diner",   "seats": 4, "desc": "Seats up to 4. Put chairs next to it."},
 	"table_small": {"name": "Single table", "size": [1, 1], "cost": 90, "solid": true, "cat": "dining",  "floor": "diner",   "seats": 1, "desc": "A small table for one, with a chair beside it. Solo diners (truckers, regulars, critics) sit here and leave the big tables for groups."},
-	"chair":    {"name": "Chair",          "size": [1, 1], "cost": 45,  "solid": false, "cat": "dining",  "floor": "diner",   "desc": "Place beside a table. It turns to face the table; press R to turn it yourself."},
+	"chair":    {"name": "Chair",          "size": [1, 1], "cost": 45,  "solid": false, "cat": "dining",  "floor": "diner",   "seat": true, "desc": "Place beside a table. It turns to face the table; press R to turn it yourself."},
+	"booth":    {"name": "Booth seat",     "size": [1, 1], "cost": 110, "solid": false, "cat": "dining",  "floor": "diner",   "seat": true, "desc": "A padded bench with a high back. Put booth seats on both sides of a table for a proper booth: couples and families love one, and like their visit a little more."},
+	"counter":  {"name": "Counter",        "size": [1, 1], "cost": 120, "solid": true,  "cat": "dining",  "floor": "diner",   "seats": 1, "counter": true, "desc": "A stretch of diner counter; line several up and they join. Put a stool beside each: truckers and regulars on their own like sitting at the counter."},
+	"stool":    {"name": "Stool",          "size": [1, 1], "cost": 40,  "solid": false, "cat": "dining",  "floor": "diner",   "seat": true, "desc": "A chrome counter stool. Place one beside a counter."},
 	"grill":    {"name": "Grill",          "size": [2, 1], "cost": 900, "solid": true,  "cat": "kitchen", "floor": "kitchen", "desc": "Cooks burgers."},
 	"fryer":    {"name": "Fryer",          "size": [1, 1], "cost": 650, "solid": true,  "cat": "kitchen", "floor": "kitchen", "desc": "Cooks fries."},
 	"griddle":  {"name": "Griddle",        "size": [2, 1], "cost": 600, "solid": true,  "cat": "kitchen", "floor": "kitchen", "desc": "Cooks pancakes and omelettes."},
@@ -257,6 +260,12 @@ const FURNITURE := {
 	"till":     {"name": "Till",           "size": [1, 1], "cost": 300, "solid": true,  "cat": "dining",  "floor": "diner",   "desc": "Customers pay here on the way out, and their table frees up sooner. Someone with Host or Serve on rings them up."},
 }
 const STATIONS := ["grill", "fryer", "griddle", "drinks", "oven"]
+## Where people like to sit: two or more at a booth, solo diners of these kinds at the counter.
+const COUNTER_KINDS := ["trucker", "regular", "critic", "takeout"]
+const SEAT_LIKED_REVIEW := 0.15
+## Busy walkways get scuffed (just for looks); it fades a little each night.
+const SCUFF_PER_STEP := 0.004
+const SCUFF_FADE := 0.97
 ## Stations can be upgraded to Pro: faster cooking and half the wear.
 const UPGRADE_COST := 0.6         # share of the station's price
 const PRO_SPEED := 1.25
@@ -270,7 +279,7 @@ const MAX_BEAUTY := 4           # beauty above this doesn't help any more
 ## The build menu, one list per category, left to right.
 const BUILD_MENU := [
 	{"key": "structure", "name": "Structure", "icon": "structure", "items": ["land", "floor_diner", "floor_kitchen", "wall", "door", "takeout", "dumpster"]},
-	{"key": "dining",    "name": "Dining",    "icon": "dining",    "items": ["table", "table_small", "chair", "host", "till"]},
+	{"key": "dining",    "name": "Dining",    "icon": "dining",    "items": ["table", "table_small", "chair", "booth", "counter", "stool", "host", "till"]},
 	{"key": "kitchen",   "name": "Kitchen",   "icon": "kitchen",   "items": ["grill", "fryer", "griddle", "drinks", "oven", "ice", "pass", "prep", "fridge", "freezer", "sink", "bin", "trap"]},
 	{"key": "restroom",  "name": "Restroom",  "icon": "restroom",  "items": ["floor_restroom", "toilet", "handsink"]},
 	{"key": "decor",     "name": "Decor",     "icon": "decor",     "items": ["plant", "lamp", "wall_art", "neon", "jukebox"]},
@@ -793,6 +802,10 @@ const SKIN := [Color("f1c7a5"), Color("e0ac86"), Color("c68863"), Color("a5694a"
 const HAIR := [Color("2b1d14"), Color("5a3a22"), Color("a0662f"), Color("d8b25a"), Color("1c1c1c"), Color("8c8c8c"), Color("b8452e")]
 const CLOTHES := [Color("3f7fc0"), Color("2f9a78"), Color("7b59b8"), Color("e2a13a"), Color("5c7088"), Color("c64e87"), Color("8f6a3f"), Color("4b8f3a"), Color("d8623f"), Color("3b4b5a")]
 const UNIFORM := Color("c8403a")
+## What each role wears: the shirt colour (see Art.person for the rest: a
+## chef's jacket and toque, a server's apron, the manager's tie...).
+const ROLE_UNIFORM := {"cook": Color("f1eee6"), "server": Color("3fa89a"), "host": Color("7a2a3a"), "busser": Color("2e2e34"),
+	"dishwasher": Color("5c7088"), "porter": Color("2f4a6a"), "manager": Color("e9e6df")}
 
 ## Directions used for rotation: 0 up, 1 right, 2 down, 3 left.
 const DIRS := [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]

@@ -816,7 +816,7 @@ func set_role(s, role: String) -> void:
 	s.role = role
 	s.priorities = GameState.default_priorities(role)
 	s.wage = maxf(Data.MIN_WAGE, Data.role_pay(role, s.cooking, s.service, s.traits) + s.raises)
-	s.queue_redraw()
+	s.dress()
 	Shifts.replan()
 	var name_: String = Data.ROLES[role]["name"].to_lower()
 	if role == "manager":

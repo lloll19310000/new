@@ -227,7 +227,7 @@ func describe_furniture(f) -> Array:
 	var sub := ""
 	var text: String = info["desc"]
 	match f.type:
-		"table", "table_small":
+		"table", "table_small", "counter":
 			sub = "%d chair%s" % [f.chairs.size(), "" if f.chairs.size() == 1 else "s"]
 			if f.chairs.is_empty():
 				text = "Put chairs next to it so customers can sit here."
@@ -236,7 +236,7 @@ func describe_furniture(f) -> Array:
 			if f.dirty_plates > 0:
 				text += "\n[color=#f2c14e]%d dirty plate%s waiting to be cleared.[/color]" % [f.dirty_plates, "" if f.dirty_plates == 1 else "s"]
 			text += "\nAtmosphere: %d of %d." % [main.lot.beauty_near(f.cell), Data.MAX_BEAUTY]
-		"chair":
+		"chair", "booth", "stool":
 			sub = "At a table" if f.table != null else "Not next to a table"
 		"pass":
 			sub = "%d of %d spots used" % [f.items.size(), Data.PASS_SLOTS]

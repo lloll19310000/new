@@ -18,6 +18,8 @@ static func run(main, _args: PackedStringArray) -> void:
 	lot.place_walls(Rect2i(1, 0, 21, 13))
 	lot.place_walls(Rect2i(1, 12, 21, 13))
 	lot.place_door(Vector2i(10, 24))
+	GameState.diner_name = "Rosie's Diner"
+	GameState.rep_level = 2
 	# each machine in a column, turned 0, 1, 2 and 3 quarter turns down the column
 	var x := 3
 	for pair in PAIRS:
@@ -56,6 +58,13 @@ static func run(main, _args: PackedStringArray) -> void:
 	var tb2 = lot.add_furniture("table", Vector2i(12, 20), 1)
 	for c in [Vector2i(11, 20), Vector2i(11, 21), Vector2i(13, 20), Vector2i(13, 21)]:
 		lot.add_furniture("chair", c, lot.chair_dir_toward_table(c))
+	# a booth, and a counter with stools
+	lot.add_furniture("table", Vector2i(17, 20), 1)
+	for c in [Vector2i(16, 20), Vector2i(16, 21), Vector2i(18, 20), Vector2i(18, 21)]:
+		lot.add_furniture("booth", c, lot.chair_dir_toward_table(c))
+	for cx in range(3, 8):
+		lot.add_furniture("counter", Vector2i(cx, 22), 0)
+		lot.add_furniture("stool", Vector2i(cx, 21), 2)
 	lot.refresh()
 	tb.food_on_table = ["burger", "fries", "milkshake", "pancakes", "coffee", "pie", "soda", "icedtea"]
 	st.food_on_table = ["meatloaf", "icedtea"]

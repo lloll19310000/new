@@ -17,9 +17,11 @@ func show_person(p) -> void:
 	if p is Dictionary:
 		skin = p["skin"]
 		hair = p["hair"]
-		shirt = Color("7d8a96")
-		staff = false
-		look = ""
+		# someone looking for work, shown in the uniform of the job they want
+		var role: String = p.get("role", "")
+		shirt = Data.ROLE_UNIFORM.get(role, Color("7d8a96"))
+		staff = role != ""
+		look = ("role:" + role) if role != "" else ""
 	elif p != null:
 		skin = p.skin
 		hair = p.hair

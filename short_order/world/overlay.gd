@@ -80,6 +80,8 @@ func _draw() -> void:
 	# table numbers (they match the kitchen tickets) and booked tables
 	var num_font := Art.font()
 	for t in lot.tables():
+		if t.is_counter():
+			continue
 		var n: int = lot.table_number(t)
 		var corner: Vector2 = t.rect_px().position + Vector2(5, 11)
 		draw_string_outline(num_font, corner, str(n), HORIZONTAL_ALIGNMENT_LEFT, -1, 10, 3, Color(0.2, 0.13, 0.08, 0.85))
