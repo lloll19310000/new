@@ -1,0 +1,98 @@
+[gd_scene load_steps=12 format=3]
+
+[ext_resource type="Theme" path="res://ui/theme.tres" id="0_theme"]
+[ext_resource type="Script" path="res://ui/hud.gd" id="1_script"]
+[ext_resource type="PackedScene" path="res://ui/top_bar.tscn" id="2_top"]
+[ext_resource type="PackedScene" path="res://ui/checklist.tscn" id="3_checklist"]
+[ext_resource type="PackedScene" path="res://ui/today_card.tscn" id="4_today"]
+[ext_resource type="PackedScene" path="res://ui/inspect_card.tscn" id="5_inspect"]
+[ext_resource type="PackedScene" path="res://ui/build_menu.tscn" id="6_build"]
+[ext_resource type="PackedScene" path="res://ui/side_panel.tscn" id="7_side"]
+[ext_resource type="Script" path="res://ui/toasts.gd" id="8_toasts"]
+[ext_resource type="PackedScene" path="res://ui/report.tscn" id="9_report"]
+[ext_resource type="PackedScene" path="res://ui/help.tscn" id="10_help"]
+[ext_resource type="PackedScene" path="res://ui/start_screen.tscn" id="11_start"]
+[ext_resource type="PackedScene" path="res://ui/event_card.tscn" id="12_event"]
+
+[node name="Hud" type="CanvasLayer"]
+layer = 10
+script = ExtResource("1_script")
+
+[node name="Root" type="Control" parent="."]
+theme = ExtResource("0_theme")
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="TopBar" parent="Root" instance=ExtResource("2_top")]
+unique_name_in_owner = true
+layout_mode = 1
+
+[node name="LeftColumn" type="VBoxContainer" parent="Root"]
+layout_mode = 0
+offset_left = 10.0
+offset_top = 68.0
+offset_right = 310.0
+offset_bottom = 120.0
+mouse_filter = 2
+theme_override_constants/separation = 8
+
+[node name="Checklist" parent="Root/LeftColumn" instance=ExtResource("3_checklist")]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="TodayCard" parent="Root/LeftColumn" instance=ExtResource("4_today")]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 0
+
+[node name="InspectCard" parent="Root/LeftColumn" instance=ExtResource("5_inspect")]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="BuildMenu" parent="Root" instance=ExtResource("6_build")]
+unique_name_in_owner = true
+layout_mode = 1
+
+[node name="SidePanel" parent="Root" instance=ExtResource("7_side")]
+unique_name_in_owner = true
+layout_mode = 1
+
+[node name="Toasts" type="VBoxContainer" parent="Root"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -190.0
+offset_top = 64.0
+offset_right = 190.0
+offset_bottom = 74.0
+grow_horizontal = 2
+mouse_filter = 2
+theme_override_constants/separation = 4
+script = ExtResource("8_toasts")
+
+[node name="Report" parent="Root" instance=ExtResource("9_report")]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+
+[node name="EventCard" parent="Root" instance=ExtResource("12_event")]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+
+[node name="Help" parent="Root" instance=ExtResource("10_help")]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+
+[node name="Start" parent="Root" instance=ExtResource("11_start")]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1

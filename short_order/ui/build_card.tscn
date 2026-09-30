@@ -1,0 +1,53 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Theme" path="res://ui/theme.tres" id="0_theme"]
+[ext_resource type="Script" path="res://ui/build_card.gd" id="1_script"]
+[ext_resource type="Script" path="res://ui/widgets/art_icon.gd" id="2_art"]
+
+[node name="BuildCard" type="Button"]
+theme = ExtResource("0_theme")
+custom_minimum_size = Vector2(92, 100)
+theme_type_variation = &"CardButton"
+toggle_mode = true
+script = ExtResource("1_script")
+
+[node name="Box" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 4.0
+offset_top = 6.0
+offset_right = -4.0
+offset_bottom = -4.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/separation = 0
+
+[node name="Art" type="Control" parent="Box"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+mouse_filter = 2
+script = ExtResource("2_art")
+
+[node name="Name" type="Label" parent="Box"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 32)
+layout_mode = 2
+theme_type_variation = &"SmallLabel"
+text = "Drinks machine"
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 3
+max_lines_visible = 2
+
+[node name="Cost" type="Label" parent="Box"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.76, 0.31, 1)
+theme_type_variation = &"MutedLabel"
+text = "$500"
+horizontal_alignment = 1
+

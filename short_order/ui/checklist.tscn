@@ -1,0 +1,66 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Theme" path="res://ui/theme.tres" id="0_theme"]
+[ext_resource type="Script" path="res://ui/checklist.gd" id="1_script"]
+[ext_resource type="Texture2D" path="res://ui/icons/check.svg" id="2_check"]
+[ext_resource type="Texture2D" path="res://ui/icons/chevron_left.svg" id="3_chevron"]
+
+[node name="Checklist" type="PanelContainer"]
+theme = ExtResource("0_theme")
+custom_minimum_size = Vector2(300, 0)
+script = ExtResource("1_script")
+
+[node name="Box" type="VBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="Header" type="HBoxContainer" parent="Box"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Icon" type="TextureRect" parent="Box/Header"]
+self_modulate = Color(0.95, 0.76, 0.31, 1)
+custom_minimum_size = Vector2(18, 18)
+layout_mode = 2
+size_flags_vertical = 4
+texture = ExtResource("2_check")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Title" type="Label" parent="Box/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"HeaderLabel"
+text = "Before you open"
+
+[node name="Count" type="Label" parent="Box/Header"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"SmallLabel"
+text = "0 of 8"
+
+[node name="Fold" type="Button" parent="Box/Header"]
+unique_name_in_owner = true
+layout_mode = 2
+tooltip_text = "Fold the list away"
+theme_type_variation = &"FlatButton"
+icon = ExtResource("3_chevron")
+
+[node name="Bar" type="ProgressBar" parent="Box"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 6)
+layout_mode = 2
+theme_type_variation = &"GoalBar"
+show_percentage = false
+
+[node name="Items" type="VBoxContainer" parent="Box"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 3
+
+[node name="Footer" type="Label" parent="Box"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(270, 0)
+layout_mode = 2
+theme_type_variation = &"MutedLabel"
+text = "Build inside your lot (the outlined land)."
+autowrap_mode = 3

@@ -1,0 +1,300 @@
+[gd_scene load_steps=15 format=3]
+
+[ext_resource type="Theme" path="res://ui/theme.tres" id="0_theme"]
+[ext_resource type="Script" path="res://ui/top_bar.gd" id="1_script"]
+[ext_resource type="Texture2D" path="res://ui/icons/money.svg" id="2_money"]
+[ext_resource type="Texture2D" path="res://ui/icons/day.svg" id="3_day"]
+[ext_resource type="Texture2D" path="res://ui/icons/clock.svg" id="4_clock"]
+[ext_resource type="Texture2D" path="res://ui/icons/sun.svg" id="5_sun"]
+[ext_resource type="Script" path="res://ui/widgets/day_timeline.gd" id="6_timeline"]
+[ext_resource type="Script" path="res://ui/widgets/star_rating.gd" id="7_stars"]
+[ext_resource type="Texture2D" path="res://ui/icons/inspector.svg" id="8_inspector"]
+[ext_resource type="Texture2D" path="res://ui/icons/open.svg" id="9_open"]
+[ext_resource type="Texture2D" path="res://ui/icons/pause.svg" id="10_pause"]
+[ext_resource type="Texture2D" path="res://ui/icons/play.svg" id="11_play"]
+[ext_resource type="Texture2D" path="res://ui/icons/fast.svg" id="12_fast"]
+[ext_resource type="Texture2D" path="res://ui/icons/faster.svg" id="13_faster"]
+[ext_resource type="Texture2D" path="res://ui/icons/sound_on.svg" id="14_sound"]
+[ext_resource type="Texture2D" path="res://ui/icons/help.svg" id="15_help"]
+[ext_resource type="Texture2D" path="res://ui/icons/star.svg" id="16_star"]
+
+[sub_resource type="ButtonGroup" id="ButtonGroup_speed"]
+
+[node name="TopBar" type="PanelContainer"]
+theme = ExtResource("0_theme")
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 10.0
+offset_top = 8.0
+offset_right = -10.0
+offset_bottom = 58.0
+grow_horizontal = 2
+theme_type_variation = &"TopBar"
+script = ExtResource("1_script")
+
+[node name="Row" type="HBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Logo" type="PanelContainer" parent="Row"]
+layout_mode = 2
+size_flags_vertical = 4
+theme_type_variation = &"SignPanel"
+
+[node name="LogoLabel" type="Label" parent="Row/Logo"]
+layout_mode = 2
+theme_type_variation = &"LogoLabel"
+text = "Short Order"
+
+[node name="MoneyBox" type="HBoxContainer" parent="Row"]
+layout_mode = 2
+tooltip_text = "Cash on hand. Wages, rent and tonight's supply delivery are paid after closing."
+theme_override_constants/separation = 5
+
+[node name="MoneyIcon" type="TextureRect" parent="Row/MoneyBox"]
+self_modulate = Color(0.95, 0.76, 0.31, 1)
+custom_minimum_size = Vector2(20, 20)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 1
+texture = ExtResource("2_money")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Money" type="Label" parent="Row/MoneyBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(70, 0)
+layout_mode = 2
+mouse_filter = 1
+theme_type_variation = &"StatLabel"
+text = "$10,000"
+
+[node name="DayBox" type="HBoxContainer" parent="Row"]
+layout_mode = 2
+tooltip_text = "Which day this is. The game saves itself every morning."
+theme_override_constants/separation = 5
+
+[node name="DayIcon" type="TextureRect" parent="Row/DayBox"]
+self_modulate = Color(0.73, 0.65, 0.59, 1)
+custom_minimum_size = Vector2(18, 18)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 1
+texture = ExtResource("3_day")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Day" type="Label" parent="Row/DayBox"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 1
+theme_type_variation = &"StatLabel"
+text = "Day 1"
+
+[node name="ClockCol" type="VBoxContainer" parent="Row"]
+layout_mode = 2
+size_flags_vertical = 4
+theme_override_constants/separation = 3
+
+[node name="ClockRow" type="HBoxContainer" parent="Row/ClockCol"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="ClockIcon" type="TextureRect" parent="Row/ClockCol/ClockRow"]
+self_modulate = Color(0.73, 0.65, 0.59, 1)
+custom_minimum_size = Vector2(18, 18)
+layout_mode = 2
+size_flags_vertical = 4
+texture = ExtResource("4_clock")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Clock" type="Label" parent="Row/ClockCol/ClockRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(48, 0)
+layout_mode = 2
+theme_type_variation = &"StatLabel"
+text = "09:00"
+
+[node name="PhaseChip" type="PanelContainer" parent="Row/ClockCol/ClockRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 4
+theme_type_variation = &"Chip"
+
+[node name="PhaseRow" type="HBoxContainer" parent="Row/ClockCol/ClockRow/PhaseChip"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="PhaseIcon" type="TextureRect" parent="Row/ClockCol/ClockRow/PhaseChip/PhaseRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(14, 14)
+layout_mode = 2
+size_flags_vertical = 4
+texture = ExtResource("5_sun")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="PhaseLabel" type="Label" parent="Row/ClockCol/ClockRow/PhaseChip/PhaseRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"SmallLabel"
+text = "Planning"
+
+[node name="Timeline" type="Control" parent="Row/ClockCol"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 5)
+layout_mode = 2
+script = ExtResource("6_timeline")
+
+[node name="RatingBox" type="HBoxContainer" parent="Row"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Stars" type="Control" parent="Row/RatingBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(93, 17)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 1
+script = ExtResource("7_stars")
+star_size = 17.0
+
+[node name="Rating" type="Label" parent="Row/RatingBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"StatLabel"
+text = "3.0"
+
+[node name="GradeChip" type="PanelContainer" parent="Row"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 1
+theme_type_variation = &"Chip"
+
+[node name="GradeRow" type="HBoxContainer" parent="Row/GradeChip"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="GradeIcon" type="TextureRect" parent="Row/GradeChip/GradeRow"]
+self_modulate = Color(0.73, 0.65, 0.59, 1)
+custom_minimum_size = Vector2(16, 16)
+layout_mode = 2
+size_flags_vertical = 4
+texture = ExtResource("8_inspector")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Grade" type="Label" parent="Row/GradeChip/GradeRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"StatLabel"
+text = "?"
+
+[node name="LevelChip" type="PanelContainer" parent="Row"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 1
+theme_type_variation = &"Chip"
+
+[node name="LevelRow" type="HBoxContainer" parent="Row/LevelChip"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="LevelIcon" type="TextureRect" parent="Row/LevelChip/LevelRow"]
+self_modulate = Color(0.95, 0.76, 0.31, 1)
+custom_minimum_size = Vector2(14, 14)
+layout_mode = 2
+size_flags_vertical = 4
+texture = ExtResource("16_star")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Level" type="Label" parent="Row/LevelChip/LevelRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"SmallLabel"
+text = "Roadside diner"
+
+[node name="Spacer" type="Control" parent="Row"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="OpenButton" type="Button" parent="Row"]
+unique_name_in_owner = true
+layout_mode = 2
+tooltip_text = "Open the doors for the day. Building stops until tomorrow morning."
+theme_type_variation = &"PrimaryButton"
+text = "Open for the day"
+icon = ExtResource("9_open")
+
+[node name="Speeds" type="HBoxContainer" parent="Row"]
+layout_mode = 2
+theme_override_constants/separation = 2
+
+[node name="Pause" type="Button" parent="Row/Speeds"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(34, 34)
+layout_mode = 2
+tooltip_text = "Pause (Space)"
+theme_type_variation = &"FlatButton"
+toggle_mode = true
+button_group = SubResource("ButtonGroup_speed")
+icon = ExtResource("10_pause")
+icon_alignment = 1
+
+[node name="Play" type="Button" parent="Row/Speeds"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(34, 34)
+layout_mode = 2
+tooltip_text = "Normal speed (1)"
+theme_type_variation = &"FlatButton"
+toggle_mode = true
+button_pressed = true
+button_group = SubResource("ButtonGroup_speed")
+icon = ExtResource("11_play")
+icon_alignment = 1
+
+[node name="Fast" type="Button" parent="Row/Speeds"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(34, 34)
+layout_mode = 2
+tooltip_text = "Fast (2)"
+theme_type_variation = &"FlatButton"
+toggle_mode = true
+button_group = SubResource("ButtonGroup_speed")
+icon = ExtResource("12_fast")
+icon_alignment = 1
+
+[node name="Faster" type="Button" parent="Row/Speeds"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(34, 34)
+layout_mode = 2
+tooltip_text = "Fastest (3)"
+theme_type_variation = &"FlatButton"
+toggle_mode = true
+button_group = SubResource("ButtonGroup_speed")
+icon = ExtResource("13_faster")
+icon_alignment = 1
+
+[node name="SoundButton" type="Button" parent="Row"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(34, 34)
+layout_mode = 2
+tooltip_text = "Sound on or off"
+theme_type_variation = &"FlatButton"
+toggle_mode = true
+icon = ExtResource("14_sound")
+icon_alignment = 1
+
+[node name="HelpButton" type="Button" parent="Row"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(34, 34)
+layout_mode = 2
+tooltip_text = "How to play"
+theme_type_variation = &"FlatButton"
+icon = ExtResource("15_help")
+icon_alignment = 1

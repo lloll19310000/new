@@ -1,0 +1,22 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Theme" path="res://ui/theme.tres" id="0_theme"]
+[ext_resource type="Script" path="res://ui/office_page.gd" id="1_script"]
+
+[node name="OfficePage" type="ScrollContainer"]
+theme = ExtResource("0_theme")
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+script = ExtResource("1_script")
+
+[node name="Box" type="VBoxContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="Intro" type="Label" parent="Box"]
+layout_mode = 2
+theme_type_variation = &"MutedLabel"
+text = "The back office: how the day starts, the bills, the front of house and your regulars."
+autowrap_mode = 3
