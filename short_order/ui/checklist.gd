@@ -6,6 +6,7 @@ extends PanelContainer
 var main
 var collapsed := false
 var _last_day := -1
+var pinned := false          # you opened it yourself, so it doesn't fold itself away
 
 @onready var count: Label = %Count
 @onready var bar: ProgressBar = %Bar
@@ -25,6 +26,7 @@ func _ready() -> void:
 
 func toggle() -> void:
 	collapsed = not collapsed
+	pinned = not collapsed   # opened by hand: it stays open
 	refresh()
 
 

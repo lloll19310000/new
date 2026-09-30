@@ -124,6 +124,7 @@ func _ready() -> void:
 
 func show_selection(thing) -> void:
 	inspect_card.show_thing(thing)
+	checklist.pinned = false
 	_fit_left_column.call_deferred()
 
 
@@ -262,7 +263,7 @@ func _fit_left_column() -> void:
 	var col: Control = checklist.get_parent()
 	var limit: float = build_menu.position.y - 8.0
 	var bottom: float = col.position.y + col.get_combined_minimum_size().y
-	if bottom > limit and checklist.visible and not checklist.collapsed:
+	if bottom > limit and checklist.visible and not checklist.collapsed and not checklist.pinned:
 		checklist.collapsed = true
 		checklist.refresh()
 
