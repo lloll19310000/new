@@ -8,7 +8,7 @@ const LOT_W := 40
 const LOT_H := 30
 const BUILD_MAX_Y := 25          # rows 0..25 can be built on
 const SIDEWALK_Y := 27           # customers walk along this row
-const MINUTE_SEC := 0.55         # real seconds per game minute at 1x speed
+const MINUTE_SEC := 1.0          # real seconds per game minute at 1x speed
 const OPEN_MIN := 10 * 60        # the diner opens at 10:00 (see GameState.open_min for today's hours)
 const LAST_SEAT_MIN := 21 * 60 + 30
 const CLOSE_MIN := 22 * 60       # no new customers after 22:00
@@ -206,7 +206,7 @@ const LOANS := [
 ]
 ## What owners aim for, as a share of sales.
 const TARGET_FOOD_COST := 0.30
-const TARGET_STAFF_COST := 0.30
+const TARGET_STAFF_COST := 0.40   # California wages: 35-45% of sales is normal for a sit-down diner
 ## Tips go to the staff. Good tips cheer people up; seeing others get them doesn't.
 const TIP_STRESS := 25.0          # stress off for tips worth a whole day's wage
 const TIP_STRESS_MAX := 12.0
@@ -230,7 +230,7 @@ const FURNITURE := {
 	"grill":    {"name": "Grill",          "size": [2, 1], "cost": 900, "solid": true,  "cat": "kitchen", "floor": "kitchen", "desc": "Cooks burgers."},
 	"fryer":    {"name": "Fryer",          "size": [1, 1], "cost": 650, "solid": true,  "cat": "kitchen", "floor": "kitchen", "desc": "Cooks fries."},
 	"griddle":  {"name": "Griddle",        "size": [2, 1], "cost": 600, "solid": true,  "cat": "kitchen", "floor": "kitchen", "desc": "Cooks pancakes and omelettes."},
-	"drinks":   {"name": "Drinks machine", "size": [1, 1], "cost": 500, "solid": true,  "cat": "kitchen", "floor": "kitchen", "desc": "Makes coffee and milkshakes."},
+	"drinks":   {"name": "Drinks machine", "size": [1, 1], "cost": 500, "solid": true,  "cat": "kitchen", "floor": "inside",  "desc": "Coffee, milkshakes and sodas. Servers pour the drinks and take them straight to the table, so it can go in the dining room as well as the kitchen."},
 	"oven":     {"name": "Oven",           "size": [1, 1], "cost": 700, "solid": true,  "cat": "kitchen", "floor": "kitchen", "desc": "Bakes meatloaf and apple pie."},
 	"pass":     {"name": "Pass counter",   "size": [2, 1], "cost": 180, "solid": true,  "cat": "kitchen", "floor": "wall",    "desc": "A hatch in the wall between the kitchen and the dining room. Cooks put finished food on it from the kitchen side and servers pick it up from the dining side. Holds 8."},
 	"fridge":   {"name": "Fridge",         "size": [1, 1], "cost": 450, "solid": true,  "cat": "kitchen", "floor": "kitchen", "desc": "Cooks fetch ingredients here. Holds 240 portions of chilled food, plus a little freezer box (50)."},
@@ -435,14 +435,21 @@ const OVERTIME := 1.5
 const DOUBLE_TIME := 2.0
 const DOUBLE_TIME_AFTER := 12.0
 const MIN_PAID_HOURS := 4.0
-## "open": the day shift, in for prep and home 8 hours later. "close": the night
-## shift, in 8 hours before the last closing jobs are done. "double": all day (overtime!).
+## "open": the day shift, in for prep and home 8 hours later. "mid": 8 hours
+## across the middle of the day, for both rushes. "close": the night shift, in
+## 8 hours before the last closing jobs are done. "double": all day (overtime!).
 const SHIFTS := {
 	"open":   {"name": "Day",    "desc": "In before the doors open for prep, home 8 hours later."},
+	"mid":    {"name": "Mid",    "desc": "Eight hours across the middle of the day, for both the lunch and dinner rushes."},
 	"close":  {"name": "Night",  "desc": "The second half of the day, and stays to close up: mop, restock, trash."},
 	"double": {"name": "Double", "desc": "The whole day. Past 8 hours it's time and a half and past 12 double time, and long days wear people out."},
 }
-const SHIFT_ORDER := ["open", "close", "double"]
+const SHIFT_ORDER := ["open", "mid", "close", "double"]
+## How many customers a diner draws grows with its seats (DEMAND_SEATS is
+## "normal"), a little less than one for one.
+const DEMAND_SEATS := 20.0
+const DEMAND_SEAT_POWER := 0.8
+const DEMAND_SEAT_RANGE := Vector2(0.6, 4.0)
 const CLOSE_EXTRA := 45           # minutes of closing duties planned after the doors shut
 const LONG_DAY_STRESS := 0.04     # extra stress per minute after 10 hours on a double
 ## Tomorrow: whoever closed late starts tired; closing then opening ("clopening") is worse.
@@ -837,6 +844,11 @@ func loan_terms(amount: int) -> Dictionary:
 		if l["amount"] == amount:
 			return l
 	return {}
+
+
+## Who makes a dish: servers pour drinks, cooks make everything else.
+func job_type_for(station: String) -> String:
+	return "serve" if station == "drinks" else "cook"
 
 
 func rush_at(minute: float) -> Dictionary:

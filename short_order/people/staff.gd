@@ -607,7 +607,12 @@ func can_take(j) -> bool:
 		"wash":
 			return j.furniture != null and j.furniture.dirty > 0 and lot.furniture.has(j.furniture)
 		"sweep":
-			return lot.dirt[lot.idx(j.cell)] >= Data.DIRT_SHOW and lot.walkable(j.cell)
+			# while open, little spills are for whoever's job is cleaning and everyone
+			# else only sweeps real mess; at closing everyone mops the lot
+			var dirt: float = lot.dirt[lot.idx(j.cell)]
+			if dirt < Data.DIRT_JOB and priorities.get("clean", 0) != 1 and GameState.phase != GameState.Phase.CLEANUP:
+				return false
+			return dirt >= Data.DIRT_SHOW and lot.walkable(j.cell)
 		"repair":
 			return j.furniture != null and j.furniture.broken and lot.furniture.has(j.furniture) and j.furniture.user == null and GameState.can_afford(Data.REPAIR_COST)
 		"service":
@@ -1063,6 +1068,27 @@ func plan_cook(j, extra: Array = []) -> void:
 		wear_out(st)
 		lot.queue_redraw()
 		return true))
+	# a server who poured the drinks takes them straight to the table
+	var direct: bool = j.station == "drinks" and extra.is_empty() and priorities.get("serve", 0) > 0 and group_ok(j.group) and not j.group.takeout
+	if direct:
+		steps.append(call_step(func():
+			if not group_ok(j.group) or j.group.table == null:
+				carry = []
+				return false
+			steps.insert(0, go_step(lot.access_cells(j.group.table), "Bringing drinks"))
+			return true))
+		steps.append(work_step(0.2, "Serving drinks", false, Vector2.ZERO))
+		steps.append(call_step(func():
+			var qs: Array = []
+			for d in all_items:
+				qs.append(reserved.get("quality", 0.6))
+			if group_ok(j.group):
+				j.group.receive(all_items.duplicate(), qs, self, [self])
+			carry = []
+			reserved.erase("plate")
+			queue_redraw()
+			return true))
+		return
 	steps.append(go_step(lot.access_cells(pass_counter), "Taking food to the pass"))
 	steps.append({"do": "wait", "label": "Waiting for room on the pass", "max": 90.0,
 		"cond": func(): return pass_counter.pass_free_slots() >= n})

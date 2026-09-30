@@ -73,7 +73,7 @@ static func schedule_checks(main) -> void:
 	Shifts.auto = true
 	check(Shifts.two_shifts(), "lunch and dinner is a long day: two shifts")
 	Shifts.plan_schedule(GameState.day)
-	var shift_roles := {"open": {}, "close": {}}
+	var shift_roles := {"open": {}, "mid": {}, "close": {}}
 	var doubles := 0
 	for s in GameState.staff:
 		if s.shift == "double":

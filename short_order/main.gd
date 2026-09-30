@@ -70,6 +70,7 @@ func _ready() -> void:
 	Shifts.main = self
 	Crew.big_moment.connect(func(): Sfx.play("fanfare", -10.0))
 	lot.layout_changed.connect(hud.refresh_checklist)
+	lot.layout_changed.connect(func(): GameState.seats = lot.seats())
 	GameState.land_changed.connect(lot.queue_redraw)
 	var args := OS.get_cmdline_user_args()
 	if "--autotest" in args or "--shot" in args:

@@ -37,17 +37,19 @@ func reset_today() -> void:
 ## When this person's shift starts today.
 func shift_start(s) -> float:
 	var start: float = GameState.prep_min()
+	var close_end: float = GameState.close_min() + Data.CLOSE_EXTRA
 	if s.shift == "close":
-		var close_end: float = GameState.close_min() + Data.CLOSE_EXTRA
 		return maxf(start, snappedf(close_end - Data.SHIFT_HOURS * 60.0, 15.0))
+	if s.shift == "mid":
+		return maxf(start, snappedf((start + close_end) / 2.0 - Data.SHIFT_HOURS * 30.0, 15.0))
 	return start
 
 
 ## When they go home, or -1 if they stay until everything's closed up.
 func shift_end(s) -> float:
-	if s.shift == "open":
-		var end: float = GameState.prep_min() + Data.SHIFT_HOURS * 60.0
-		# a short day: an opener is there all day anyway
+	if s.shift == "open" or s.shift == "mid":
+		var end: float = shift_start(s) + Data.SHIFT_HOURS * 60.0
+		# a short day: they're there to the end anyway
 		if end >= GameState.close_min():
 			return -1.0
 		return end
@@ -114,6 +116,8 @@ func plan_schedule(day: int, keep_offs: bool = false) -> void:
 		for s in team:
 			if s.sched_off == day:
 				s.sched_off = -1
+		# about two days off a week each, spread out so only a few are off at once;
+		# anyone on their sixth day in a row gets one whatever the count
 		var wants: Array = []
 		for s in team:
 			if s.away_day == day or s.sick_days > 0:
@@ -121,11 +125,11 @@ func plan_schedule(day: int, keep_offs: bool = false) -> void:
 			var need := off_need(s, boss != null)
 			if need > 0.0:
 				wants.append([need, s])
-		wants.sort_custom(func(a, b): return a[0] > b[0])
-		var max_off := maxi(1, int(ceil(team.size() * 2.0 / 7.0)))
+		wants.sort_custom(func(a, b): return a[0] > b[0] or (a[0] == b[0] and (a[1].id + day) % 7 < (b[1].id + day) % 7))
+		var quota := maxi(1, int(round(team.size() * 2.0 / 7.0)))
 		var off := 0
 		for w in wants:
-			if off >= max_off:
+			if off >= quota and w[1].streak < 6:
 				break
 			if can_spare(w[1], by_role[w[1].role], day, two):
 				w[1].sched_off = day
@@ -149,25 +153,28 @@ func plan_schedule(day: int, keep_offs: bool = false) -> void:
 			else:
 				lone.shift = "open"
 			continue
-		# split the role between the day and night shifts; whoever closed last
-		# night stays on nights (nobody likes closing then opening)
-		free.sort_custom(func(a, b): return int(a.closed_late) < int(b.closed_late) or (a.closed_late == b.closed_late and a.id < b.id))
-		var days := 0
-		var nights := 0
+		# spread the role over the day: a day crew (in for prep), a night crew
+		# (stays to close) and, from three people up, a mid shift across both
+		# rushes. Whoever closed last night doesn't open this morning.
+		var targets: Array = []
+		for i in people.size():
+			targets.append(["open", "close", "mid"][i % 3])
 		for s in people:
 			if s.shift_locked:
-				if s.shift != "close":
-					days += 1
-				if s.shift != "open":
-					nights += 1
-		var want_days := int(ceil(people.size() / 2.0))
+				if targets.has(s.shift):
+					targets.erase(s.shift)
+				elif not targets.is_empty():
+					targets.pop_back()
+		free.sort_custom(func(a, b): return int(a.closed_late) > int(b.closed_late) or (a.closed_late == b.closed_late and a.id < b.id))
 		for s in free:
-			if days < want_days and (days <= nights or not s.closed_late):
-				s.shift = "open"
-				days += 1
-			else:
-				s.shift = "close"
-				nights += 1
+			var pick: String = targets[0] if not targets.is_empty() else "mid"
+			if s.closed_late:
+				for t in ["close", "mid"]:
+					if targets.has(t):
+						pick = t
+						break
+			targets.erase(pick)
+			s.shift = pick
 	if boss != null and two:
 		_manager_touches(team, day)
 	plan_note = schedule_text(day, boss)
@@ -176,7 +183,8 @@ func plan_schedule(day: int, keep_offs: bool = false) -> void:
 	GameState.staff_changed.emit()
 
 
-## How much someone needs a day off tomorrow (0 = they don't).
+## How much someone needs a day off tomorrow (0 = they don't). From three
+## days in a row they're in the running, so days off spread over the week.
 func off_need(s, managed: bool) -> float:
 	if s.streak >= 6:
 		return 10.0 + s.streak
@@ -184,10 +192,8 @@ func off_need(s, managed: bool) -> float:
 		return 20.0
 	if managed and s.stress >= 60.0:
 		return 8.0 + s.stress / 10.0
-	if s.streak >= 5:
-		return 5.0 + s.stress / 20.0
-	if managed and s.streak >= 4 and s.stress >= 40.0:
-		return 3.0
+	if s.streak >= 3:
+		return s.streak + s.stress / (20.0 if managed else 50.0)
 	return 0.0
 
 
@@ -233,6 +239,7 @@ func _manager_touches(team: Array, day: int) -> void:
 ## "Keisha wrote tomorrow's schedule: 4 on days, 3 on nights, Mei and Tunde off."
 func schedule_text(day: int, boss) -> String:
 	var days := 0
+	var mids := 0
 	var nights := 0
 	var doubles := 0
 	var off: Array = []
@@ -245,16 +252,18 @@ func schedule_text(day: int, boss) -> String:
 			days += 1
 		elif s.shift == "close":
 			nights += 1
+		elif s.shift == "mid":
+			mids += 1
 		else:
 			doubles += 1
 	var who: String = ("%s wrote the schedule" % boss.person_name) if boss != null else "The schedule"
 	var bits: Array = []
 	if two_shifts():
-		bits.append("%d on days, %d on nights" % [days, nights])
+		bits.append("%d on days, %d on mids, %d on nights" % [days, mids, nights] if mids > 0 else "%d on days, %d on nights" % [days, nights])
 		if doubles > 0:
 			bits.append("%d on a double" % doubles)
 	else:
-		bits.append("%d in" % (days + nights + doubles))
+		bits.append("%d in" % (days + mids + nights + doubles))
 	if not off.is_empty():
 		bits.append("%s off" % Crew.and_list(off))
 	return "%s for day %d: %s." % [who, day, ", ".join(bits)]

@@ -434,7 +434,7 @@ func place_order(server = null) -> void:
 		by_station[st].append(d)
 	for st in by_station:
 		var items: Array = by_station[st]
-		JobBoard.post("cook", "cook", {"group": self, "dish": items[0], "items": items, "count": items.size(), "station": st})
+		JobBoard.post(Data.job_type_for(st), "cook", {"group": self, "dish": items[0], "items": items, "count": items.size(), "station": st})
 	expected = ticket.size()
 	state = "ordered"
 
@@ -520,7 +520,7 @@ func send_back(wrong: String, right: String, cooks: Array) -> void:
 	remakes += 1
 	extra_hits["a wrong order"] = Data.WRONG_REVIEW
 	GameState.today["wrong_orders"] += 1
-	var job = JobBoard.post("cook", "cook", {"group": self, "dish": right, "items": [right], "count": 1, "station": Data.DISHES[right]["station"]})
+	var job = JobBoard.post(Data.job_type_for(Data.DISHES[right]["station"]), "cook", {"group": self, "dish": right, "items": [right], "count": 1, "station": Data.DISHES[right]["station"]})
 	job.remake = true
 	var taker = order_taker if order_taker != null and is_instance_valid(order_taker) and GameState.staff.has(order_taker) else null
 	var text := "%s got %s instead of %s." % [label(), Data.DISHES[wrong]["name"].to_lower(), Data.DISHES[right]["name"].to_lower()]

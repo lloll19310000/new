@@ -125,7 +125,7 @@ func show_report(r: Dictionary) -> void:
 		set_number("food", nums["food"], "Food cost", Data.TARGET_FOOD_COST, true,
 			"Ingredients used and thrown out today, as a share of sales. Owners aim for about %d%%." % int(Data.TARGET_FOOD_COST * 100))
 		set_number("staff", nums["staff"], "Staff cost", Data.TARGET_STAFF_COST, true,
-			"Wages as a share of sales. Owners aim for about %d%%." % int(Data.TARGET_STAFF_COST * 100))
+			"Wages as a share of sales. With California wages, owners aim for about %d%%." % int(Data.TARGET_STAFF_COST * 100))
 		set_number("margin", nums["margin"], "Profit margin", 0.0, false,
 			"What's left of each dollar of sales after food, wages and a day's share of the weekly bills ($%d)." % int(nums["bills"]))
 	stars.value = r["rating"]

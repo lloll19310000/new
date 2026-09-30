@@ -46,6 +46,7 @@ var owned: Array = ["start"]       # plots of land you own (Data.PLOTS ids)
 var rep_level: int = 0             # index into Data.REP_LEVELS
 var staff_meal := false            # everyone eats together before opening
 var hours := {"breakfast": false, "lunch": true, "dinner": true}   # which services you open for (Data.SERVICES)
+var seats := 16                    # seats in the dining room (kept up to date by main.gd)
 var last_allergy_day := -99        # the last day a customer had an allergic reaction (the inspector hears about it)
 
 
@@ -373,8 +374,13 @@ func groups_per_hour() -> float:
 		base *= rush["mult"]
 	if day <= Data.NEW_DINER_RAMP.size():
 		base *= Data.NEW_DINER_RAMP[day - 1]
-	base *= level_info()["mult"] * price_demand() * Events.crowd_mult()
+	base *= level_info()["mult"] * price_demand() * Events.crowd_mult() * seat_demand()
 	return base * Data.GRADE_EFFECT.get(grade, 1.0)
+
+
+## A bigger dining room draws more people.
+func seat_demand() -> float:
+	return clampf(pow(maxf(1.0, seats) / Data.DEMAND_SEATS, Data.DEMAND_SEAT_POWER), Data.DEMAND_SEAT_RANGE.x, Data.DEMAND_SEAT_RANGE.y)
 
 
 func set_grade(g: String) -> void:

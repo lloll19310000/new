@@ -1494,31 +1494,27 @@ static func run_balance(main, args: PackedStringArray) -> void:
 		if a.begins_with("--staff="):
 			team = int(a.substr(8))
 	print("BALANCE: built for $%d, cash left $%d, checklist %s" % [int(Data.START_MONEY - GameState.money), int(GameState.money), main.lot.checklist().filter(func(c): return not c[1]).map(func(c): return c[0])])
+	# hire a sensible mix of roles, in this order
+	var order := ["cook", "server", "cook", "server", "cook", "busser", "dishwasher", "manager", "host", "server", "cook", "busser",
+		"porter", "server", "cook", "dishwasher", "host", "server", "cook", "manager"]
+	for a in args:
+		if a.begins_with("--roles="):
+			order = Array(a.substr(8).split(","))
 	for i in team:
-		if GameState.candidates.is_empty():
-			GameState.roll_candidates()
+		GameState.candidates = [GameState.make_candidate(order[i % order.size()])]
 		main.hire(0)
-	var pr := [
-		{"cook": 1, "serve": 3, "host": 0, "wash": 4, "clean": 4, "fix": 2},
-		{"cook": 3, "serve": 1, "host": 2, "wash": 3, "clean": 2, "fix": 0},
-		{"cook": 4, "serve": 2, "host": 3, "wash": 1, "clean": 1, "fix": 3},
-		{"cook": 2, "serve": 1, "host": 3, "wash": 3, "clean": 2, "fix": 3},
-		{"cook": 1, "serve": 2, "host": 0, "wash": 2, "clean": 3, "fix": 3},
-		{"cook": 3, "serve": 1, "host": 1, "wash": 2, "clean": 2, "fix": 3},
-		{"cook": 1, "serve": 3, "host": 0, "wash": 3, "clean": 3, "fix": 2},
-	]
 	Front.take_bookings = true
 	Front.apps_on = "--apps" in args
 	GameState.staff_meal = true
-	# like a sensible owner: a cook and a server open, the rest cover the evening
-	var mix := "odocc"
+	# the schedule writes itself, unless --shifts=odocc gives each person a shift by hand
+	Shifts.plan_schedule(GameState.day, true)
 	for a in args:
 		if a.begins_with("--shifts="):
-			mix = a.substr(9)
-	var letters := {"o": "open", "c": "close", "d": "double"}
-	for i in GameState.staff.size():
-		GameState.staff[i].priorities = pr[i]
-		GameState.staff[i].shift = letters.get(mix.substr(i, 1), "double")
+			var mix := a.substr(9)
+			var letters := {"o": "open", "c": "close", "d": "double"}
+			Shifts.auto = false
+			for i in GameState.staff.size():
+				GameState.staff[i].shift = letters.get(mix.substr(i, 1), "double")
 	for s in GameState.staff:
 		print("BALANCE: %s the %s (%s) %s cook=%d serve=%d shift=%s $%.2f/hr" % [s.person_name, s.role, Data.hometown(s.origin), s.traits, s.cooking, s.service, s.shift, s.wage])
 	var totals := {"bickers": 0, "phones": 0, "friends": 0, "rivals": 0}
@@ -1590,11 +1586,18 @@ static func run_balance(main, args: PackedStringArray) -> void:
 		print("BALANCE: day %d kitchen: delivery $%d, food used $%d, waste $%d %s, prepped %d used %d, sold out %s, order $%d won't fit %s | dishes %s" % [GameState.day,
 			int(rr.get("supplies", 0)), int(rr.get("food_used", 0)), int(rr.get("waste", 0)), rr.get("waste_items", []), rr.get("prepped", 0), rr.get("prep_used", 0),
 			rr.get("sold_out", []), int(rr.get("order", 0)), rr.get("short_fit", {}), GameState.today["dishes"]])
-		if GameState.staff.size() < mini(team, 4):
-			GameState.roll_candidates()
-			main.hire(0)
-			GameState.staff[-1].priorities = pr[GameState.staff.size() - 1]
-			GameState.staff[-1].shift = "double"
+		# like a sensible owner: replace anyone who quit with someone for the same kind of job
+		var have := {}
+		for s in GameState.staff:
+			have[s.role] = have.get(s.role, 0) + 1
+		var want_roles := {}
+		for i in team:
+			want_roles[order[i % order.size()]] = want_roles.get(order[i % order.size()], 0) + 1
+		for r in want_roles:
+			while have.get(r, 0) < want_roles[r]:
+				GameState.candidates = [GameState.make_candidate(r)]
+				main.hire(0)
+				have[r] = have.get(r, 0) + 1
 		var t: Dictionary = Crew.today
 		var labels := {}
 		for k in Crew.labels:
@@ -1613,6 +1616,12 @@ static func run_balance(main, args: PackedStringArray) -> void:
 			hs2[k] = snappedf(hs[k] / maxf(1, nrev), 0.01)
 		print("BALANCE: day %d shifts late %s no-show %s sick home %s sick in %s days off %s" % [GameState.day, Shifts.today["late"], Shifts.today["no_show"], Shifts.today["sick_home"], Shifts.today["sick_in"], GameState.staff.filter(func(s): return s.away_day == GameState.day).map(func(s): return s.person_name)])
 		print("BALANCE: day %d stars lost per review (%d reviews): %s" % [GameState.day, nrev, hs2])
+		var nb: Dictionary = rr.get("numbers", {})
+		var on_days := GameState.staff.filter(func(s): return s.came_at >= 0.0).size()
+		print("SUMMARY day %2d | served %3d left %3d | sales $%5d payroll $%5d (%2d%%) food %2d%% | profit $%6d | cash $%6d | rating %.2f | %d staff, %d came in, %d off | quits %s breakdowns %d" % [
+			GameState.day, rr.get("served", 0), rr.get("left", 0), int(rr.get("revenue", 0.0)), int(rr.get("wages", 0.0)), int(nb.get("staff", 0.0) * 100),
+			int(nb.get("food", 0.0) * 100), int(nb.get("profit", 0.0)), int(GameState.money), GameState.rating, GameState.staff.size(), on_days,
+			GameState.staff.size() - on_days, Crew.today["quits"], rr.get("breakdowns", 0)])
 		print("BALANCE: day %d served=%d left=%d rating=%.2f | labels=%s bickers=%d breakups=%d phone-lines=%d new friends=%s new rivals=%s" % [
 			GameState.day, GameState.today["served"], GameState.today["left"], GameState.rating, labels,
 			t["bickers"], t["breakups"], phone_starts, t["new_friends"], t["new_rivals"]])
