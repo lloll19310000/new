@@ -5,6 +5,7 @@ extends RefCounted
 ##   godot --path . -- --art
 ## The pictures land in the user data folder as art_*.png.
 
+const Art = preload("res://world/art.gd")
 const PAIRS := [["kitchen", ["oven", "fridge", "freezer", "sink", "drinks", "ice", "handsink"]], ["diner", ["host", "till", "jukebox"]]]
 
 
@@ -65,6 +66,43 @@ static func run(main, _args: PackedStringArray) -> void:
 	for cx in range(3, 8):
 		lot.add_furniture("counter", Vector2i(cx, 22), 0)
 		lot.add_furniture("stool", Vector2i(cx, 21), 2)
+	# a staff room and office on the right, with the new pieces
+	lot.place_floor(Rect2i(24, 1, 14, 11), Data.FLOOR_STAFF)
+	lot.place_walls(Rect2i(23, 0, 16, 13))
+	lot.add_furniture("sofa", Vector2i(25, 2), 0)
+	lot.add_furniture("staff_table", Vector2i(29, 3), 0)
+	lot.add_furniture("coffee_maker", Vector2i(33, 2), 0)
+	lot.add_furniture("vending", Vector2i(35, 2), 0)
+	lot.add_furniture("tv", Vector2i(36, 5), 0)
+	lot.add_furniture("lockers", Vector2i(25, 6), 0)
+	lot.add_furniture("desk", Vector2i(30, 8), 0)
+	lot.add_furniture("filing", Vector2i(34, 9), 0)
+	lot.add_furniture("whiteboard", Vector2i(27, 0), 0)
+	lot.add_furniture("records", Vector2i(31, 0), 0)
+	lot.add_furniture("tin_sign", Vector2i(33, 0), 0)
+	# decor and a waiting area on diner floor below it
+	lot.place_floor(Rect2i(24, 14, 14, 10), Data.FLOOR_DINER)
+	lot.place_walls(Rect2i(23, 13, 16, 12))
+	var dx := 25
+	for t in ["rug", "flowers", "palm", "gumball", "bench", "wait_chair", "clock"]:
+		if t == "clock":
+			lot.add_furniture(t, Vector2i(dx, 13), 0)
+		else:
+			lot.add_furniture(t, Vector2i(dx, 15), 0)
+		dx += 2 if Data.FURNITURE[t]["size"][0] == 1 else 3
+	# a lineup of people, each with a look of their own
+	var lineup := Node2D.new()
+	lineup.z_index = 20
+	lineup.draw.connect(func():
+		for i in 14:
+			var at := Vector2((25 + i % 7 * 1.8) * Data.TILE, (18.5 + int(i / 7) * 2.2) * Data.TILE)
+			var shirt: Color = Data.CLOTHES[i % Data.CLOTHES.size()]
+			Art.person(lineup, at, Vector2.DOWN, shirt, Data.SKIN[i % Data.SKIN.size()], Data.HAIR[(i * 3) % Data.HAIR.size()], 0.0, i >= 11, false, false,
+				("role:" + ["cook", "server", "manager"][i - 11]) if i >= 11 else "", 1.3, Art.style_for(i * 7919))
+		for i in 8:
+			var pr := Rect2(Vector2((24.4 + i * 1.7) * Data.TILE, 22.6 * Data.TILE), Vector2(1.5, 1.5) * Data.TILE)
+			Art.portrait(lineup, pr, Data.SKIN[i % Data.SKIN.size()], Data.HAIR[(i * 3) % Data.HAIR.size()], Data.CLOTHES[i % Data.CLOTHES.size()], false, "", Art.style_for(i * 7919)))
+	lot.add_child(lineup)
 	lot.refresh()
 	tb.food_on_table = ["burger", "fries", "milkshake", "pancakes", "coffee", "pie", "soda", "icedtea"]
 	st.food_on_table = ["meatloaf", "icedtea"]
@@ -78,7 +116,8 @@ static func run(main, _args: PackedStringArray) -> void:
 	GameState.phase = GameState.Phase.SERVICE
 	GameState.minute = 21 * 60.0
 	var tree: SceneTree = main.get_tree()
-	for area in [["kitchen", Rect2(Vector2(1, 0), Vector2(21, 13))], ["diner", Rect2(Vector2(1, 12), Vector2(21, 13))]]:
+	for area in [["kitchen", Rect2(Vector2(1, 0), Vector2(21, 13))], ["diner", Rect2(Vector2(1, 12), Vector2(21, 13))],
+			["staff", Rect2(Vector2(23, 0), Vector2(16, 13))], ["people", Rect2(Vector2(23, 13), Vector2(16, 12))]]:
 		var view: Vector2 = main.get_viewport().get_visible_rect().size
 		var world: Rect2 = Rect2(area[1].position * Data.TILE, area[1].size * Data.TILE)
 		var z := minf(view.x / world.size.x, view.y / world.size.y) * 0.98

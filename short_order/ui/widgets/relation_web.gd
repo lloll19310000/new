@@ -182,7 +182,7 @@ func _draw() -> void:
 		var dim: bool = focus >= 0 and focus != i and not _linked(focus, i)
 		draw_circle(r.get_center(), _face / 2.0 + 2.5, Crew.MOOD_COLORS.get(s.mood, UiKit.MUTED) * Color(1, 1, 1, 0.35 if dim else 1.0))
 		draw_circle(r.get_center(), _face / 2.0, Color("201915"))
-		Art.portrait(self, r, s.skin, s.hair, s.shirt, true, s.look)
+		Art.portrait(self, r, s.skin, s.hair, s.shirt, true, s.look, s.style)
 		if dim:
 			draw_circle(r.get_center(), _face / 2.0 + 3.0, Color(0.12, 0.09, 0.08, 0.6))
 		if s.manager:

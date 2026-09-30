@@ -11,6 +11,7 @@ const Art = preload("res://world/art.gd")
 @export var staff := true
 @export var look := ""
 @export var ring := Color(0, 0, 0, 0)
+var style: Dictionary = {}
 
 
 func show_person(p) -> void:
@@ -22,12 +23,14 @@ func show_person(p) -> void:
 		shirt = Data.ROLE_UNIFORM.get(role, Color("7d8a96"))
 		staff = role != ""
 		look = ("role:" + role) if role != "" else ""
+		style = Art.style_for(hash(str(p.get("name", ""))))
 	elif p != null:
 		skin = p.skin
 		hair = p.hair
 		shirt = p.shirt
 		staff = p.is_staff
 		look = p.look
+		style = p.style
 	queue_redraw()
 
 
@@ -35,6 +38,6 @@ func _draw() -> void:
 	var d := minf(size.x, size.y)
 	var r := Rect2((size - Vector2(d, d)) / 2.0, Vector2(d, d))
 	draw_circle(r.get_center(), d * 0.5, Color("201915"))
-	Art.portrait(self, r, skin, hair, shirt, staff, look)
+	Art.portrait(self, r, skin, hair, shirt, staff, look, style)
 	if ring.a > 0.0:
 		draw_arc(r.get_center(), d * 0.5 - 1.0, 0, TAU, 32, ring, 2.0, true)

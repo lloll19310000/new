@@ -73,6 +73,12 @@ var at_work := true             # in the building today (walking in counts)
 var arriving := false           # walking in from the street
 var heading_home := false       # walking out at the end of their shift
 var stayed_late := false        # stayed past their shift to help out today
+var break_kind := ""            # "meal" or "rest" while on a timed break, else ""
+var break_left := 0.0
+var meal_break_done := false
+var meal_missed := false        # worked past the 5th hour without a meal break today
+var rest_breaks := 0            # rest breaks taken today
+var _snacked := false
 var clock_out := false          # their shift is over: finish up and go home
 var arrive_at := -1.0           # game minute they're due in today
 var came_at := -1.0             # when they actually got here
@@ -156,6 +162,7 @@ func setup(d: Dictionary, lot_ref) -> void:
 		for k in d["priorities"]:
 			priorities[k] = int(d["priorities"][k])
 	dress()
+	style = Art.style_for(hash(person_name))
 	is_staff = true
 	customer_nav = false
 	mess = 2.0 if has_trait("clumsy") else (0.5 if has_trait("tidy") else 1.0)
@@ -296,7 +303,10 @@ func tick(dt: float, minutes: float) -> void:
 	if job != null:
 		practice(minutes)
 	if job == null and not on_break:
-		if (energy < Data.BREAK_AT or break_asked) and active:
+		var due := break_due() if GameState.phase == GameState.Phase.SERVICE else ""
+		if due != "":
+			start_timed_break(due)
+		elif (energy < Data.BREAK_AT or break_asked) and active:
 			break_asked = false
 			start_break()
 		else:
@@ -456,6 +466,111 @@ func start_break() -> void:
 		Crew.sofa_full(self, others)
 
 
+## Minutes on the clock today.
+func minutes_worked() -> float:
+	return GameState.minute - came_at if came_at >= 0.0 else 0.0
+
+
+## A meal or rest break that's due now (and can be taken), or "".
+func break_due() -> String:
+	if came_at < 0.0 or clock_out or heading_home or arriving:
+		return ""
+	var w := minutes_worked()
+	var shift_left: float = Shifts.shift_end(self) - GameState.minute if Shifts.shift_end(self) >= 0.0 else 999.0
+	var kind := ""
+	if not meal_break_done and w >= Data.MEAL_BREAK_AFTER and shift_left > 45.0:
+		kind = "meal"
+	elif rest_breaks < int(w / Data.REST_BREAK_EVERY) and shift_left > 30.0:
+		kind = "rest"
+	if kind == "":
+		return ""
+	# the break's about to be missed: take it whatever's going on
+	var urgent: bool = kind == "meal" and w >= Data.MEAL_BREAK_BY - 20.0
+	if not urgent and JobBoard.waiting_count() >= Data.BREAK_SWAMPED:
+		return ""
+	# never the last cook or server on the floor, even for an overdue break
+	if not Shifts.can_break(self):
+		return ""
+	return kind
+
+
+## A meal break (30 minutes, at the break table if there is one) or a rest
+## break (10 minutes, on the sofa or by the coffee).
+func start_timed_break(kind: String) -> void:
+	on_break = true
+	break_kind = kind
+	break_left = Data.MEAL_BREAK_MIN if kind == "meal" else Data.REST_BREAK_MIN
+	_snacked = false
+	if kind == "meal":
+		meal_break_done = true
+		if minutes_worked() > Data.MEAL_BREAK_BY:
+			meal_missed = true
+		Shifts.today["meal_breaks"] = Shifts.today.get("meal_breaks", 0) + 1
+	else:
+		rest_breaks += 1
+		Shifts.today["rest_breaks"] = Shifts.today.get("rest_breaks", 0) + 1
+	status = "Meal break" if kind == "meal" else "Rest break"
+	rest_sofa = null
+	meal_seat = null
+	var here := current_cell()
+	# a meal at the break table, otherwise a seat on the sofa, otherwise the staff room
+	if kind == "meal":
+		for t in lot.of_type("staff_table"):
+			for c in lot.access_cells(t):
+				if not Crew.cell_taken(c, self):
+					meal_seat = null
+					rest_cell = c
+					if go_to(c):
+						set_meta("break_table", t)
+						return
+	for f in lot.of_type("sofa"):
+		var c = f.free_rest_cell()
+		# a 10-minute rest break isn't worth a long walk: they rest where they are
+		if c != null and (kind == "meal" or lot.distance(here, c) <= Data.REST_BREAK_WALK) and not lot.find_path(here, c).is_empty():
+			rest_sofa = f
+			rest_cell = c
+			rest_sofa.resters[rest_cell] = self
+			go_to(rest_cell)
+			return
+	if kind == "meal":
+		var room: Array = lot.cells_of_floor(Data.FLOOR_STAFF)
+		if not room.is_empty():
+			go_to(room.pick_random())
+
+
+func timed_break_tick(minutes: float) -> void:
+	if is_moving():
+		return
+	if has_meta("break_table") and not sitting:
+		sitting = true
+		var t = get_meta("break_table")
+		if lot.furniture.has(t):
+			face_toward(t.center_px())
+		queue_redraw()
+	elif rest_sofa != null and not sitting and lot.furniture.has(rest_sofa):
+		sitting = true
+		place_at(rest_cell)
+		facing = Vector2(rest_sofa.facing())
+		queue_redraw()
+	status = ("Meal break" if break_kind == "meal" else "Rest break") + " (%d min)" % int(ceil(break_left))
+	var gain: float = (Data.REST_SOFA if sitting else Data.REST_STANDING) * (Data.BREAK_ROOM_COFFEE if lot.has_type("coffee_maker") else 1.0)
+	energy = minf(100.0, energy + minutes * gain)
+	if lot.has_type("tv"):
+		add_stress(Data.BREAK_TV_STRESS * minutes, "the break room TV")
+	if not _snacked and lot.has_type("vending"):
+		_snacked = true
+		add_stress(Data.VENDING_SNACK, "a vending machine snack")
+	break_left -= minutes
+	if break_left <= 0.0:
+		if break_kind == "meal":
+			add_stress(Data.TABLE_MEAL_STRESS if has_meta("break_table") else Data.TABLE_MEAL_STRESS * 0.5, "a meal break")
+			ate_today = true
+		if has_meta("break_table"):
+			remove_meta("break_table")
+		break_kind = ""
+		end_break()
+
+
 ## The staff meal before opening: sit down together and eat.
 func start_meal(seat) -> void:
 	drop_job()
@@ -497,6 +612,9 @@ func rest_tick(minutes: float) -> void:
 	if meal_left > 0.0:
 		meal_tick(minutes)
 		return
+	if break_kind != "":
+		timed_break_tick(minutes)
+		return
 	if rest_sofa != null and not lot.furniture.has(rest_sofa):
 		rest_sofa = null
 		sitting = false
@@ -519,6 +637,9 @@ func rest_tick(minutes: float) -> void:
 
 func end_break() -> void:
 	on_break = false
+	break_kind = ""
+	if has_meta("break_table"):
+		remove_meta("break_table")
 	sitting = false
 	meal_left = 0.0
 	meal_seat = null

@@ -47,8 +47,22 @@ static func ellipse(ci: CanvasItem, c: Vector2, radii: Vector2, color: Color, an
 # ------------------------------------------------------------------ people
 
 ## look: "" (plain), "backpack", "cap", "beret", "coat", "apron".
+## A look of their own, the same every time for the same seed: hairstyle,
+## build, beard, glasses, clothes pattern, an accessory and an expression.
+static func style_for(seed_: int) -> Dictionary:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_
+	var accents := [Color("d23b30"), Color("3f86c6"), Color("f2c14e"), Color("4f9a45"), Color("b58be0"), Color("e27fa8"), Color("2b2b30")]
+	return {"hair": rng.randi_range(0, 7), "beard": rng.randf() < 0.22, "glasses": rng.randf() < 0.25,
+		"build": rng.randf_range(0.88, 1.16), "pattern": rng.randi_range(0, 4), "extra": rng.randi_range(0, 5),
+		"accent": accents[rng.randi() % accents.size()], "mouth": rng.randi_range(0, 3), "brows": rng.randf_range(-0.25, 0.25),
+		"bounce": rng.randf_range(0.7, 1.35)}
+
+
 static func person(ci: CanvasItem, p: Vector2, facing: Vector2, shirt: Color, skin: Color, hair: Color,
-		step: float, staff: bool, hat: bool, sitting: bool = false, look: String = "", s: float = 1.0) -> void:
+		step: float, staff: bool, hat: bool, sitting: bool = false, look: String = "", s: float = 1.0, st: Dictionary = {}) -> void:
+	var build: float = st.get("build", 1.0)
+	var hstyle: int = st.get("hair", 0)
 	var f := facing.normalized() if facing.length() > 0.01 else Vector2.DOWN
 	var side := Vector2(-f.y, f.x)
 	ellipse(ci, p + Vector2(0, 8) * s, Vector2(9, 4) * s, Color(0, 0, 0, 0.22))
@@ -59,13 +73,18 @@ static func person(ci: CanvasItem, p: Vector2, facing: Vector2, shirt: Color, sk
 		rbox(ci, Rect2(p - f * 9.0 * s - Vector2(7, 6) * s, Vector2(14, 12) * s), Color("e2703a"), Color("a84e22"), 3, 1)
 		ci.draw_rect(Rect2(p - f * 9.0 * s - Vector2(5, 1) * s, Vector2(10, 2) * s), Color("fbe3cf"))
 	var role := look.substr(5) if look.begins_with("role:") else ""
-	var swing := 0.0 if sitting else sin(step) * 3.0
+	var swing := 0.0 if sitting else sin(step) * 3.0 * float(st.get("bounce", 1.0))
 	var hands := Color("f2c14e") if role == "dishwasher" else skin
-	ci.draw_circle(p + (side * 8.5 + f * (2.0 + swing)) * s, 3.0 * s, hands)
-	ci.draw_circle(p + (-side * 8.5 + f * (2.0 - swing)) * s, 3.0 * s, hands)
+	ci.draw_circle(p + (side * 8.5 * build + f * (2.0 + swing)) * s, 3.0 * s, hands)
+	ci.draw_circle(p + (-side * 8.5 * build + f * (2.0 - swing)) * s, 3.0 * s, hands)
 	var body := Color("f4f4f0") if look == "coat" else shirt
-	ellipse(ci, p, Vector2(10, 7) * s, body.darkened(0.25), side.angle())
-	ellipse(ci, p - Vector2(0, 1) * s, Vector2(9, 6) * s, body, side.angle())
+	ellipse(ci, p, Vector2(10 * build, 7) * s, body.darkened(0.25), side.angle())
+	ellipse(ci, p - Vector2(0, 1) * s, Vector2(9 * build, 6) * s, body, side.angle())
+	if not staff and look != "coat":
+		clothes_pattern(ci, p - Vector2(0, 1) * s, f, side, body, int(st.get("pattern", 0)), st.get("accent", Color("2b2b30")), build, s)
+	if int(st.get("extra", 0)) == 4:
+		# a scarf round the neck
+		ci.draw_arc(p + (f * 1.5 - Vector2(0, 2)) * s, 6.4 * s, 0, TAU, 16, st.get("accent", Color("d23b30")), 2.2 * s, true)
 	if staff:
 		uniform(ci, p, f, side, role, s)
 	if look == "coat":
@@ -82,8 +101,38 @@ static func person(ci: CanvasItem, p: Vector2, facing: Vector2, shirt: Color, sk
 		ci.draw_rect(Rect2(nb - Vector2(3, 4) * s, Vector2(6, 8) * s), Color("fbfbf5"))
 		ci.draw_line(nb - Vector2(2, 1) * s, nb + Vector2(2, -1) * s, Color("555555"), 1.0)
 	var hp := p + (f * 1.5 - Vector2(0, 2)) * s
+	# long hair and ponytails hang behind the head
+	if hstyle == 1:
+		ellipse(ci, hp - f * 3.2 * s, Vector2(6.8, 5.2) * s, hair.darkened(0.1), side.angle())
+	elif hstyle == 3:
+		ci.draw_line(hp - f * 5.0 * s, hp - f * 10.5 * s, hair.darkened(0.1), 3.2 * s)
+		ci.draw_circle(hp - f * 10.5 * s, 1.8 * s, hair.darkened(0.1))
 	ci.draw_circle(hp, 6.3 * s, skin)
-	ci.draw_circle(hp - f * 1.9 * s, 5.7 * s, hair)
+	if int(st.get("extra", 0)) == 1:
+		for k in [-1.0, 1.0]:
+			ci.draw_circle(hp + side * 6.2 * k * s + f * 0.8 * s, 0.9 * s, Color("f2c14e"))
+	match hstyle:
+		5:
+			ci.draw_circle(hp - f * 1.2 * s - side * 1.5 * s, 1.8 * s, Color(1, 1, 1, 0.35))   # bald, with a shine
+		6:
+			ci.draw_circle(hp - f * 1.9 * s, 5.5 * s, Color(hair, 0.55))                       # a buzz cut
+		4:
+			ci.draw_circle(hp - f * 1.9 * s, 6.2 * s, hair)
+			for k in 7:
+				ci.draw_circle(hp - f * 1.9 * s + Vector2.from_angle(TAU * k / 7.0) * 5.4 * s, 2.3 * s, hair)
+		_:
+			ci.draw_circle(hp - f * 1.9 * s, 5.7 * s, hair)
+	if hstyle == 2:
+		ci.draw_circle(hp - f * 5.2 * s, 2.8 * s, hair.darkened(0.12))                      # a bun
+	elif hstyle == 7:
+		for k in [-1.0, 1.0]:
+			ci.draw_circle(hp + side * 6.0 * k * s - f * 1.5 * s, 2.4 * s, hair.darkened(0.08))   # pigtails
+	if st.get("beard", false) and hstyle != 7:
+		ci.draw_arc(hp + f * 1.5 * s, 5.2 * s, f.angle() - 1.1, f.angle() + 1.1, 10, hair.darkened(0.2), 2.4 * s, true)
+	if st.get("glasses", false) and look != "shades":
+		ci.draw_line(hp + f * 4.6 * s - side * 3.8 * s, hp + f * 4.6 * s + side * 3.8 * s, Color("2b2b30"), 1.2 * s)
+	if int(st.get("extra", 0)) == 2 and not staff:
+		ci.draw_arc(hp - f * 1.0 * s, 5.9 * s, f.angle() + PI * 0.5 - 1.2, f.angle() + PI * 0.5 + 1.2, 8, st.get("accent", Color("d23b30")), 1.8 * s, true)
 	if hat or role == "cook":
 		# a chef's toque, puffed at the top
 		ci.draw_circle(hp - f * 0.8 * s, 5.6 * s, Color("fbfbf8"))
@@ -111,6 +160,26 @@ static func person(ci: CanvasItem, p: Vector2, facing: Vector2, shirt: Color, sk
 			ci.draw_circle(hp - f * 0.6 * s, 6.4 * s, Color("e2703a"))
 			ci.draw_arc(hp - f * 0.6 * s, 6.4 * s, 0, TAU, 16, Color("a84e22"), 1.0 * s, true)
 			ellipse(ci, hp + f * 3.2 * s, Vector2(2.4, 5.0) * s, Color("2b2b30"), f.angle())
+
+
+## Stripes, polka dots, a plaid or an open jacket on a customer's shirt.
+static func clothes_pattern(ci: CanvasItem, p: Vector2, f: Vector2, side: Vector2, body: Color, pattern: int, accent: Color, build: float, s: float) -> void:
+	var line := body.darkened(0.28) if body.get_luminance() > 0.35 else body.lightened(0.3)
+	match pattern:
+		1:
+			for k in [-3.0, 0.0, 3.0]:
+				ci.draw_line(p + f * k * s - side * 7.5 * build * s, p + f * k * s + side * 7.5 * build * s, line, 1.1 * s)
+		2:
+			for k in 5:
+				ci.draw_circle(p + side * (k - 2) * 3.2 * s + f * ((k % 2) * 2.4 - 1.2) * s, 0.8 * s, line)
+		3:
+			for k in [-2.5, 2.5]:
+				ci.draw_line(p + f * k * s - side * 7.5 * build * s, p + f * k * s + side * 7.5 * build * s, accent, 0.9 * s)
+				ci.draw_line(p + side * k * s - f * 5.0 * s, p + side * k * s + f * 5.0 * s, accent, 0.9 * s)
+		4:
+			# an open jacket: darker sides, the shirt showing in the middle
+			ellipse(ci, p + side * 5.0 * build * s, Vector2(3.6, 5.6) * s, accent.darkened(0.2), side.angle() + PI * 0.5)
+			ellipse(ci, p - side * 5.0 * build * s, Vector2(3.6, 5.6) * s, accent.darkened(0.2), side.angle() + PI * 0.5)
 
 
 ## The uniform on top of the shirt, seen from above: the chef's buttons, an
@@ -142,7 +211,54 @@ static func uniform(ci: CanvasItem, p: Vector2, f: Vector2, side: Vector2, role:
 
 
 ## A head-and-shoulders picture for the interface, filling rect r.
-static func portrait(ci: CanvasItem, r: Rect2, skin: Color, hair: Color, shirt: Color, staff: bool, look: String = "") -> void:
+static func portrait(ci: CanvasItem, r: Rect2, skin: Color, hair: Color, shirt: Color, staff: bool, look: String = "", st: Dictionary = {}) -> void:
+	var hstyle: int = st.get("hair", 0)
+	var cc := r.get_center()
+	var uu := r.size.y / 48.0
+	# long hair and pigtails behind the head and shoulders
+	if hstyle == 1:
+		ci.draw_rect(Rect2(cc + Vector2(-12, -4) * uu, Vector2(24, 20) * uu), hair.darkened(0.1))
+	elif hstyle == 7:
+		for k in [-1.0, 1.0]:
+			ci.draw_circle(cc + Vector2(12.5 * k, 2) * uu, 4.5 * uu, hair.darkened(0.08))
+	_portrait_body(ci, r, skin, hair, shirt, staff, look, st)
+	var c := cc
+	var u := uu
+	match hstyle:
+		2:
+			ci.draw_circle(c + Vector2(0, -14) * u, 4.5 * u, hair)
+		3:
+			ci.draw_circle(c + Vector2(10.5, -4) * u, 3.5 * u, hair.darkened(0.08))
+		4:
+			for k in 9:
+				ci.draw_circle(c + Vector2(0, -4) * u + Vector2.from_angle(PI + PI * k / 8.0) * 10.5 * u, 3.4 * u, hair)
+	if st.get("beard", false) and hstyle != 7:
+		var bpts := PackedVector2Array()
+		for i in 11:
+			var a := PI * i / 10.0
+			bpts.append(c + Vector2(0, 1) * u + Vector2(cos(a) * 9.8, sin(a) * 8.8) * u)
+		ci.draw_colored_polygon(bpts, hair.darkened(0.15))
+		ci.draw_arc(c + Vector2(0, 3.5) * u, 3.0 * u, 0.3, PI - 0.3, 8, Color("2a1d17"), maxf(1.0, 1.1 * u), true)
+	if st.get("glasses", false) and look != "shades":
+		for k in [-1.0, 1.0]:
+			ci.draw_arc(c + Vector2(3.8 * k, 0) * u, 3.0 * u, 0, TAU, 12, Color("2b2b30"), maxf(1.0, 1.0 * u), true)
+		ci.draw_line(c + Vector2(-0.8, 0) * u, c + Vector2(0.8, 0) * u, Color("2b2b30"), maxf(1.0, 0.9 * u))
+	match int(st.get("extra", 0)):
+		1:
+			for k in [-1.0, 1.0]:
+				ci.draw_circle(c + Vector2(10.4 * k, 3) * u, 1.3 * u, Color("f2c14e"))
+		2:
+			if not staff:
+				ci.draw_rect(Rect2(c + Vector2(-10.5, -9.5) * u, Vector2(21, 2.6) * u), st.get("accent", Color("d23b30")))
+		3:
+			for k in [Vector2(-5.5, 2.5), Vector2(-4, 3.5), Vector2(5.5, 2.5), Vector2(4, 3.5), Vector2(-4.8, 1.2), Vector2(4.8, 1.2)]:
+				ci.draw_circle(c + k * u, 0.55 * u, skin.darkened(0.3))
+		4:
+			ellipse(ci, c + Vector2(0, 11) * u, Vector2(10, 3.2) * u, st.get("accent", Color("d23b30")))
+
+
+static func _portrait_body(ci: CanvasItem, r: Rect2, skin: Color, hair: Color, shirt: Color, staff: bool, look: String = "", st: Dictionary = {}) -> void:
+	var hstyle: int = st.get("hair", 0)
 	var c := r.get_center()
 	var u := r.size.y / 48.0
 	ci.draw_circle(c, r.size.y * 0.5, Color(1, 1, 1, 0.07))
@@ -174,11 +290,31 @@ static func portrait(ci: CanvasItem, r: Rect2, skin: Color, hair: Color, shirt: 
 		pts.append(c + Vector2(0, -3) * u + Vector2(cos(a) * 11.2, sin(a) * 10.5) * u)
 	pts.append(c + Vector2(9, -4) * u)
 	pts.append(c + Vector2(-9, -4) * u)
-	ci.draw_colored_polygon(pts, hair)
-	# face
+	if hstyle == 5:
+		ci.draw_circle(c + Vector2(-3, -8) * u, 2.5 * u, Color(1, 1, 1, 0.3))
+	elif hstyle == 6:
+		ci.draw_colored_polygon(pts, Color(hair, 0.5))
+	else:
+		ci.draw_colored_polygon(pts, hair)
+	# face: eyes, brows and a mouth of their own
 	ci.draw_circle(c + Vector2(-3.8, 0) * u, 1.3 * u, Color("2a1d17"))
 	ci.draw_circle(c + Vector2(3.8, 0) * u, 1.3 * u, Color("2a1d17"))
-	ci.draw_arc(c + Vector2(0, 3) * u, 3.4 * u, 0.25, PI - 0.25, 10, Color("2a1d17"), maxf(1.0, 1.2 * u), true)
+	var tilt: float = st.get("brows", 0.0)
+	if not st.is_empty():
+		for k in [-1.0, 1.0]:
+			var bc := c + Vector2(3.8 * k, -3.2) * u
+			var d := Vector2(cos(tilt * k), sin(tilt * k)) * 2.2 * u
+			ci.draw_line(bc - d, bc + d, hair.darkened(0.3), maxf(1.0, 1.1 * u))
+	match int(st.get("mouth", 0)):
+		1:
+			ci.draw_arc(c + Vector2(0, 2.6) * u, 3.6 * u, 0.1, PI - 0.1, 10, Color("2a1d17"), maxf(1.0, 1.2 * u), true)
+			ci.draw_line(c + Vector2(-3.4, 2.8) * u, c + Vector2(3.4, 2.8) * u, Color("2a1d17"), maxf(1.0, 1.0 * u))
+		2:
+			ci.draw_line(c + Vector2(-2.6, 4.8) * u, c + Vector2(2.6, 4.8) * u, Color("2a1d17"), maxf(1.0, 1.2 * u))
+		3:
+			ci.draw_arc(c + Vector2(1, 3) * u, 3.0 * u, 0.2, PI * 0.6, 8, Color("2a1d17"), maxf(1.0, 1.2 * u), true)
+		_:
+			ci.draw_arc(c + Vector2(0, 3) * u, 3.4 * u, 0.25, PI - 0.25, 10, Color("2a1d17"), maxf(1.0, 1.2 * u), true)
 	if role == "cook":
 		# a tall chef's toque
 		ci.draw_rect(Rect2(c + Vector2(-8, -16) * u, Vector2(16, 8) * u), Color("fbfbf8"))
@@ -857,6 +993,129 @@ static func furniture_in(ci: CanvasItem, type: String, r: Rect2, dir: int, f = n
 			rbox(ci, top.grow(-9 * s), Color("2b1d17"), Color("2b1d17"), 3, 0)
 			for i in 3:
 				ci.draw_line(Vector2(inner.position.x + 6 * s, inner.position.y + (4 + i * 3) * s), Vector2(inner.end.x - 6 * s, inner.position.y + (4 + i * 3) * s), Color("d8d0c2"), 1.0)
+		"bench", "wait_chair":
+			# a wooden bench (or a single chair) with a red seat cushion and a back rail
+			var wide := inner.size.x >= inner.size.y
+			var back := Rect2(inner.position, Vector2(inner.size.x, 5 * s)) if wide else Rect2(inner.position, Vector2(5 * s, inner.size.y))
+			ci.draw_rect(Rect2(inner.position + Vector2(1, 2) * s, inner.size), Color(0, 0, 0, 0.18))
+			rbox(ci, inner, Color("8a5a36"), Color("5e3b20"), 3, 1)
+			rbox(ci, back, Color("6e4526"), Color("5e3b20"), 2, 1)
+			var seat := inner.grow(-4 * s)
+			if wide:
+				seat.position.y += 3 * s
+				seat.size.y -= 3 * s
+			else:
+				seat.position.x += 3 * s
+				seat.size.x -= 3 * s
+			rbox(ci, seat, Color("c8403a"), Color("9e2f28"), 3, 1)
+			if type == "bench":
+				var mid := seat.get_center()
+				if wide:
+					ci.draw_line(Vector2(mid.x, seat.position.y), Vector2(mid.x, seat.end.y), Color("9e2f28"), 1.2 * s)
+				else:
+					ci.draw_line(Vector2(seat.position.x, mid.y), Vector2(seat.end.x, mid.y), Color("9e2f28"), 1.2 * s)
+		"staff_table":
+			rbox(ci, inner, Color("9aa3a8"), Color("6e777c"), 3)
+			rbox(ci, inner.grow(-3 * s), Color("c9d0d4"), Color("c9d0d4"), 2, 0)
+			ci.draw_circle(inner.get_center() + Vector2(-inner.size.x * 0.2, 0), 3.2 * s, Color("f4f4f4"))
+			ci.draw_circle(inner.get_center() + Vector2(inner.size.x * 0.22, -1 * s), 2.4 * s, Color("c98a3a"))
+		"coffee_maker":
+			rbox(ci, inner, Color("3a3d42"), Color("25272b"), 3)
+			ci.draw_circle(inner.get_center() + Vector2(0, 2) * s, 6 * s, Color("dfeef6"))
+			ci.draw_circle(inner.get_center() + Vector2(0, 2) * s, 4.8 * s, Color("5a3520"))
+			ci.draw_rect(Rect2(inner.position + Vector2(3, 3) * s, Vector2(inner.size.x - 6 * s, 4 * s)), Color("d23b30"))
+		"vending":
+			rbox(ci, inner, Color("2f6fb3"), Color("1f4f82"), 3)
+			var glass := Rect2(inner.position + Vector2(3, 3) * s, Vector2(inner.size.x * 0.62, inner.size.y - 6 * s))
+			ci.draw_rect(glass, Color("bfe3f7"))
+			for yy in 3:
+				for xx in 3:
+					var cc: Color = [Color("e75a4e"), Color("f2c14e"), Color("6cc3a0")][(xx + yy) % 3]
+					ci.draw_rect(Rect2(glass.position + Vector2(2 + xx * glass.size.x / 3.2, 2 + yy * glass.size.y / 3.2), Vector2(glass.size.x / 4.5, glass.size.y / 5.0)), cc)
+			ci.draw_rect(Rect2(Vector2(glass.end.x + 2 * s, inner.position.y + 5 * s), Vector2(inner.end.x - glass.end.x - 5 * s, 6 * s)), Color("1a1a1a"))
+		"tv":
+			rbox(ci, inner, Color("5a4030"), Color("3e2b1f"), 3)
+			var scr := inner.grow(-4 * s)
+			scr.size.y *= 0.7
+			ci.draw_rect(scr, Color("1b1d22"))
+			ci.draw_rect(scr.grow(-1.5 * s), Color("3f86c6"))
+			ci.draw_rect(Rect2(scr.position + Vector2(scr.size.x * 0.1, scr.size.y * 0.55), Vector2(scr.size.x * 0.8, scr.size.y * 0.3)), Color("4f9a45"))
+		"lockers":
+			rbox(ci, inner, Color("6c8aa3"), Color("4a6377"), 2)
+			var n := 4
+			for i in n:
+				var lw := inner.size.x / n if inner.size.x >= inner.size.y else inner.size.x
+				var lh := inner.size.y if inner.size.x >= inner.size.y else inner.size.y / n
+				var lr := Rect2(inner.position + (Vector2(lw * i, 0) if inner.size.x >= inner.size.y else Vector2(0, lh * i)), Vector2(lw, lh)).grow(-1.2 * s)
+				ci.draw_rect(lr, Color("7fa0ba"))
+				for k in 3:
+					ci.draw_line(lr.position + Vector2(2 * s, (3 + k * 2) * s), lr.position + Vector2(lr.size.x - 2 * s, (3 + k * 2) * s), Color("4a6377"), 0.8 * s)
+				ci.draw_circle(lr.get_center() + Vector2(lr.size.x * 0.25, 0), 1.0 * s, Color("f2c14e"))
+		"desk":
+			rbox(ci, inner, Color("6b4226"), Color("4a2c18"), 3)
+			rbox(ci, inner.grow(-3 * s), Color("8a5a36"), Color("8a5a36"), 2, 0)
+			var dc := inner.get_center()
+			ci.draw_rect(Rect2(dc + Vector2(-inner.size.x * 0.35, -4 * s), Vector2(9 * s, 7 * s)), Color("f6f1e6"))
+			ci.draw_rect(Rect2(dc + Vector2(-inner.size.x * 0.33, -3 * s), Vector2(9 * s, 7 * s)), Color("fbfbf5"))
+			ci.draw_rect(Rect2(dc + Vector2(inner.size.x * 0.05, -5 * s), Vector2(11 * s, 8 * s)), Color("2a2c30"))
+			ci.draw_rect(Rect2(dc + Vector2(inner.size.x * 0.05 + 1, -4 * s), Vector2(11 * s - 2, 6 * s)), Color("6aa6d9"))
+			ci.draw_circle(dc + Vector2(inner.size.x * 0.36, 2 * s), 2 * s, Color("f4f4f4"))
+		"filing":
+			rbox(ci, inner, Color("8d949b"), Color("5f666c"), 2)
+			for k in 3:
+				var dr := Rect2(inner.position + Vector2(2 * s, 2 * s + k * (inner.size.y - 4 * s) / 3.0), Vector2(inner.size.x - 4 * s, (inner.size.y - 4 * s) / 3.0 - 1 * s))
+				ci.draw_rect(dr, Color("aab1b7"))
+				ci.draw_rect(Rect2(dr.get_center() - Vector2(3, 0.8) * s, Vector2(6, 1.6) * s), Color("4a4f54"))
+		"whiteboard", "tin_sign", "records":
+			var dw2 := Vector2(Data.DIRS[wall_dir if wall_dir >= 0 else 2])
+			var bsz := Vector2(12, 24) * s if dw2.x != 0 else Vector2(24, 12) * s
+			var br := Rect2(r.get_center() + dw2 * 7.0 * s - bsz / 2.0, bsz)
+			rbox(ci, Rect2(br.position + Vector2(1, 1.5) * s, br.size), Color(0, 0, 0, 0.28), Color(0, 0, 0, 0), 2, 0)
+			match type:
+				"whiteboard":
+					rbox(ci, br, Color("f7f7f2"), Color("9aa3a8"), 2, 1)
+					for k in 3:
+						var y0 := br.position + Vector2(2.5, 2.5 + k * 3.0) * s
+						ci.draw_line(y0, y0 + Vector2(br.size.x - 5 * s, 0) * (0.5 + 0.15 * k) if br.size.x > br.size.y else y0 + Vector2(br.size.x - 5 * s, 0), [Color("d23b30"), Color("3f86c6"), Color("3a2e26")][k], 0.9 * s)
+				"tin_sign":
+					rbox(ci, br, Color("c8403a"), Color("8a2a24"), 2, 1)
+					ci.draw_circle(br.get_center(), 3.2 * s, Color("f4f4f4"))
+					ci.draw_circle(br.get_center(), 2.4 * s, Color("5a3520"))
+					ci.draw_line(br.get_center() + Vector2(-1, -4) * s, br.get_center() + Vector2(0, -6) * s, Color(1, 1, 1, 0.7), 0.8 * s)
+				"records":
+					var along2 := Vector2(dw2.y, dw2.x).abs()
+					for k in 3:
+						var rc := br.get_center() + along2 * (k - 1) * 7.5 * s
+						ci.draw_circle(rc, 3.6 * s, Color("16161a"))
+						ci.draw_arc(rc, 2.6 * s, 0, TAU, 12, Color("33333a"), 0.6 * s)
+						ci.draw_circle(rc, 1.2 * s, [Color("e75a4e"), Color("f2c14e"), Color("6aa6d9")][k])
+		"rug":
+			rbox(ci, inner, Color("a8452a"), Color("7e3220"), 3)
+			rbox(ci, inner.grow(-3 * s), Color("d9a14a"), Color("d9a14a"), 2, 0)
+			rbox(ci, inner.grow(-6 * s), Color("2f6b52"), Color("2f6b52"), 2, 0)
+		"flowers":
+			rbox(ci, inner.grow(-3 * s), Color("8a5a36"), Color("5e3b20"), 2)
+			var fc := inner.get_center()
+			for k in 5:
+				var fp := fc + Vector2.from_angle(TAU * k / 5.0) * 4.5 * s
+				ci.draw_circle(fp, 2.6 * s, [Color("e75a4e"), Color("f2c14e"), Color("e27fa8"), Color("f7f7f2"), Color("b58be0")][k])
+				ci.draw_circle(fp, 0.8 * s, Color("f2c14e"))
+			ci.draw_circle(fc, 2 * s, Color("4f9a45"))
+		"palm":
+			ci.draw_circle(r.get_center() + Vector2(1, 1.5) * s, 9 * s, Color(0, 0, 0, 0.2))
+			ci.draw_circle(r.get_center(), 7 * s, Color("b8793a"))
+			for k in 7:
+				var a2 := TAU * k / 7.0 + 0.3
+				ellipse(ci, r.get_center() + Vector2.from_angle(a2) * 8 * s, Vector2(9, 3) * s, Color("3f8a3c") if k % 2 == 0 else Color("56a84a"), a2)
+			ci.draw_circle(r.get_center(), 2.5 * s, Color("6b4226"))
+		"gumball":
+			ci.draw_circle(r.get_center() + Vector2(1, 1.5) * s, 9 * s, Color(0, 0, 0, 0.2))
+			ci.draw_circle(r.get_center(), 8.5 * s, Color("c8403a"))
+			ci.draw_circle(r.get_center(), 7 * s, Color("dfeef6"))
+			for k in 9:
+				var gp := r.get_center() + Vector2.from_angle(k * 2.4) * (1.5 + (k % 3) * 1.8) * s
+				ci.draw_circle(gp, 1.5 * s, [Color("e75a4e"), Color("f2c14e"), Color("6aa6d9"), Color("6cc3a0"), Color("e27fa8")][k % 5])
+			ci.draw_circle(r.get_center() + Vector2(-2.5, -2.5) * s, 1.6 * s, Color(1, 1, 1, 0.6))
 		"sofa":
 			var face: Vector2i = Data.DIRS[dir]
 			rbox(ci, inner, Color("3f8f86"), Color("2b6a63"), 6)
@@ -925,7 +1184,7 @@ static func furniture_in(ci: CanvasItem, type: String, r: Rect2, dir: int, f = n
 				ci.draw_circle(pr.get_center() + Vector2(0, -1.5) * s, 3.0 * s, Color("c9bfae"))
 				ci.draw_circle(pr.get_center() + Vector2(0, 4.5) * s, 4.5 * s, Color("c9bfae"))
 			else:
-				portrait(ci, pr, lk["skin"], lk["hair"], lk["shirt"], true, lk["look"])
+				portrait(ci, pr, lk["skin"], lk["hair"], lk["shirt"], true, lk["look"], style_for(hash(str(Moments.eotm.get("name", "")))))
 			ci.draw_circle(er.position + Vector2(er.size.x / 2.0, er.size.y - 1.5 * s), 2.2 * s, Color("e75a4e"))
 		"wall_art":
 			# a framed landscape hanging on the room side of the wall: wide on the

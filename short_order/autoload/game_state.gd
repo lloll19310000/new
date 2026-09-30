@@ -553,5 +553,5 @@ func guess_role(priorities: Dictionary, manager: bool) -> String:
 func wages() -> float:
 	var total := 0.0
 	for s in staff:
-		total += Shifts.pay_today(s)
+		total += Shifts.pay_today(s) + Shifts.premium_today(s)
 	return total

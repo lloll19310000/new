@@ -63,7 +63,7 @@ func _draw() -> void:
 		match kind:
 			"mvp":
 				var pr := Rect2(c - Vector2(34, 34), Vector2(68, 68))
-				Art.portrait(self, pr, data["skin"], data["hair"], data["shirt"], true, data.get("look", ""))
+				Art.portrait(self, pr, data["skin"], data["hair"], data["shirt"], true, data.get("look", ""), Art.style_for(hash(str(data.get("name", "")))))
 				_icon("star", Rect2(photo.end - Vector2(24, 24), Vector2(18, 18)), Color("fff4c2"))
 			"best":
 				_icon("star", Rect2(c - Vector2(26, 30), Vector2(52, 52)), Color("fff4c2"))

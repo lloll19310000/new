@@ -29,7 +29,8 @@ func reset() -> void:
 
 
 func reset_today() -> void:
-	today = {"late": [], "no_show": [], "sick_home": [], "sick_in": [], "clopen": [], "overtime": 0.0, "trained": [], "trained_done": []}
+	today = {"late": [], "no_show": [], "sick_home": [], "sick_in": [], "clopen": [], "overtime": 0.0, "trained": [], "trained_done": [],
+		"meal_breaks": 0, "rest_breaks": 0, "missed_meal": []}
 
 
 # ------------------------------------------------------------------ shift times
@@ -280,6 +281,10 @@ func overworked() -> Array:
 ## When the day starts: who's coming in, when, and in what state.
 func morning() -> void:
 	reset_today()
+	# a locker each: everyone starts a little calmer
+	if main != null and GameState.staff.size() > 0 and main.lot.of_type("lockers").size() * 4 >= GameState.staff.size():
+		for s in GameState.staff:
+			s.add_stress(-Data.LOCKER_CALM, "a locker of their own")
 	for s in GameState.staff:
 		s.came_at = -1.0
 		s.left_at = -1.0
@@ -287,6 +292,9 @@ func morning() -> void:
 		s.heading_home = false
 		s.arriving = false
 		s.stayed_late = false
+		s.meal_break_done = false
+		s.meal_missed = false
+		s.rest_breaks = 0
 		s.late_by = 0.0
 		s.no_show = false
 		s.exposure = 0.0
@@ -320,6 +328,8 @@ func morning() -> void:
 			var p_no: float = Data.NO_SHOW_CHANCE + (0.02 if s.mood == "fed_up" else 0.0) + (0.04 if s.burnout_warned else 0.0) + 0.01 * s.warnings
 			skip = randf() < p_no
 			var p_late: float = Data.LATE_CHANCE + (0.06 if s.mood == "fed_up" else 0.0) + (0.05 if s.energy < Data.CLOSED_LATE_ENERGY else 0.0) + (0.03 if s.has_trait("slow") else 0.0)
+			if main != null and main.lot.has_type("whiteboard"):
+				p_late *= Data.WHITEBOARD_LATE
 			if randf() < p_late:
 				late = float(randi_range(Data.LATE_MINUTES.x, Data.LATE_MINUTES.y))
 		if force_no_show.has(s.id):
@@ -456,6 +466,20 @@ func tick(minutes: float) -> void:
 			s.train_today += minutes
 
 
+## One person per role on a timed break at a time, and never the last cook
+## or server on the floor.
+func can_break(s) -> bool:
+	var here := 0
+	for o in Crew.present():
+		if o == s or o.role != s.role:
+			continue
+		if o.on_break and o.break_kind != "":
+			return false
+		if not o.on_break and not o.clock_out:
+			here += 1
+	return here >= 1 or not s.role in ESSENTIAL
+
+
 ## Would leaving now leave their role with nobody, or the floor swamped?
 func must_stay(s) -> bool:
 	var others := 0
@@ -590,6 +614,11 @@ func pay_today(s) -> float:
 	return pay_for_hours(s.wage, h)
 
 
+## The meal-break premium: an hour's pay for a missed meal break.
+func premium_today(s) -> float:
+	return s.wage if s.meal_missed and hours_today(s) > 0.0 else 0.0
+
+
 ## California pay for a day's hours at this hourly rate: time and a half past 8
 ## hours, double time past 12, and at least 4 hours for coming in.
 static func pay_for_hours(rate: float, h: float) -> float:
@@ -616,6 +645,11 @@ func night() -> void:
 		elif s.away:
 			s.streak = 0
 		today["overtime"] += maxf(0.0, hours_today(s) - Data.SHIFT_HOURS)
+		# worked past the 5th hour without a meal break: an hour's pay on top
+		if s.came_at >= 0.0 and not s.meal_break_done and hours_today(s) * 60.0 > Data.MEAL_BREAK_BY + 15.0:
+			s.meal_missed = true
+		if s.meal_missed:
+			today["missed_meal"].append(s.person_name)
 		# sick days count down at home; working through it doesn't help
 		if s.sick_days > 0 and s.away and not s.sick_at_work:
 			s.sick_days -= 1
@@ -682,6 +716,11 @@ func report_lines() -> Array:
 	for s in overworked():
 		out.append(["alert", "#f2c14e", "[b]%s[/b] has worked %d days in a row: nobody else can cover as a %s. Hire another so the schedule can give them a day off." % [
 			s.person_name, s.streak, Data.ROLES[s.role]["name"].to_lower()]])
+	if today.get("meal_breaks", 0) + today.get("rest_breaks", 0) > 0:
+		out.append(["sun", "#6cc3a0", "Breaks today: %d meal break%s and %d rest break%s." % [today["meal_breaks"], "" if today["meal_breaks"] == 1 else "s", today["rest_breaks"], "" if today["rest_breaks"] == 1 else "s"]])
+	var missed: Array = today.get("missed_meal", [])
+	if not missed.is_empty():
+		out.append(["money", "#e75a4e", "%s worked past the 5th hour without a meal break: an hour's pay each on top (California's meal-break premium). A second person in the role lets breaks happen." % Crew.and_list(missed)])
 	if plan_note != "":
 		out.append(["clock", "#6aa6d9", plan_note])
 	return out

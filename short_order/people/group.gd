@@ -13,6 +13,7 @@ extends Node
 ## named regulars (see autoload/front.gd).
 
 const Customer = preload("res://people/customer.gd")
+const Art = preload("res://world/art.gd")
 
 var lot
 var kind := "regular"
@@ -65,6 +66,9 @@ var allergic_items: Array = [] # that person's dishes not served yet
 var restroom_in := -1.0    # minutes until one of them goes to the restroom, or -1
 var saw_mouse := false
 var refill_in := -1.0      # minutes until they'd like a coffee top-up, or -1
+var table2 = null          # a second table pushed together for a big party
+var wait_spots: Array = [] # cells they're waiting on (a bench, a waiting chair, the line)
+var wait_seated := false   # someone in the group got a seat to wait on
 var wants_refill := false
 var refills := 0
 
@@ -93,6 +97,7 @@ func start(lot_ref, size: int, parent: Node, kind_: String = "regular", window =
 		members[0].skin = regular["skin"]
 		members[0].hair = regular["hair"]
 		members[0].shirt = regular["shirt"]
+		members[0].style = Art.style_for(hash(regular["name"]))
 		members[0].queue_redraw()
 	if booking != null:
 		booking["group"] = self
@@ -138,8 +143,12 @@ func tick(minutes: float) -> void:
 				else:
 					state = "waiting"
 					Sfx.play("door", -6.0)
+					take_wait_spots()
 		"waiting":
 			waited += minutes
+			for m in members:
+				if m.has_meta("wait_seat") and not m.is_moving() and not m.sitting:
+					m.sitting = true
 			if not greeted and Front.host_working() and not JobBoard.has_open("greet", "group", self):
 				JobBoard.post("host", "greet", {"group": self})
 			try_seat()
@@ -229,6 +238,10 @@ func restroom_tick(minutes: float) -> void:
 
 func table_patience() -> float:
 	var p: float = Data.TABLE_PATIENCE * info()["patience"]
+	if wait_seated:
+		p *= Data.WAIT_SEAT_PATIENCE
+	elif not wait_spots.is_empty() and Events.raining and lot.floor_at(wait_spots[0]) == Data.FLOOR_NONE:
+		p *= Data.LINE_RAIN_PATIENCE
 	if greeted:
 		p *= Data.GREET_PATIENCE
 	if booking != null:
@@ -289,6 +302,40 @@ func label() -> String:
 
 # ------------------------------------------------------------------ seating
 
+## Waiting for a table: a bench or waiting chair if there's one free (nearest
+## the door first), otherwise a place in the line along the sidewalk.
+func take_wait_spots() -> void:
+	var taken: Dictionary = lot.wait_taken
+	var seats: Array = lot.wait_seats().filter(func(ws): return not taken.has(ws[0]) and lot.walkable(ws[0]))
+	seats.sort_custom(func(a, b): return lot.distance(a[0], lot.entry_inside) < lot.distance(b[0], lot.entry_inside))
+	var line: Array = lot.line_cells().filter(func(c): return not taken.has(c))
+	for m in members:
+		var spot = null
+		if not seats.is_empty():
+			spot = seats.pop_front()[0]
+			m.set_meta("wait_seat", true)
+			wait_seated = true
+		elif not line.is_empty():
+			spot = line.pop_front()
+		if spot == null:
+			continue
+		taken[spot] = m
+		wait_spots.append(spot)
+		m.offset = Vector2.ZERO
+		m.go_to(spot)
+
+
+func release_wait_spots() -> void:
+	for c in wait_spots:
+		if lot.wait_taken.get(c) in members:
+			lot.wait_taken.erase(c)
+	wait_spots.clear()
+	for m in members:
+		if m.has_meta("wait_seat"):
+			m.remove_meta("wait_seat")
+			m.sitting = false
+
+
 func try_seat() -> void:
 	var best = null
 	# a booked table waits for them
@@ -305,10 +352,25 @@ func try_seat() -> void:
 			if best == null or t.chairs.size() < best.chairs.size() or (t.chairs.size() == best.chairs.size() and \
 					(int(likes_seat(t)) > int(likes_seat(best)) or (likes_seat(t) == likes_seat(best) and lot.distance(t.cell, lot.entry_inside) < lot.distance(best.cell, lot.entry_inside)))):
 				best = t
+	var chairs: Array = best.chairs.duplicate() if best != null else []
+	if best == null and members.size() > 1:
+		# a big party: push two free tables together
+		for p in lot.merge_pairs():
+			if p[2] < members.size() or not p[0].table_free() or not p[1].table_free():
+				continue
+			if (p[0].reserved != null and p[0].reserved != booking) or (p[1].reserved != null and p[1].reserved != booking):
+				continue
+			best = p[0]
+			table2 = p[1]
+			table2.group = self
+			chairs = p[0].chairs + p[1].chairs
+			GameState.toast.emit("%s: the staff pushed tables %d and %d together." % [Data.CUSTOMERS[kind]["name"], lot.table_number(p[0]), lot.table_number(p[1])], "")
+			break
 	if best == null:
 		if booking != null and waited > 8.0:
 			extra_hits["our booked table wasn't ready"] = 0.5
 		return
+	release_wait_spots()
 	table = best
 	table.group = self
 	if likes_seat(best):
@@ -319,7 +381,7 @@ func try_seat() -> void:
 			review_bonus += Data.BOOKING_REVIEW
 		booking["state"] = "seated"
 	for i in members.size():
-		var ch = table.chairs[i]
+		var ch = chairs[i]
 		ch.occupant = members[i]
 		members[i].seat = ch
 		members[i].offset = Vector2.ZERO
@@ -789,13 +851,26 @@ func leave_table() -> void:
 	table.dirty_plates += plates
 	if plates > 0 and not JobBoard.has_open("bus", "furniture", table):
 		JobBoard.post("clean", "bus", {"furniture": table})
-	for ch in table.chairs:
+	for ch in table.chairs + (table2.chairs if table2 != null else []):
 		lot.add_dirt(ch.cell, randf_range(0.05, 0.25))
 		if ch.occupant in members:
 			ch.occupant = null
 	if table.group == self:
 		table.group = null
+	free_table2()
 	lot.queue_redraw()
+
+
+## The second table of a pushed-together pair goes back to normal.
+func free_table2() -> void:
+	if table2 == null:
+		return
+	if table2.group == self:
+		table2.group = null
+	for ch in table2.chairs:
+		if ch.occupant in members:
+			ch.occupant = null
+	table2 = null
 
 
 # ------------------------------------------------------------------ paying
@@ -1123,6 +1198,8 @@ func leave(score: float, complaint: String, paid: bool) -> void:
 			GameState.note_moment(0.0, moment_who(), complaint if complaint != "" else "waiting too long", true)
 	if booking != null:
 		Front.release(booking)
+	release_wait_spots()
+	free_table2()
 	if table != null:
 		if table.group == self:
 			table.group = null

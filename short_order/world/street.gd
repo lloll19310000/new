@@ -62,7 +62,7 @@ func _process(delta: float) -> void:
 	if _walk_t <= 0.0:
 		_walk_t = randf_range(2.5, 7.0) / busy()
 		var d := 1 if randf() < 0.5 else -1
-		walkers.append({"x": -20.0 if d == 1 else w + 20.0, "dir": d, "speed": randf_range(30.0, 50.0), "shirt": Data.CLOTHES.pick_random(),
+		walkers.append({"x": -20.0 if d == 1 else w + 20.0, "dir": d, "speed": randf_range(30.0, 50.0), "style": Art.style_for(randi()), "shirt": Data.CLOTHES.pick_random(),
 			"skin": Data.SKIN.pick_random(), "hair": Data.HAIR.pick_random(), "step": 0.0})
 	for p in walkers:
 		p["x"] += p["dir"] * p["speed"] * dt
@@ -83,4 +83,4 @@ func _draw() -> void:
 		Art.car(self, Vector2(c["x"], y), 1 if c["lane"] == 0 else -1, c["color"], c["bus"])
 	for p in walkers:
 		var pos := Vector2(p["x"], (Data.LOT_H - 0.25) * t)
-		Art.person(self, pos, Vector2(p["dir"], 0), p["shirt"], p["skin"], p["hair"], p["step"], false, false, false, "", 0.8)
+		Art.person(self, pos, Vector2(p["dir"], 0), p["shirt"], p["skin"], p["hair"], p["step"], false, false, false, "", 0.8, p.get("style", {}))

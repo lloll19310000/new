@@ -19,6 +19,7 @@ var is_staff := false
 var wears_hat := false
 var look := ""                 # extra details: "backpack", "cap", "beret", "coat"
 var body_scale := 1.0          # kids are a bit smaller
+var style: Dictionary = {}     # their own look: hair, build, glasses... (see Art.style_for)
 var customer_nav := false      # customers stay out of the kitchen and staff room
 var mess := 1.0                # how much dirt they track in
 
@@ -105,7 +106,7 @@ func face_toward(p: Vector2) -> void:
 
 
 func _draw() -> void:
-	Art.person(self, Vector2.ZERO, facing, shirt, skin, hair, step_anim, is_staff, wears_hat, sitting, look, body_scale)
+	Art.person(self, Vector2.ZERO, facing, shirt, skin, hair, step_anim, is_staff, wears_hat, sitting, look, body_scale, style)
 	if carry.is_empty():
 		return
 	var side := Vector2(-facing.y, facing.x)

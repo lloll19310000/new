@@ -136,7 +136,7 @@ func _draw() -> void:
 
 func face(s, r: Rect2, hot: bool) -> void:
 	draw_circle(r.get_center(), r.size.x / 2.0, Color("201915"))
-	Art.portrait(self, r, s.skin, s.hair, s.shirt, true, s.look)
+	Art.portrait(self, r, s.skin, s.hair, s.shirt, true, s.look, s.style)
 	var ring := Color("f2c14e") if s.manager else (Color("f5ecdf") if hot else Color(0, 0, 0, 0))
 	if ring.a > 0.0:
 		draw_arc(r.get_center(), r.size.x / 2.0 - 0.5, 0, TAU, 24, ring, 1.5, true)

@@ -33,6 +33,7 @@ func _ready() -> void:
 
 
 func init_grid() -> void:
+	wait_taken = {}
 	var n := W * H
 	floor_type = PackedByteArray()
 	floor_type.resize(n)
@@ -338,6 +339,71 @@ func tables() -> Array:
 	return furniture.filter(func(f): return f.is_table() and f.chairs.size() > 0)
 
 
+## Waiting seats (benches and waiting chairs), one per cell: [cell, piece].
+var wait_taken := {}          # waiting seat or line cell -> the customer standing there
+
+
+## Walkable cells with this floor.
+func cells_of_floor(t: int) -> Array:
+	var out: Array = []
+	for y in H:
+		for x in W:
+			var c := Vector2i(x, y)
+			if floor_type[idx(c)] == t and walkable(c):
+				out.append(c)
+	return out
+
+
+func wait_seats() -> Array:
+	var out: Array = []
+	for f in furniture:
+		if f.info().get("wait_seat", false):
+			for c in f.cells():
+				out.append([c, f])
+	return out
+
+
+## Where a line forms outside: along the sidewalk from the door, both ways.
+func line_cells() -> Array:
+	var out: Array = []
+	if not has_entry():
+		return out
+	for k in range(1, Data.LINE_MAX + 4):
+		for side in [1, -1]:
+			var c: Vector2i = entry_outside + Vector2i(k * side, 0)
+			if in_lot(c) and walkable(c) and out.size() < Data.LINE_MAX:
+				out.append(c)
+	return out
+
+
+## Two free tables close enough to push together, for a big party: the
+## pairs, each [a, b, seats]. Counters don't move.
+func merge_pairs() -> Array:
+	var ts: Array = tables().filter(func(t): return not t.is_counter())
+	var out: Array = []
+	for i in ts.size():
+		for j in range(i + 1, ts.size()):
+			var a = ts[i]
+			var b = ts[j]
+			var ra: Rect2i = Rect2i(a.cell, Vector2i(a.rect_px().size / Data.TILE))
+			var rb: Rect2i = Rect2i(b.cell, Vector2i(b.rect_px().size / Data.TILE))
+			var gx: int = maxi(0, maxi(ra.position.x - rb.end.x, rb.position.x - ra.end.x))
+			var gy: int = maxi(0, maxi(ra.position.y - rb.end.y, rb.position.y - ra.end.y))
+			if maxi(gx, gy) <= Data.MERGE_GAP:
+				out.append([a, b, a.chairs.size() + b.chairs.size()])
+	return out
+
+
+## The most people one sitting can seat: a table, or two pushed together.
+func biggest_party() -> int:
+	var best := 0
+	for t in tables():
+		best = maxi(best, t.chairs.size())
+	for p in merge_pairs():
+		best = maxi(best, p[2])
+	return best
+
+
 ## Tables are numbered left to right, top to bottom: "Table 3".
 func table_number(t) -> int:
 	var ts: Array = tables()
@@ -439,11 +505,13 @@ func floor_ok(need: String, kind: int) -> bool:
 		"restroom": return kind == Data.FLOOR_RESTROOM
 		"wash": return kind == Data.FLOOR_KITCHEN or kind == Data.FLOOR_RESTROOM
 		"outside": return kind == Data.FLOOR_NONE
+		"front": return kind == Data.FLOOR_DINER or kind == Data.FLOOR_NONE
 	return true
 
 
 const FLOOR_HINT := {
 	"any": "Furniture goes on a floor. Lay a floor first.",
+	"front": "This goes in the dining room or outside, by the front.",
 	"diner": "This goes on diner floor.",
 	"kitchen": "This goes on kitchen floor.",
 	"staff": "This goes on staff room floor.",
@@ -789,6 +857,8 @@ func inspection() -> Dictionary:
 	if broken > 0:
 		notes.append("broken equipment")
 	notes.append_array(extra[1])
+	if has_type("filing"):
+		score += 100.0 * Data.FILING_INSPECTION   # the paperwork's in order
 	var g := "A" if score >= 85.0 else ("B" if score >= 65.0 else "C")
 	return {"score": score, "grade": g, "notes": notes}
 
@@ -866,6 +936,17 @@ func _draw() -> void:
 				Art.door_tile(self, c, horizontal)
 	for f in furniture:
 		Art.furniture(self, f, inside_dir(f) if f.on_wall() else -1)
+	# a big party: the two tables pushed together get a tablecloth runner across
+	for f in furniture:
+		var g = f.group if f.is_table() else null
+		if g != null and is_instance_valid(g) and g.table == f and g.table2 != null and is_instance_valid(g.table2):
+			var a: Vector2 = f.center_px()
+			var b: Vector2 = g.table2.center_px()
+			draw_line(a, b, Color("f6f1e6"), 16.0)
+			var n := int(a.distance_to(b) / 8.0)
+			for i in n:
+				if i % 2 == 0:
+					draw_line(a.lerp(b, float(i) / n), a.lerp(b, float(i + 1) / n), Color("d23b30"), 16.0)
 	for f in furniture:
 		if f.is_table():
 			Art.table_food(self, f)

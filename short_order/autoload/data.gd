@@ -252,6 +252,8 @@ const FURNITURE := {
 	"chair":    {"name": "Chair",          "size": [1, 1], "cost": 45,  "solid": false, "cat": "dining",  "floor": "diner",   "seat": true, "desc": "Place beside a table. It turns to face the table; press R to turn it yourself."},
 	"booth":    {"name": "Booth seat",     "size": [1, 1], "cost": 110, "solid": false, "cat": "dining",  "floor": "diner",   "seat": true, "desc": "A padded bench with a high back. Put booth seats on both sides of a table for a proper booth: couples and families love one, and like their visit a little more."},
 	"counter":  {"name": "Counter",        "size": [1, 1], "cost": 120, "solid": true,  "cat": "dining",  "floor": "diner",   "seats": 1, "counter": true, "desc": "A stretch of diner counter; line several up and they join. Put a stool beside each: truckers and regulars on their own like sitting at the counter."},
+	"bench":    {"name": "Waiting bench",  "size": [2, 1], "cost": 160, "solid": false, "cat": "dining",  "floor": "front",   "wait_seat": true, "desc": "Somewhere to sit while waiting for a table: inside by the door, or out on the sidewalk. People waiting on a seat stay much longer before giving up, and a free seat means fewer walk past."},
+	"wait_chair": {"name": "Waiting chair", "size": [1, 1], "cost": 55, "solid": false, "cat": "dining", "floor": "front", "wait_seat": true, "desc": "A chair by the door for someone waiting for a table."},
 	"stool":    {"name": "Stool",          "size": [1, 1], "cost": 40,  "solid": false, "cat": "dining",  "floor": "diner",   "seat": true, "desc": "A chrome counter stool. Place one beside a counter."},
 	"grill":    {"name": "Grill",          "size": [2, 1], "cost": 900, "solid": true,  "cat": "kitchen", "floor": "kitchen", "desc": "Cooks burgers."},
 	"fryer":    {"name": "Fryer",          "size": [1, 1], "cost": 650, "solid": true,  "cat": "kitchen", "floor": "kitchen", "desc": "Cooks fries."},
@@ -267,12 +269,26 @@ const FURNITURE := {
 	"plant":    {"name": "Potted plant",   "size": [1, 1], "cost": 60,  "solid": true,  "cat": "decor",   "floor": "any",     "beauty": 1, "radius": 3, "desc": "Cheers up tables nearby."},
 	"lamp":     {"name": "Floor lamp",     "size": [1, 1], "cost": 90,  "solid": true,  "cat": "decor",   "floor": "any",     "beauty": 1, "radius": 3, "glow": true, "desc": "Cheers up tables nearby and glows in the evening."},
 	"eotm":     {"name": "Employee of the month", "size": [1, 1], "cost": 80, "solid": true, "cat": "decor", "floor": "wall", "beauty": 1, "radius": 3, "desc": "A frame on the wall with this month's best worker (picked every four weeks). Cheers up tables nearby."},
+	"rug":      {"name": "Rug",            "size": [2, 1], "cost": 80,  "solid": false, "cat": "decor",   "floor": "diner",   "beauty": 1, "radius": 3, "desc": "A woven rug. People can walk on it."},
+	"flowers":  {"name": "Flower box",     "size": [1, 1], "cost": 70,  "solid": true,  "cat": "decor",   "floor": "any",     "beauty": 1, "radius": 3, "desc": "Fresh flowers. Cheers up tables nearby."},
+	"palm":     {"name": "Big palm",       "size": [1, 1], "cost": 160, "solid": true,  "cat": "decor",   "floor": "any",     "beauty": 2, "radius": 4, "desc": "A big potted palm. Very California."},
+	"records":  {"name": "Record wall",    "size": [1, 1], "cost": 200, "solid": true,  "cat": "decor",   "floor": "wall",    "beauty": 2, "radius": 5, "desc": "Old vinyl records hung on the wall."},
+	"tin_sign": {"name": "Tin sign",       "size": [1, 1], "cost": 60,  "solid": true,  "cat": "decor",   "floor": "wall",    "beauty": 1, "radius": 4, "desc": "A vintage \"HOT COFFEE\" sign."},
+	"gumball":  {"name": "Gumball machine", "size": [1, 1], "cost": 120, "solid": true, "cat": "decor",   "floor": "diner",   "beauty": 1, "radius": 3, "kids": true, "desc": "Kids love it. So do their parents' quarters."},
 	"trophy":   {"name": "Trophy shelf",   "size": [1, 1], "cost": 150, "solid": true,  "cat": "decor",   "floor": "wall",    "beauty": 2, "radius": 5, "locked": true, "desc": "Your diner's trophies, on the wall. Customers love it. A reward from the Goals board."},
 	"aquarium": {"name": "Fish tank",      "size": [2, 1], "cost": 600, "solid": true,  "cat": "decor",   "floor": "diner",   "beauty": 3, "radius": 6, "locked": true, "desc": "A bubbling tank of goldfish. Very calming. A reward from the Goals board."},
 	"clock":    {"name": "Chrome clock",   "size": [1, 1], "cost": 120, "solid": true,  "cat": "decor",   "floor": "wall",    "beauty": 2, "radius": 5, "locked": true, "desc": "A classic chrome diner clock. A reward from the Goals board."},
 	"wall_art": {"name": "Framed picture", "size": [1, 1], "cost": 120, "solid": true,  "cat": "decor",   "floor": "wall",    "beauty": 1, "radius": 4, "desc": "Hangs on a wall. Cheers up tables nearby."},
 	"neon":     {"name": "Neon sign",      "size": [1, 1], "cost": 400, "solid": true,  "cat": "decor",   "floor": "wall",    "beauty": 2, "radius": 6, "glow": true, "desc": "Hangs on a wall and glows. Customers love it."},
 	"jukebox":  {"name": "Jukebox",        "size": [1, 1], "cost": 700, "solid": true,  "cat": "decor",   "floor": "diner",   "beauty": 2, "radius": 7, "music": true, "desc": "Plays tunes while you're open. Tables nearby enjoy the music."},
+	"staff_table": {"name": "Break table", "size": [2, 1], "cost": 180, "solid": true, "cat": "staff", "floor": "staff", "desc": "Where the crew eats on a meal break (and the staff meal). A proper sit-down meal takes more stress off."},
+	"coffee_maker": {"name": "Staff coffee", "size": [1, 1], "cost": 140, "solid": true, "cat": "staff", "floor": "staff", "desc": "A coffee maker for the crew. Breaks put energy back half as fast again."},
+	"vending":  {"name": "Vending machine", "size": [1, 1], "cost": 380, "solid": true, "cat": "staff", "floor": "staff", "desc": "Snacks and sodas. Someone on a break grabs something: a little less stress."},
+	"tv":       {"name": "Break room TV",  "size": [1, 1], "cost": 300, "solid": true,  "cat": "staff",   "floor": "staff",   "desc": "The game's on. Breaks take stress off faster."},
+	"lockers":  {"name": "Lockers",        "size": [2, 1], "cost": 220, "solid": true,  "cat": "staff",   "floor": "staff",   "desc": "Somewhere to keep their things. Each set holds four; with a locker each, the crew starts the day a little calmer."},
+	"desk":     {"name": "Manager's desk", "size": [2, 1], "cost": 450, "solid": true,  "cat": "staff",   "floor": "staff",   "desc": "The manager's office. With a desk, managers do the paperwork in peace: their talks and check-ins work better, and the whole crew's nights are calmer."},
+	"filing":   {"name": "Filing cabinet", "size": [1, 1], "cost": 90,  "solid": true,  "cat": "staff",   "floor": "staff",   "desc": "Receipts, invoices and the health certificate. The inspector likes seeing the paperwork in order (a little help at inspections)."},
+	"whiteboard": {"name": "Schedule board", "size": [1, 1], "cost": 70, "solid": true, "cat": "staff",   "floor": "wall",    "desc": "The week's schedule, pinned up where everyone sees it. People are late half as often."},
 	"sofa":     {"name": "Sofa",           "size": [2, 1], "cost": 250, "solid": false, "cat": "staff",   "floor": "staff",   "desc": "Tired staff rest here much faster than standing around. Goes in the staff room."},
 	"toilet":   {"name": "Toilet",         "size": [1, 1], "cost": 450, "solid": false, "cat": "restroom", "floor": "restroom", "desc": "Customers use it during their visit, and staff on their breaks. It gets dirty: someone with Clean on scrubs it. The inspector checks."},
 	"handsink": {"name": "Hand sink",      "size": [1, 1], "cost": 150, "solid": true,  "cat": "restroom", "floor": "wash",    "desc": "Staff wash their hands here after the restroom or the trash. Goes in a restroom or the kitchen. Skipping it costs inspection points."},
@@ -299,10 +315,41 @@ const GOALS := [
 	{"key": "crew12", "name": "Full crew", "desc": "Have 12 people on staff.", "reward": {"money": 400}},
 ]
 
+## Breaks, California style: a 30-minute meal break before the end of the
+## 5th hour, a 10-minute rest break for every 4 hours. A missed meal break
+## costs an hour's pay (the meal-period premium). Only one person per role is
+## on a timed break at a time, and not while the floor is swamped (unless
+## the break's about to be missed).
+const MEAL_BREAK_AFTER := 180.0     # minutes worked before the meal break is due (staggered from here)
+const MEAL_BREAK_BY := 300.0        # ...and by when it must start
+const MEAL_BREAK_MIN := 30.0
+const REST_BREAK_EVERY := 240.0
+const REST_BREAK_MIN := 10.0
+const REST_BREAK_WALK := 10         # tiles: further than this, a rest break is taken on the spot
+const BREAK_SWAMPED := 3            # customer jobs waiting: breaks wait too
+const BREAK_ROOM_COFFEE := 1.5      # energy back faster with staff coffee
+const BREAK_TV_STRESS := -0.5       # stress per minute on a break with a TV
+const VENDING_SNACK := -3.0
+const TABLE_MEAL_STRESS := -4.0     # a sit-down meal break at the break table
+const LOCKER_CALM := 2.0            # stress off each morning with a locker each
+const DESK_BONUS := 1.3             # a manager with a desk: better talks and check-ins
+const DESK_NIGHT_CALM := 1.5
+const WHITEBOARD_LATE := 0.5
+const FILING_INSPECTION := 0.05
+
 ## Staying on: at the end of a shift, someone stays (up to this many minutes)
 ## if nobody else in their role is here yet, or this many customer jobs wait.
+## Waiting for a table: people take a waiting seat if there's one, otherwise
+## they line up along the sidewalk outside. Seated they wait longer.
+const WAIT_SEAT_PATIENCE := 1.5
+const LINE_RAIN_PATIENCE := 0.7   # lining up outside in the rain
+const LINE_MAX := 10              # the longest line outside
+## Big parties sit at two tables pushed together (tables this close count).
+const MERGE_GAP := 2
+## A few early birds come in during the prep hour (this share of the usual rate).
+const PREP_WALKINS := 0.2
 const STAY_LATE_MAX := 90.0
-const STAY_LATE_BUSY := 5
+const STAY_LATE_BUSY := 8
 
 ## Crew moments (see Moments).
 const YEAR_DAYS := 364
@@ -342,11 +389,11 @@ const MAX_BEAUTY := 4           # beauty above this doesn't help any more
 ## The build menu, one list per category, left to right.
 const BUILD_MENU := [
 	{"key": "structure", "name": "Structure", "icon": "structure", "items": ["land", "floor_diner", "floor_kitchen", "wall", "door", "takeout", "dumpster"]},
-	{"key": "dining",    "name": "Dining",    "icon": "dining",    "items": ["table", "table_small", "chair", "booth", "counter", "stool", "host", "till"]},
+	{"key": "dining",    "name": "Dining",    "icon": "dining",    "items": ["table", "table_small", "chair", "booth", "counter", "stool", "bench", "wait_chair", "host", "till"]},
 	{"key": "kitchen",   "name": "Kitchen",   "icon": "kitchen",   "items": ["grill", "fryer", "griddle", "drinks", "oven", "ice", "pass", "prep", "fridge", "freezer", "sink", "bin", "trap"]},
 	{"key": "restroom",  "name": "Restroom",  "icon": "restroom",  "items": ["floor_restroom", "toilet", "handsink"]},
-	{"key": "decor",     "name": "Decor",     "icon": "decor",     "items": ["plant", "lamp", "wall_art", "eotm", "neon", "jukebox", "clock", "trophy", "aquarium"]},
-	{"key": "staff",     "name": "Staff room", "icon": "staff_room", "items": ["floor_staff", "sofa"]},
+	{"key": "decor",     "name": "Decor",     "icon": "decor",     "items": ["plant", "flowers", "palm", "lamp", "rug", "wall_art", "tin_sign", "records", "eotm", "neon", "jukebox", "gumball", "clock", "trophy", "aquarium"]},
+	{"key": "staff",     "name": "Staff & office", "icon": "staff_room", "items": ["floor_staff", "sofa", "staff_table", "coffee_maker", "vending", "tv", "lockers", "desk", "filing", "whiteboard"]},
 ]
 
 ## Who comes to eat. weight = how common, hours = when they come,
@@ -358,6 +405,7 @@ const CUSTOMERS := {
 	"student": {"name": "Students",    "weight": 18.0, "size": [2, 4], "hours": [13, 22], "patience": 1.15, "price": 2.0, "tip": 0.5, "likes": ["fries", "milkshake"], "look": "backpack", "order": [0.6, 0.7, 0.75, 0.3]},
 	"family":  {"name": "A family",    "weight": 14.0, "size": [2, 4], "hours": [8, 20], "patience": 0.85, "price": 1.2, "tip": 1.1, "likes": ["pancakes", "milkshake", "pie"], "look": "family", "order": [0.8, 0.35, 0.8, 0.55]},
 	"trucker": {"name": "A trucker",   "weight": 12.0, "size": [1, 1], "hours": [6, 22], "patience": 0.75, "price": 0.6, "tip": 1.6, "likes": ["burger", "meatloaf", "fries", "coffee"], "look": "cap", "order": [1.0, 0.8, 0.8, 0.45]},
+	"party":   {"name": "A big party", "weight": 2.0, "size": [5, 8], "hours": [11, 21], "patience": 1.3, "price": 1.1, "tip": 1.2, "likes": ["burger", "pie", "milkshake"], "look": "", "order": [0.95, 0.6, 0.8, 0.5], "min_seats": 5},
 	"tourist": {"name": "Tourists",    "weight": 10.0, "size": [2, 4], "hours": [9, 20], "patience": 0.9,  "price": 0.7, "tip": 1.3, "likes": ["pancakes", "meatloaf", "pie", "milkshake"], "look": "camera", "order": [0.9, 0.5, 0.8, 0.5], "min_level": 2},
 	"critic":  {"name": "A food critic", "weight": 0.0, "size": [1, 1], "hours": [11, 20], "patience": 0.9, "price": 1.5, "tip": 1.0, "likes": [], "look": "beret", "order": [1.0, 0.5, 1.0, 0.8], "review_weight": 5, "picky": 2.0},
 	"celebrity": {"name": "A celebrity", "weight": 0.0, "size": [1, 2], "hours": [10, 22], "patience": 0.8, "price": 0.5, "tip": 2.5, "likes": ["meatloaf", "pie"], "look": "shades", "order": [1.0, 0.5, 1.0, 0.8], "review_weight": 3, "picky": 1.3},

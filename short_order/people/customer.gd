@@ -25,6 +25,7 @@ func setup(lot_ref, g, index: int = 0) -> void:
 	if g.kind == "critic":
 		shirt = Color("3b3340")
 	offset = Vector2(randf_range(-6, 6), randf_range(-5, 5))
+	style = Art.style_for(randi())
 
 
 ## Off to the restroom. Returns false if there's no way there.

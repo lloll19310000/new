@@ -176,6 +176,10 @@ func simulate(real_dt: float) -> void:
 		Health.tick(minutes)
 		Shifts.tick(minutes)
 		if phase == GameState.Phase.PREP:
+			# a few early birds wander in while the crew preps
+			if GameState.minute >= GameState.open_min() - 45.0:
+				spawn_tick(minutes * Data.PREP_WALKINS)
+				kitchen_tick(minutes)
 			if GameState.minute >= GameState.open_min():
 				open_doors()
 		elif phase == GameState.Phase.SERVICE:
@@ -309,7 +313,9 @@ func spawn_tick(minutes: float) -> void:
 		if g.state == "waiting" or (g.state == "arriving" and not g.takeout and g.kind != "inspector"):
 			queued += 1
 	# a host keeps a waitlist: people put their name down instead of walking past
-	if queued >= (Data.QUEUE_LIMIT_HOST if Front.host_working() else Data.QUEUE_LIMIT):
+	# free waiting seats keep people from walking past a line
+	var free_seats: int = lot.wait_seats().size() - lot.wait_taken.size()
+	if queued >= (Data.QUEUE_LIMIT_HOST if Front.host_working() else Data.QUEUE_LIMIT) + maxi(0, free_seats / 2):
 		return   # they see the line at the door and keep walking
 	spawn_group(pick_kind(), -1)
 
@@ -331,6 +337,8 @@ func pick_kind() -> String:
 			continue
 		if GameState.rep_level < c.get("min_level", 0):
 			continue
+		if c.get("min_seats", 0) > 0 and not lot.merge_pairs().any(func(p): return p[2] >= c["min_seats"] and p[0].table_free() and p[1].table_free()):
+			continue   # a big party only comes in if there's somewhere to push tables together now
 		options.append(k)
 		total += c["weight"]
 	var roll := randf() * total
@@ -349,10 +357,7 @@ func spawn_group(kind: String, size: int, window = null, extra: Dictionary = {})
 			size = 1 if r < 0.25 else (2 if r < 0.65 else (3 if r < 0.85 else 4))
 		else:
 			size = randi_range(range_[0], range_[1])
-		var biggest := 0
-		for t in lot.tables():
-			biggest = maxi(biggest, t.chairs.size())
-		size = mini(size, maxi(biggest, 1))
+		size = mini(size, maxi(lot.biggest_party(), 1))
 	var g := Group.new()
 	g.name = "Group"
 	add_child(g)
@@ -479,6 +484,7 @@ func end_day() -> void:
 		if is_instance_valid(g):
 			g.remove_now()
 	groups.clear()
+	lot.wait_taken.clear()
 	for p in lot.of_type("pass"):
 		for it in p.items:
 			if it.get("plated", false):

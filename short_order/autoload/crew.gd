@@ -631,7 +631,7 @@ func ask_mediation(a, b) -> bool:
 
 ## The talk: how well it goes depends on the manager's people skills and mood.
 func mediate(m, a, b) -> void:
-	var q: float = clampf(0.5 + 0.05 * m.service, 0.5, 1.0) * (0.7 if m.mood == "okay" else 1.0)
+	var q: float = clampf(0.5 + 0.05 * m.service, 0.5, 1.0) * (0.7 if m.mood == "okay" else 1.0) * desk_bonus()
 	both(a, b, "mediated", Data.MEDIATE_POINTS * q)
 	a.add_stress(-Data.MEDIATE_STRESS * q, "the manager talked it out")
 	b.add_stress(-Data.MEDIATE_STRESS * q, "the manager talked it out")
@@ -664,8 +664,13 @@ func post_checkins(t: Array) -> void:
 		JobBoard.post("serve", "checkin", {"who": worst})
 
 
+## A manager with a desk of their own does better talks and check-ins.
+func desk_bonus() -> float:
+	return Data.DESK_BONUS if main != null and main.lot.has_type("desk") else 1.0
+
+
 func check_in(m, s) -> void:
-	var q: float = clampf(0.5 + 0.05 * m.service, 0.5, 1.0)
+	var q: float = clampf(0.5 + 0.05 * m.service, 0.5, 1.0) * desk_bonus()
 	s.add_stress(-Data.CHECKIN_STRESS * q, "the manager checked in")
 	if s.energy < 60.0 or s.stress >= Data.STRESS_FED_UP:
 		s.break_asked = true
@@ -861,6 +866,8 @@ func nightly() -> void:
 			s.burnout_warned = false
 			s.burnout_nights = 0
 	var calm: float = Data.MANAGER_NIGHT_CALM if team().any(func(s): return s.manager) else 0.0
+	if calm > 0.0 and main != null and main.lot.has_type("desk"):
+		calm *= Data.DESK_NIGHT_CALM
 	for s in team():
 		s.add_stress(Data.STRESS_NIGHT - calm, "a night's rest")
 	var worked: Array = []
@@ -892,6 +899,14 @@ func nightly() -> void:
 
 
 ## Someone has had enough and leaves. Their friends take it hard.
+## Someone else is already standing or sitting on this cell.
+func cell_taken(c: Vector2i, me) -> bool:
+	for o in GameState.staff:
+		if o != me and o.is_inside_tree() and o.at_work and o.current_cell() == c:
+			return true
+	return false
+
+
 func quit(s, text: String) -> void:
 	today["quits"].append(s.person_name)
 	GameState.totals["last_quit_day"] = GameState.day

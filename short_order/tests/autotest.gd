@@ -1,6 +1,7 @@
 extends RefCounted
 const V6 = preload("res://tests/v6_checks.gd")
 const V7 = preload("res://tests/v7_checks.gd")
+const V8 = preload("res://tests/v8_checks.gd")
 ## Automatic tests. Run from a terminal in the project folder:
 ##   godot --headless --path . -- --autotest     plays two days as fast as possible
 ##   godot --path . -- --uitest                  clicks through the interface like a player
@@ -152,7 +153,8 @@ static func run(main, args: PackedStringArray) -> void:
 		for s in GameState.staff:
 			if s.meal_left > 0.0 and s.sitting:
 				meal_seen = true
-		if GameState.phase == GameState.Phase.PREP and main.groups.size() > 0:
+		# a few early birds may come in during the last 45 minutes of prep, never before
+		if GameState.phase == GameState.Phase.PREP and GameState.minute < GameState.open_min() - 46.0 and main.groups.size() > 0:
 			early = true
 	for s in GameState.staff:
 		if s.ate_today:
@@ -165,7 +167,7 @@ static func run(main, args: PackedStringArray) -> void:
 	check(Front.bookings.size() >= Data.BOOKINGS_PER_DAY.x and not Front.visits.is_empty(), "the host took %d bookings for today, and %d regulars will come by" % [Front.bookings.size(), Front.visits.size()])
 	check(prep_jobs > 0 and GameState.today["prepped"] >= 20, "cooks prepped before opening (%d jobs, %d portions)" % [prep_jobs, GameState.today["prepped"]])
 	check(GameState.phase == GameState.Phase.SERVICE and GameState.minute < GameState.open_min() + 0.5 and not early,
-		"the doors open by themselves at 10:00 (%s), and nobody came in before that" % GameState.clock_text())
+		"the doors open by themselves at 10:00 (%s), and only a few early birds came in before that" % GameState.clock_text())
 	main.critic_at = 12.5 * 60.0
 	main.inspect_at = 15.0 * 60.0
 	check(GameState.phase == GameState.Phase.SERVICE, "the diner opened")
@@ -401,6 +403,7 @@ static func run(main, args: PackedStringArray) -> void:
 		main.get_viewport().get_texture().get_image().save_png("user://shot_day2.png")
 	await V6.run(main)
 	await V7.run(main)
+	await V8.run(main)
 	await flavour_check(main)
 	print("AUTOTEST: done")
 	Sfx.quit_game()
@@ -1063,6 +1066,10 @@ static func event_checks(main) -> void:
 	# a shouting match between rivals: telling them to cool off stops their bickering today
 	var a = st[0]
 	var b = st[1]
+	for x in [a, b]:
+		x.set_at_work(true)
+		if x.on_break:
+			x.end_break()
 	set_opinion(a, b, -70.0)
 	set_opinion(b, a, -70.0)
 	Crew.refresh_labels()
@@ -1233,7 +1240,9 @@ static func shift_checks(main) -> void:
 	for f in main.lot.furniture:
 		if f.is_station() and not f.stocked:
 			all_stocked = false
-	check(all_stocked and GameState.today.get("restocked", 0) >= 5, "closing duties: every station restocked before the day ends (%d)" % GameState.today.get("restocked", 0))
+	var unstocked: Array = main.lot.furniture.filter(func(f): return f.is_station() and not f.stocked).map(func(f): return f.type)
+	check(all_stocked and GameState.today.get("restocked", 0) >= 5, "closing duties: every station restocked before the day ends (%d, left %s, ended %s, crew %s)" % [GameState.today.get("restocked", 0), unstocked,
+		GameState.clock_text(), GameState.staff.map(func(x): return "%s:%s:%s" % [x.role, x.at_work, x.left_at])])
 	var open_pay := Shifts.pay_today(opener)
 	var dbl_pay := Shifts.pay_today(dbl)
 	check(open_pay >= opener.wage * 7.9 and open_pay <= opener.wage * 9.6, "an opener's 8 hours pay about 8 hours at their rate ($%d at $%.2f/hr)" % [int(open_pay), opener.wage])
