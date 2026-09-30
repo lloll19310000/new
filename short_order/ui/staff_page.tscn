@@ -1,0 +1,10 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Theme" path="res://ui/theme.tres" id="0_theme"]
+[ext_resource type="Script" path="res://ui/staff_page.gd" id="1_script"]
+
+[node name="StaffPage" type="VBoxContainer"]
+theme = ExtResource("0_theme")
+size_flags_vertical = 3
+theme_override_constants/separation = 6
+script = ExtResource("1_script")

@@ -1,0 +1,133 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Theme" path="res://ui/theme.tres" id="0_theme"]
+[ext_resource type="Script" path="res://ui/report.gd" id="1_script"]
+[ext_resource type="Script" path="res://ui/widgets/star_rating.gd" id="2_stars"]
+[ext_resource type="Texture2D" path="res://ui/icons/play.svg" id="3_play"]
+
+[node name="Report" type="Control"]
+theme = ExtResource("0_theme")
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_script")
+
+[node name="Backdrop" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.06, 0.045, 0.035, 0.6)
+
+[node name="Center" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Card" type="PanelContainer" parent="Center"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(600, 0)
+layout_mode = 2
+theme_type_variation = &"ModalPanel"
+
+[node name="Box" type="VBoxContainer" parent="Center/Card"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Title" type="Label" parent="Center/Card/Box"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+theme_type_variation = &"TitleLabel"
+text = "Day 1 is over"
+
+[node name="Columns" type="HBoxContainer" parent="Center/Card/Box"]
+layout_mode = 2
+theme_override_constants/separation = 28
+
+[node name="Left" type="VBoxContainer" parent="Center/Card/Box/Columns"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="CustomersTitle" type="Label" parent="Center/Card/Box/Columns/Left"]
+layout_mode = 2
+theme_type_variation = &"HeaderLabel"
+text = "Customers"
+
+[node name="Customers" type="GridContainer" parent="Center/Card/Box/Columns/Left"]
+unique_name_in_owner = true
+layout_mode = 2
+columns = 2
+
+[node name="Right" type="VBoxContainer" parent="Center/Card/Box/Columns"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="MoneyTitle" type="Label" parent="Center/Card/Box/Columns/Right"]
+layout_mode = 2
+theme_type_variation = &"HeaderLabel"
+text = "Money"
+
+[node name="Money" type="GridContainer" parent="Center/Card/Box/Columns/Right"]
+unique_name_in_owner = true
+layout_mode = 2
+columns = 2
+
+[node name="Sep" type="HSeparator" parent="Center/Card/Box"]
+layout_mode = 2
+
+[node name="RatingRow" type="HBoxContainer" parent="Center/Card/Box"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Stars" type="Control" parent="Center/Card/Box/RatingRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(130, 24)
+layout_mode = 2
+size_flags_vertical = 4
+script = ExtResource("2_stars")
+star_size = 24.0
+
+[node name="Rating" type="Label" parent="Center/Card/Box/RatingRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"BigLabel"
+text = "3.0"
+
+[node name="Reviews" type="Label" parent="Center/Card/Box/RatingRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"MutedLabel"
+text = "Today's reviews"
+horizontal_alignment = 2
+autowrap_mode = 3
+
+[node name="Notes" type="RichTextLabel" parent="Center/Card/Box"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(556, 0)
+layout_mode = 2
+bbcode_enabled = true
+text = "Notes"
+fit_content = true
+scroll_active = false
+
+[node name="Buttons" type="HBoxContainer" parent="Center/Card/Box"]
+layout_mode = 2
+alignment = 2
+
+[node name="NextButton" type="Button" parent="Center/Card/Box/Buttons"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"PrimaryButton"
+text = "Start day 2"
+icon = ExtResource("3_play")

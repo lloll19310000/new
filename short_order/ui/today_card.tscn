@@ -1,0 +1,175 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Theme" path="res://ui/theme.tres" id="0_theme"]
+[ext_resource type="Script" path="res://ui/today_card.gd" id="1_script"]
+[ext_resource type="Texture2D" path="res://ui/icons/open.svg" id="2_open"]
+[ext_resource type="Texture2D" path="res://ui/icons/people.svg" id="3_people"]
+[ext_resource type="Texture2D" path="res://ui/icons/walkout.svg" id="4_walkout"]
+[ext_resource type="Texture2D" path="res://ui/icons/money.svg" id="5_money"]
+[ext_resource type="Texture2D" path="res://ui/icons/tip.svg" id="6_tip"]
+[ext_resource type="Texture2D" path="res://ui/icons/rush.svg" id="7_rush"]
+
+[node name="TodayCard" type="PanelContainer"]
+theme = ExtResource("0_theme")
+visible = false
+custom_minimum_size = Vector2(240, 0)
+script = ExtResource("1_script")
+
+[node name="Box" type="VBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="Header" type="HBoxContainer" parent="Box"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Icon" type="TextureRect" parent="Box/Header"]
+self_modulate = Color(0.95, 0.76, 0.31, 1)
+custom_minimum_size = Vector2(18, 18)
+layout_mode = 2
+size_flags_vertical = 4
+texture = ExtResource("2_open")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Title" type="Label" parent="Box/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"HeaderLabel"
+text = "Today"
+
+[node name="RushChip" type="PanelContainer" parent="Box/Header"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+size_flags_vertical = 4
+theme_type_variation = &"Chip"
+
+[node name="RushRow" type="HBoxContainer" parent="Box/Header/RushChip"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="RushIcon" type="TextureRect" parent="Box/Header/RushChip/RushRow"]
+self_modulate = Color(0.89, 0.44, 0.23, 1)
+custom_minimum_size = Vector2(13, 13)
+layout_mode = 2
+size_flags_vertical = 4
+texture = ExtResource("7_rush")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="RushLabel" type="Label" parent="Box/Header/RushChip/RushRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"SmallLabel"
+text = "Lunch rush"
+
+[node name="Grid" type="GridContainer" parent="Box"]
+layout_mode = 2
+theme_override_constants/h_separation = 8
+columns = 3
+
+[node name="I1" type="TextureRect" parent="Box/Grid"]
+self_modulate = Color(0.73, 0.65, 0.59, 1)
+custom_minimum_size = Vector2(16, 16)
+layout_mode = 2
+size_flags_vertical = 4
+texture = ExtResource("3_people")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="L1" type="Label" parent="Box/Grid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"BodyLabel"
+text = "Customers served"
+
+[node name="Served" type="Label" parent="Box/Grid"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"StatLabel"
+text = "0"
+horizontal_alignment = 2
+
+[node name="I2" type="TextureRect" parent="Box/Grid"]
+self_modulate = Color(0.73, 0.65, 0.59, 1)
+custom_minimum_size = Vector2(16, 16)
+layout_mode = 2
+size_flags_vertical = 4
+texture = ExtResource("3_people")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="L2" type="Label" parent="Box/Grid"]
+layout_mode = 2
+theme_type_variation = &"BodyLabel"
+text = "Waiting at the door"
+
+[node name="Waiting" type="Label" parent="Box/Grid"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"StatLabel"
+text = "0"
+horizontal_alignment = 2
+
+[node name="I3" type="TextureRect" parent="Box/Grid"]
+self_modulate = Color(0.73, 0.65, 0.59, 1)
+custom_minimum_size = Vector2(16, 16)
+layout_mode = 2
+size_flags_vertical = 4
+texture = ExtResource("4_walkout")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="L3" type="Label" parent="Box/Grid"]
+layout_mode = 2
+theme_type_variation = &"BodyLabel"
+text = "Walked out"
+
+[node name="Left" type="Label" parent="Box/Grid"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"StatLabel"
+text = "0"
+horizontal_alignment = 2
+
+[node name="I4" type="TextureRect" parent="Box/Grid"]
+self_modulate = Color(0.95, 0.76, 0.31, 1)
+custom_minimum_size = Vector2(16, 16)
+layout_mode = 2
+size_flags_vertical = 4
+texture = ExtResource("5_money")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="L4" type="Label" parent="Box/Grid"]
+layout_mode = 2
+theme_type_variation = &"BodyLabel"
+text = "Sales"
+
+[node name="Sales" type="Label" parent="Box/Grid"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"StatLabel"
+text = "$0"
+horizontal_alignment = 2
+
+[node name="I5" type="TextureRect" parent="Box/Grid"]
+self_modulate = Color(0.95, 0.76, 0.31, 1)
+custom_minimum_size = Vector2(16, 16)
+layout_mode = 2
+size_flags_vertical = 4
+texture = ExtResource("6_tip")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="L5" type="Label" parent="Box/Grid"]
+layout_mode = 2
+theme_type_variation = &"BodyLabel"
+text = "Tips"
+
+[node name="Tips" type="Label" parent="Box/Grid"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"StatLabel"
+text = "$0"
+horizontal_alignment = 2

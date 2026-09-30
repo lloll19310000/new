@@ -1,0 +1,86 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Theme" path="res://ui/theme.tres" id="0_theme"]
+[ext_resource type="Script" path="res://ui/build_menu.gd" id="1_script"]
+[ext_resource type="Texture2D" path="res://ui/icons/inspect.svg" id="2_inspect"]
+[ext_resource type="Texture2D" path="res://ui/icons/remove.svg" id="3_remove"]
+
+[node name="BuildMenu" type="VBoxContainer"]
+theme = ExtResource("0_theme")
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = -58.0
+offset_right = 600.0
+offset_bottom = -10.0
+grow_vertical = 0
+mouse_filter = 2
+theme_override_constants/separation = 6
+alignment = 2
+script = ExtResource("1_script")
+
+[node name="HintPanel" type="PanelContainer" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+size_flags_horizontal = 0
+mouse_filter = 2
+theme_type_variation = &"Well"
+
+[node name="Hint" type="Label" parent="HintPanel"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(460, 0)
+layout_mode = 2
+theme_type_variation = &"BodyLabel"
+text = "Hint"
+autowrap_mode = 3
+
+[node name="Tray" type="PanelContainer" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+size_flags_horizontal = 0
+
+[node name="TrayBox" type="VBoxContainer" parent="Tray"]
+layout_mode = 2
+
+[node name="TrayTitle" type="Label" parent="Tray/TrayBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"HeaderLabel"
+text = "Kitchen"
+
+[node name="Cards" type="HBoxContainer" parent="Tray/TrayBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Bar" type="PanelContainer" parent="."]
+layout_mode = 2
+size_flags_horizontal = 0
+theme_type_variation = &"TopBar"
+
+[node name="Categories" type="HBoxContainer" parent="Bar"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Inspect" type="Button" parent="Bar/Categories"]
+unique_name_in_owner = true
+layout_mode = 2
+tooltip_text = "Inspect: click people and things to see what they're doing (Esc)."
+theme_type_variation = &"CategoryButton"
+toggle_mode = true
+button_pressed = true
+text = "Inspect"
+icon = ExtResource("2_inspect")
+
+[node name="Remove" type="Button" parent="Bar/Categories"]
+unique_name_in_owner = true
+layout_mode = 2
+tooltip_text = "Remove: drag a box to take things away and get half the price back."
+theme_type_variation = &"CategoryButton"
+toggle_mode = true
+text = "Remove"
+icon = ExtResource("3_remove")

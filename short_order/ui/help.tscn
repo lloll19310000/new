@@ -1,0 +1,84 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Theme" path="res://ui/theme.tres" id="0_theme"]
+[ext_resource type="Script" path="res://ui/help.gd" id="1_script"]
+[ext_resource type="Texture2D" path="res://ui/icons/close.svg" id="2_close"]
+
+[node name="Help" type="Control"]
+theme = ExtResource("0_theme")
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_script")
+
+[node name="Backdrop" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.06, 0.045, 0.035, 0.55)
+
+[node name="Center" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Card" type="PanelContainer" parent="Center"]
+custom_minimum_size = Vector2(680, 0)
+layout_mode = 2
+theme_type_variation = &"ModalPanel"
+
+[node name="Box" type="VBoxContainer" parent="Center/Card"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Header" type="HBoxContainer" parent="Center/Card/Box"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="Center/Card/Box/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 30
+theme_type_variation = &"TitleLabel"
+text = "How to play"
+
+[node name="Close" type="Button" parent="Center/Card/Box/Header"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 0
+tooltip_text = "Close"
+theme_type_variation = &"FlatButton"
+icon = ExtResource("2_close")
+
+[node name="Scroll" type="ScrollContainer" parent="Center/Card/Box"]
+custom_minimum_size = Vector2(636, 440)
+layout_mode = 2
+horizontal_scroll_mode = 0
+
+[node name="Text" type="RichTextLabel" parent="Center/Card/Box/Scroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+bbcode_enabled = true
+text = "Help"
+fit_content = true
+scroll_active = false
+
+[node name="Buttons" type="HBoxContainer" parent="Center/Card/Box"]
+layout_mode = 2
+alignment = 2
+
+[node name="GotIt" type="Button" parent="Center/Card/Box/Buttons"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"PrimaryButton"
+text = "Got it"
