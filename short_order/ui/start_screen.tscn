@@ -1,0 +1,98 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Theme" path="res://ui/theme.tres" id="0_theme"]
+[ext_resource type="Script" path="res://ui/start_screen.gd" id="1_script"]
+[ext_resource type="Texture2D" path="res://ui/icons/play.svg" id="2_play"]
+[ext_resource type="Texture2D" path="res://ui/icons/plus.svg" id="3_plus"]
+[ext_resource type="Texture2D" path="res://ui/icons/close.svg" id="4_close"]
+
+[node name="Start" type="Control"]
+theme = ExtResource("0_theme")
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_script")
+
+[node name="Backdrop" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.09, 0.065, 0.05, 0.78)
+
+[node name="Center" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Box" type="VBoxContainer" parent="Center"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="Logo" type="Label" parent="Center/Box"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 72
+theme_type_variation = &"TitleLabel"
+text = "Short Order"
+horizontal_alignment = 1
+
+[node name="Tagline" type="Label" parent="Center/Box"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.76, 0.31, 1)
+theme_override_font_sizes/font_size = 17
+theme_type_variation = &"BodyLabel"
+text = "Build a diner. Hire a crew. Keep the coffee coming."
+horizontal_alignment = 1
+
+[node name="Card" type="PanelContainer" parent="Center/Box"]
+custom_minimum_size = Vector2(380, 0)
+layout_mode = 2
+size_flags_horizontal = 4
+theme_type_variation = &"ModalPanel"
+
+[node name="Buttons" type="VBoxContainer" parent="Center/Box/Card"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Intro" type="Label" parent="Center/Box/Card/Buttons"]
+custom_minimum_size = Vector2(330, 0)
+layout_mode = 2
+theme_type_variation = &"BodyLabel"
+text = "You have an empty lot and $10,000. You set the priorities; your staff do the work."
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="ContinueButton" type="Button" parent="Center/Box/Card/Buttons"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"PrimaryButton"
+text = "Continue your diner"
+icon = ExtResource("2_play")
+
+[node name="NewButton" type="Button" parent="Center/Box/Card/Buttons"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Start a new diner"
+icon = ExtResource("3_plus")
+
+[node name="QuitButton" type="Button" parent="Center/Box/Card/Buttons"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Quit"
+icon = ExtResource("4_close")
+
+[node name="Footer" type="Label" parent="Center/Box"]
+layout_mode = 2
+theme_type_variation = &"MutedLabel"
+text = "Everything here is drawn in code, so you can swap in your own sprites whenever you like."
+horizontal_alignment = 1

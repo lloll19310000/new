@@ -1,0 +1,82 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Theme" path="res://ui/theme.tres" id="0_theme"]
+[ext_resource type="Script" path="res://ui/supplies_page.gd" id="1_script"]
+[ext_resource type="Texture2D" path="res://ui/icons/plate.svg" id="2_plate"]
+[ext_resource type="Texture2D" path="res://ui/icons/plus.svg" id="3_plus"]
+
+[node name="SuppliesPage" type="ScrollContainer"]
+theme = ExtResource("0_theme")
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+script = ExtResource("1_script")
+
+[node name="Box" type="VBoxContainer" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="Intro" type="Label" parent="Box"]
+layout_mode = 2
+theme_type_variation = &"MutedLabel"
+text = "Every night you order enough to top up to the Keep amounts, as far as the fridge and freezer space allows. The van comes in the morning and you pay then. Food goes off, so don't keep too much."
+autowrap_mode = 3
+
+[node name="Rows" type="VBoxContainer" parent="Box"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="Delivery" type="Label" parent="Box"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.76, 0.31, 1)
+theme_type_variation = &"SmallLabel"
+text = "Tonight's delivery will cost about $0."
+
+[node name="Sep" type="HSeparator" parent="Box"]
+layout_mode = 2
+
+[node name="PlatesTitle" type="Label" parent="Box"]
+layout_mode = 2
+theme_type_variation = &"HeaderLabel"
+text = "Plates"
+
+[node name="PlatesRow" type="HBoxContainer" parent="Box"]
+layout_mode = 2
+
+[node name="PlateIcon" type="TextureRect" parent="Box/PlatesRow"]
+self_modulate = Color(0.73, 0.65, 0.59, 1)
+custom_minimum_size = Vector2(20, 20)
+layout_mode = 2
+size_flags_vertical = 4
+texture = ExtResource("2_plate")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Plates" type="Label" parent="Box/PlatesRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"StatLabel"
+text = "30 clean of 30"
+
+[node name="BuyPlates" type="Button" parent="Box/PlatesRow"]
+unique_name_in_owner = true
+layout_mode = 2
+tooltip_text = "More plates means fewer orders waiting for the dishwasher."
+theme_type_variation = &"SmallButton"
+text = "Buy 6"
+icon = ExtResource("3_plus")
+
+[node name="PlateBar" type="ProgressBar" parent="Box"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 6)
+layout_mode = 2
+value = 100.0
+show_percentage = false
+
+[node name="PlatesNote" type="Label" parent="Box"]
+layout_mode = 2
+theme_type_variation = &"MutedLabel"
+text = "Food goes out on clean plates. Dirty ones are cleared from tables and washed at the sink by staff with Clean and Wash switched on."
+autowrap_mode = 3

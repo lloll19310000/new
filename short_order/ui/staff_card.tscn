@@ -1,0 +1,238 @@
+[gd_scene load_steps=10 format=3]
+
+[ext_resource type="Theme" path="res://ui/theme.tres" id="0_theme"]
+[ext_resource type="Script" path="res://ui/staff_card.gd" id="1_script"]
+[ext_resource type="Script" path="res://ui/widgets/portrait.gd" id="2_portrait"]
+[ext_resource type="Texture2D" path="res://ui/icons/close.svg" id="3_close"]
+[ext_resource type="Texture2D" path="res://ui/icons/cook.svg" id="4_cook"]
+[ext_resource type="Texture2D" path="res://ui/icons/serve.svg" id="5_serve"]
+[ext_resource type="Texture2D" path="res://ui/icons/energy.svg" id="6_energy"]
+[ext_resource type="Texture2D" path="res://ui/icons/star.svg" id="7_star"]
+[ext_resource type="Texture2D" path="res://ui/icons/mood_okay.svg" id="8_mood"]
+[ext_resource type="Texture2D" path="res://ui/icons/storm.svg" id="9_stress"]
+
+[node name="StaffCard" type="PanelContainer"]
+theme = ExtResource("0_theme")
+theme_type_variation = &"Card"
+script = ExtResource("1_script")
+
+[node name="Box" type="VBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Top" type="HBoxContainer" parent="Box"]
+layout_mode = 2
+
+[node name="Portrait" type="Control" parent="Box/Top"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(46, 46)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+script = ExtResource("2_portrait")
+
+[node name="Info" type="VBoxContainer" parent="Box/Top"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 1
+size_flags_horizontal = 3
+theme_override_constants/separation = 0
+
+[node name="NameRow" type="HBoxContainer" parent="Box/Top/Info"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Name" type="Label" parent="Box/Top/Info/NameRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"StatLabel"
+text = "Name"
+
+[node name="MoodIcon" type="TextureRect" parent="Box/Top/Info/NameRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(14, 14)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 1
+texture = ExtResource("8_mood")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Traits" type="HFlowContainer" parent="Box/Top/Info/NameRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/h_separation = 4
+theme_override_constants/v_separation = 3
+
+[node name="Origin" type="Label" parent="Box/Top/Info"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7254902, 0.654902, 0.5921569, 1)
+theme_type_variation = &"SmallLabel"
+text = "Oaxaca, Mexico"
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="StatusRow" type="HBoxContainer" parent="Box/Top/Info"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="StatusIcon" type="TextureRect" parent="Box/Top/Info/StatusRow"]
+unique_name_in_owner = true
+self_modulate = Color(0.73, 0.65, 0.59, 1)
+custom_minimum_size = Vector2(14, 14)
+layout_mode = 2
+size_flags_vertical = 4
+texture = ExtResource("4_cook")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Status" type="Label" parent="Box/Top/Info/StatusRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(60, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"MutedLabel"
+text = "Idle"
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="Right" type="VBoxContainer" parent="Box/Top"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="Buttons" type="HBoxContainer" parent="Box/Top/Right"]
+layout_mode = 2
+size_flags_horizontal = 8
+theme_override_constants/separation = 0
+
+[node name="Manager" type="Button" parent="Box/Top/Right/Buttons"]
+unique_name_in_owner = true
+layout_mode = 2
+tooltip_text = "Make manager"
+theme_type_variation = &"FlatButton"
+toggle_mode = true
+icon = ExtResource("7_star")
+
+[node name="Fire" type="Button" parent="Box/Top/Right/Buttons"]
+unique_name_in_owner = true
+layout_mode = 2
+tooltip_text = "Let this person go. Click twice to confirm."
+theme_type_variation = &"DangerButton"
+icon = ExtResource("3_close")
+
+[node name="Wage" type="Label" parent="Box/Top/Right"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"MutedLabel"
+text = "$80/day"
+horizontal_alignment = 2
+
+[node name="Bars" type="HBoxContainer" parent="Box"]
+layout_mode = 2
+theme_override_constants/separation = 5
+
+[node name="CookIcon" type="TextureRect" parent="Box/Bars"]
+self_modulate = Color(0.95, 0.76, 0.31, 1)
+custom_minimum_size = Vector2(14, 14)
+layout_mode = 2
+size_flags_vertical = 4
+texture = ExtResource("4_cook")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="CookBar" type="ProgressBar" parent="Box/Bars"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 7)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+theme_type_variation = &"SkillBar"
+max_value = 10.0
+value = 5.0
+show_percentage = false
+
+[node name="CookValue" type="Label" parent="Box/Bars"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(16, 0)
+layout_mode = 2
+theme_type_variation = &"SmallLabel"
+text = "5"
+
+[node name="ServeIcon" type="TextureRect" parent="Box/Bars"]
+self_modulate = Color(0.95, 0.76, 0.31, 1)
+custom_minimum_size = Vector2(14, 14)
+layout_mode = 2
+size_flags_vertical = 4
+texture = ExtResource("5_serve")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="ServeBar" type="ProgressBar" parent="Box/Bars"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 7)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+theme_type_variation = &"SkillBar"
+max_value = 10.0
+value = 5.0
+show_percentage = false
+
+[node name="ServeValue" type="Label" parent="Box/Bars"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(16, 0)
+layout_mode = 2
+theme_type_variation = &"SmallLabel"
+text = "5"
+
+[node name="EnergyIcon" type="TextureRect" parent="Box/Bars"]
+self_modulate = Color(0.42, 0.65, 0.85, 1)
+custom_minimum_size = Vector2(14, 14)
+layout_mode = 2
+size_flags_vertical = 4
+texture = ExtResource("6_energy")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="EnergyBar" type="ProgressBar" parent="Box/Bars"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 7)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+theme_type_variation = &"EnergyBar"
+value = 100.0
+show_percentage = false
+
+[node name="StressIcon" type="TextureRect" parent="Box/Bars"]
+self_modulate = Color(0.91, 0.35, 0.31, 1)
+custom_minimum_size = Vector2(14, 14)
+layout_mode = 2
+size_flags_vertical = 4
+texture = ExtResource("9_stress")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="StressBar" type="ProgressBar" parent="Box/Bars"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 7)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+theme_type_variation = &"SkillBar"
+show_percentage = false
+
+[node name="Relations" type="Label" parent="Box"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_type_variation = &"SmallLabel"
+text = "Friends: Linh"
+autowrap_mode = 3
+
+[node name="Priorities" type="HBoxContainer" parent="Box"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 4

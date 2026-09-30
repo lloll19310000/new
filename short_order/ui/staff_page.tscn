@@ -1,0 +1,78 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Theme" path="res://ui/theme.tres" id="0_theme"]
+[ext_resource type="Script" path="res://ui/staff_page.gd" id="1_script"]
+
+[node name="StaffPage" type="ScrollContainer"]
+theme = ExtResource("0_theme")
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+script = ExtResource("1_script")
+
+[node name="Box" type="VBoxContainer" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="HireTitle" type="Label" parent="Box"]
+layout_mode = 2
+theme_type_variation = &"HeaderLabel"
+text = "Looking for work today"
+
+[node name="Candidates" type="VBoxContainer" parent="Box"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="Sep" type="HSeparator" parent="Box"]
+layout_mode = 2
+
+[node name="CrewHeader" type="HBoxContainer" parent="Box"]
+layout_mode = 2
+
+[node name="CrewTitle" type="Label" parent="Box/CrewHeader"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"HeaderLabel"
+text = "Your crew"
+
+[node name="CrewCount" type="Label" parent="Box/CrewHeader"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"MutedLabel"
+text = "0 of 12"
+
+[node name="PriorityHelp" type="Label" parent="Box"]
+layout_mode = 2
+theme_type_variation = &"MutedLabel"
+text = "The numbers are job priorities: 1 is done first, 4 last, – never. Click to change, right-click to go back."
+autowrap_mode = 3
+
+[node name="EmptyNote" type="Label" parent="Box"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"BodyLabel"
+text = "Nobody works here yet. Hire someone above: you need at least one cook and one server."
+autowrap_mode = 3
+
+[node name="Crew" type="VBoxContainer" parent="Box"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Jobs" type="PanelContainer" parent="Box"]
+layout_mode = 2
+theme_type_variation = &"Well"
+
+[node name="JobsBox" type="HBoxContainer" parent="Box/Jobs"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="JobsTitle" type="Label" parent="Box/Jobs/JobsBox"]
+layout_mode = 2
+theme_type_variation = &"MutedLabel"
+text = "Jobs waiting"
+
+[node name="JobsRow" type="HBoxContainer" parent="Box/Jobs/JobsBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 10

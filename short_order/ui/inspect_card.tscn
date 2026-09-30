@@ -1,0 +1,97 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Theme" path="res://ui/theme.tres" id="0_theme"]
+[ext_resource type="Script" path="res://ui/inspect_card.gd" id="1_script"]
+[ext_resource type="Script" path="res://ui/widgets/portrait.gd" id="2_portrait"]
+[ext_resource type="Script" path="res://ui/widgets/art_icon.gd" id="3_art"]
+[ext_resource type="Texture2D" path="res://ui/icons/close.svg" id="4_close"]
+[ext_resource type="Texture2D" path="res://ui/icons/chevron_right.svg" id="5_turn"]
+
+[node name="InspectCard" type="PanelContainer"]
+theme = ExtResource("0_theme")
+visible = false
+custom_minimum_size = Vector2(300, 0)
+script = ExtResource("1_script")
+
+[node name="Box" type="VBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="Top" type="HBoxContainer" parent="Box"]
+layout_mode = 2
+
+[node name="Picture" type="Control" parent="Box/Top"]
+custom_minimum_size = Vector2(44, 44)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+
+[node name="Portrait" type="Control" parent="Box/Top/Picture"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("2_portrait")
+
+[node name="Art" type="Control" parent="Box/Top/Picture"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("3_art")
+
+[node name="Names" type="VBoxContainer" parent="Box/Top"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+theme_override_constants/separation = 0
+
+[node name="Title" type="Label" parent="Box/Top/Names"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"StatLabel"
+text = "Title"
+
+[node name="Subtitle" type="Label" parent="Box/Top/Names"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(150, 0)
+layout_mode = 2
+theme_type_variation = &"MutedLabel"
+text = "Subtitle"
+autowrap_mode = 3
+
+[node name="Close" type="Button" parent="Box/Top"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 0
+tooltip_text = "Close (Esc)"
+theme_type_variation = &"FlatButton"
+icon = ExtResource("4_close")
+
+[node name="Body" type="RichTextLabel" parent="Box"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(276, 0)
+layout_mode = 2
+mouse_filter = 2
+bbcode_enabled = true
+text = "Body"
+fit_content = true
+scroll_active = false
+
+[node name="Actions" type="HBoxContainer" parent="Box"]
+layout_mode = 2
+
+[node name="Rotate" type="Button" parent="Box/Actions"]
+unique_name_in_owner = true
+layout_mode = 2
+tooltip_text = "Turn it a quarter turn (R). Free, mornings only."
+theme_type_variation = &"SmallButton"
+text = "Turn  (R)"
+icon = ExtResource("5_turn")

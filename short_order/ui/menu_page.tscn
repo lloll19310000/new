@@ -1,0 +1,25 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Theme" path="res://ui/theme.tres" id="0_theme"]
+[ext_resource type="Script" path="res://ui/menu_page.gd" id="1_script"]
+
+[node name="MenuPage" type="ScrollContainer"]
+theme = ExtResource("0_theme")
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+script = ExtResource("1_script")
+
+[node name="Box" type="VBoxContainer" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="Intro" type="Label" parent="Box"]
+layout_mode = 2
+theme_type_variation = &"MutedLabel"
+text = "Switch dishes on or off and set their prices. Each dish needs its station in the kitchen."
+autowrap_mode = 3
+
+[node name="Rows" type="VBoxContainer" parent="Box"]
+unique_name_in_owner = true
+layout_mode = 2

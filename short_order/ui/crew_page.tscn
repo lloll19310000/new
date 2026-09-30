@@ -1,0 +1,71 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Theme" path="res://ui/theme.tres" id="0_theme"]
+[ext_resource type="Script" path="res://ui/crew_page.gd" id="1_script"]
+[ext_resource type="Script" path="res://ui/widgets/opinion_grid.gd" id="2_grid"]
+
+[node name="CrewPage" type="ScrollContainer"]
+theme = ExtResource("0_theme")
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+script = ExtResource("1_script")
+
+[node name="Box" type="VBoxContainer" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="Intro" type="Label" parent="Box"]
+layout_mode = 2
+theme_type_variation = &"MutedLabel"
+text = "How everyone feels about each other. Each row is how that person feels about each column. Hover a square to see why."
+autowrap_mode = 3
+
+[node name="Legend" type="HFlowContainer" parent="Box"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/h_separation = 10
+theme_override_constants/v_separation = 4
+
+[node name="Grid" type="Control" parent="Box"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 60)
+layout_mode = 2
+script = ExtResource("2_grid")
+
+[node name="EmptyNote" type="Label" parent="Box"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"BodyLabel"
+text = "Hire at least two people to see how they get along."
+autowrap_mode = 3
+
+[node name="Sep" type="HSeparator" parent="Box"]
+layout_mode = 2
+
+[node name="LogHeader" type="HBoxContainer" parent="Box"]
+layout_mode = 2
+
+[node name="LogTitle" type="Label" parent="Box/LogHeader"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"HeaderLabel"
+text = "Staff log"
+
+[node name="ShowAll" type="Button" parent="Box/LogHeader"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+tooltip_text = "Show everyone's log again"
+theme_type_variation = &"SmallButton"
+text = "Show everyone"
+
+[node name="Log" type="RichTextLabel" parent="Box"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/normal_font_size = 12
+theme_override_font_sizes/bold_font_size = 12
+bbcode_enabled = true
+fit_content = true
+scroll_active = false

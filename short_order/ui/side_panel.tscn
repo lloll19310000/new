@@ -1,0 +1,177 @@
+[gd_scene load_steps=13 format=3]
+
+[ext_resource type="Theme" path="res://ui/theme.tres" id="0_theme"]
+[ext_resource type="Script" path="res://ui/side_panel.gd" id="1_script"]
+[ext_resource type="PackedScene" path="res://ui/staff_page.tscn" id="2_staff"]
+[ext_resource type="PackedScene" path="res://ui/menu_page.tscn" id="3_menu"]
+[ext_resource type="PackedScene" path="res://ui/supplies_page.tscn" id="4_supplies"]
+[ext_resource type="PackedScene" path="res://ui/crew_page.tscn" id="5_crew"]
+[ext_resource type="Texture2D" path="res://ui/icons/staff.svg" id="6_staff"]
+[ext_resource type="Texture2D" path="res://ui/icons/menu.svg" id="7_menu"]
+[ext_resource type="Texture2D" path="res://ui/icons/supplies.svg" id="8_supplies"]
+[ext_resource type="Texture2D" path="res://ui/icons/crew.svg" id="9_crew"]
+[ext_resource type="Texture2D" path="res://ui/icons/chevron_right.svg" id="10_chevron"]
+[ext_resource type="PackedScene" path="res://ui/office_page.tscn" id="11_office"]
+[ext_resource type="Texture2D" path="res://ui/icons/office.svg" id="12_office"]
+
+[node name="SidePanel" type="Control"]
+theme = ExtResource("0_theme")
+layout_mode = 3
+anchors_preset = 11
+anchor_left = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -424.0
+offset_top = 68.0
+offset_right = -10.0
+offset_bottom = -10.0
+grow_horizontal = 0
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_script")
+
+[node name="Panel" type="PanelContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 9
+anchor_bottom = 1.0
+offset_right = 358.0
+grow_vertical = 2
+
+[node name="Box" type="VBoxContainer" parent="Panel"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Header" type="HBoxContainer" parent="Panel/Box"]
+layout_mode = 2
+
+[node name="TitleIcon" type="TextureRect" parent="Panel/Box/Header"]
+unique_name_in_owner = true
+self_modulate = Color(0.95, 0.76, 0.31, 1)
+custom_minimum_size = Vector2(22, 22)
+layout_mode = 2
+size_flags_vertical = 4
+texture = ExtResource("6_staff")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Title" type="Label" parent="Panel/Box/Header"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"BigLabel"
+text = "Staff"
+
+[node name="Close" type="Button" parent="Panel/Box/Header"]
+unique_name_in_owner = true
+layout_mode = 2
+tooltip_text = "Hide this panel (Tab)"
+theme_type_variation = &"FlatButton"
+icon = ExtResource("10_chevron")
+
+[node name="Sep" type="HSeparator" parent="Panel/Box"]
+layout_mode = 2
+
+[node name="StaffPage" parent="Panel/Box" instance=ExtResource("2_staff")]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="MenuPage" parent="Panel/Box" instance=ExtResource("3_menu")]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+
+[node name="SuppliesPage" parent="Panel/Box" instance=ExtResource("4_supplies")]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+
+[node name="CrewPage" parent="Panel/Box" instance=ExtResource("5_crew")]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+
+[node name="OfficePage" parent="Panel/Box" instance=ExtResource("11_office")]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+
+[node name="Rail" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 11
+anchor_left = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -50.0
+grow_horizontal = 0
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/separation = 6
+
+[node name="StaffTab" type="Button" parent="Rail"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(50, 50)
+layout_mode = 2
+tooltip_text = "Staff: hire people and set their job priorities"
+theme_type_variation = &"RailButton"
+toggle_mode = true
+button_pressed = true
+icon = ExtResource("6_staff")
+icon_alignment = 1
+
+[node name="MenuTab" type="Button" parent="Rail"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(50, 50)
+layout_mode = 2
+tooltip_text = "Menu: dishes and prices"
+theme_type_variation = &"RailButton"
+toggle_mode = true
+icon = ExtResource("7_menu")
+icon_alignment = 1
+
+[node name="SuppliesTab" type="Button" parent="Rail"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(50, 50)
+layout_mode = 2
+tooltip_text = "Supplies: ingredients and plates"
+theme_type_variation = &"RailButton"
+toggle_mode = true
+icon = ExtResource("8_supplies")
+icon_alignment = 1
+
+[node name="CrewTab" type="Button" parent="Rail"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(50, 50)
+layout_mode = 2
+tooltip_text = "Crew: who gets along with whom, and the staff log"
+theme_type_variation = &"RailButton"
+toggle_mode = true
+icon = ExtResource("9_crew")
+icon_alignment = 1
+
+[node name="CrewBadge" type="Label" parent="Rail/CrewTab"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -16.0
+offset_top = 2.0
+offset_right = -3.0
+offset_bottom = 18.0
+grow_horizontal = 0
+theme_override_colors/font_color = Color(0.95, 0.76, 0.31, 1)
+theme_type_variation = &"StatLabel"
+text = "!"
+horizontal_alignment = 1
+
+[node name="OfficeTab" type="Button" parent="Rail"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(50, 50)
+layout_mode = 2
+tooltip_text = "Office: the morning routine, bills and loans, the front of house and your regulars"
+theme_type_variation = &"RailButton"
+toggle_mode = true
+icon = ExtResource("12_office")
+icon_alignment = 1
