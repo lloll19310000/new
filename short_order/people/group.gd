@@ -1093,7 +1093,7 @@ func leave(score: float, complaint: String, paid: bool) -> void:
 		var p: Vector2 = members[0].position if not members.is_empty() else Vector2.ZERO
 		lot.fx.stars(p, score)
 		var dishes: Array = received.map(func(d): return Data.DISHES[d]["name"].to_lower())
-		GameState.note_moment(score, moment_who(), complaint if score < 3.5 and complaint != "" else Crew.and_list(dishes.slice(0, 3)))
+		GameState.note_moment(score, moment_who(), complaint if score < 3.5 and complaint != "" else Crew.and_list(dishes.slice(0, 2)))
 		if kind == "celebrity":
 			Events.celebrity_review(score)
 		if kind == "critic":

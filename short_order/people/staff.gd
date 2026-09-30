@@ -571,6 +571,10 @@ func job_priority(j) -> int:
 			return mini(a, b)
 		"complaint", "mediate", "checkin":
 			return 1 if manager else 0
+		"refill":
+			# a nice extra: only when the rest of the floor is handled
+			var sv: int = priorities.get("serve", 0)
+			return 0 if sv == 0 else mini(sv + 1, 4)
 	return priorities.get(j.type, 0)
 
 
@@ -648,7 +652,9 @@ func can_take(j) -> bool:
 		"collect":
 			return j.furniture != null and lot.furniture.has(j.furniture) and j.furniture.cash > 0.0
 		"refill":
-			return group_ok(j.group) and j.group.state == "eating" and j.group.wants_refill and j.group.table != null and not lot.of_type("drinks").is_empty()
+			# only when the floor's calm: orders, food and checks come first
+			return group_ok(j.group) and j.group.state == "eating" and j.group.wants_refill and j.group.table != null \
+				and not lot.of_type("drinks").is_empty() and JobBoard.waiting_count() <= Data.REFILL_CALM
 		"wash":
 			return j.furniture != null and j.furniture.dirty > 0 and lot.furniture.has(j.furniture)
 		"sweep":

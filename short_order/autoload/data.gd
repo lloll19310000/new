@@ -317,7 +317,8 @@ const REFILL_AFTER := Vector2(5.0, 9.0)
 const REFILL_MAX := 2
 const REFILL_REVIEW := 0.12
 const REFILL_TIP := 0.08
-const REFILL_MISSED := 0.1
+const REFILL_MISSED := 0.05
+const REFILL_CALM := 1              # servers only go round with the pot when at most this many customer jobs wait
 const COUNTER_KINDS := ["trucker", "regular", "critic", "takeout"]
 const SEAT_LIKED_REVIEW := 0.15
 ## Busy walkways get scuffed (just for looks); it fades a little each night.
