@@ -11,6 +11,7 @@ const Staff = preload("res://people/staff.gd")
 const Group = preload("res://people/group.gd")
 const HudScene = preload("res://ui/hud.tscn")
 const Autotest = preload("res://tests/autotest.gd")
+const ArtPreview = preload("res://tests/art_preview.gd")
 const SAVE_PATH := "user://short_order_save.json"
 const SAVE_VERSION := 5
 
@@ -73,6 +74,9 @@ func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
 	if "--autotest" in args or "--shot" in args:
 		_run_autotest.call_deferred(args)
+		return
+	if "--art" in args:
+		(func(): await ArtPreview.run(self, args)).call_deferred()
 		return
 	if "--balance" in args:
 		(func(): await Autotest.run_balance(self, args)).call_deferred()

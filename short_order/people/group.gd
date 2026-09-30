@@ -262,7 +262,7 @@ func label() -> String:
 		return "App order"
 	if takeout:
 		return "Takeout"
-	if table != null and table.type == "table":
+	if table != null and table.is_table():
 		return "Table %d" % lot.table_number(table)
 	return Data.CUSTOMERS[kind]["name"]
 
@@ -324,7 +324,7 @@ func sit_down() -> void:
 # ------------------------------------------------------------------ ordering and eating
 
 func makeable(d: String) -> bool:
-	return GameState.dish_on(d) and lot.working(Data.DISHES[d]["station"]) and (Stock.ready_portions(d) > 0 or GameState.has_ingredients(d))
+	return GameState.dish_on(d) and lot.can_make(d) and (Stock.ready_portions(d) > 0 or GameState.has_ingredients(d))
 
 
 ## Picks one dish: favourites (likes) and today's special are likelier.
@@ -360,7 +360,7 @@ func place_order(server = null) -> void:
 	var wanted: Array = []   # on the menu with a working station, sold out or not
 	var can: Array = []      # what the kitchen can actually make right now
 	for k in courses:
-		wanted.append(Data.DISH_ORDER.filter(func(d): return Data.DISHES[d]["kind"] == k and GameState.dish_on(d) and lot.working(Data.DISHES[d]["station"])))
+		wanted.append(Data.DISH_ORDER.filter(func(d): return Data.DISHES[d]["kind"] == k and GameState.dish_on(d) and lot.can_make(d)))
 		can.append(Data.DISH_ORDER.filter(func(d): return Data.DISHES[d]["kind"] == k and makeable(d)))
 	var order: Array = []
 	for i in members.size():

@@ -24,6 +24,9 @@ var dirty_plates: int = 0
 var food_on_table: Array = []           # dishes being eaten
 var chairs: Array = []                  # chairs next to this table
 var reserved = null                     # the booking this table is held for (a Dictionary), or null
+var cash: float = 0.0                   # money a table left behind, waiting to be picked up
+var cash_tip: float = 0.0               # ...and the tip in it, for whoever served them
+var cash_servers: Array = []
 # chairs
 var table = null
 var occupant = null
@@ -78,8 +81,17 @@ func beauty() -> int:
 	return info().get("beauty", 0)
 
 
+func is_table() -> bool:
+	return info().get("seats", 0) > 0
+
+
+## How many chairs can sit at this table.
+func seats_max() -> int:
+	return info().get("seats", 0)
+
+
 func table_free() -> bool:
-	return type == "table" and group == null and dirty_plates == 0 and chairs.size() > 0
+	return is_table() and group == null and dirty_plates == 0 and cash <= 0.0 and chairs.size() > 0
 
 
 func pass_free_slots() -> int:

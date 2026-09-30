@@ -215,8 +215,10 @@ func access_cells(f) -> Array:
 				continue
 			if f.type == "takeout" and floor_at(n) == 0:
 				continue   # staff work the window from inside
+			if f.type == "pass" and not floor_at(n) in [Data.FLOOR_KITCHEN, Data.FLOOR_DINER]:
+				continue
 			out.append(n)
-	if f.type == "table":
+	if f.is_table():
 		var no_chairs := out.filter(func(n):
 			var o = furniture_at(n)
 			return o == null or o.type != "chair")
@@ -282,7 +284,7 @@ func has_entry() -> bool:
 
 func link_tables() -> void:
 	for f in furniture:
-		if f.type == "table":
+		if f.is_table():
 			f.chairs = []
 		elif f.type == "chair":
 			f.table = null
@@ -294,7 +296,7 @@ func link_tables() -> void:
 			var dirs: Array = [f.facing()] if pass_n == 0 else Data.DIRS
 			for d in dirs:
 				var t = furniture_at(f.cell + d)
-				if t != null and t.type == "table" and t.chairs.size() < 4:
+				if t != null and t.is_table() and t.chairs.size() < t.seats_max():
 					f.table = t
 					t.chairs.append(f)
 					break
@@ -304,13 +306,13 @@ func link_tables() -> void:
 func chair_dir_toward_table(c: Vector2i) -> int:
 	for i in 4:
 		var t = furniture_at(c + Data.DIRS[i])
-		if t != null and t.type == "table":
+		if t != null and t.is_table():
 			return i
 	return -1
 
 
 func tables() -> Array:
-	return furniture.filter(func(f): return f.type == "table" and f.chairs.size() > 0)
+	return furniture.filter(func(f): return f.is_table() and f.chairs.size() > 0)
 
 
 ## Tables are numbered left to right, top to bottom: "Table 3".
@@ -451,6 +453,8 @@ func furniture_blocker(type: String, c: Vector2i, dir: int, ignore = null) -> St
 				return "There's a wall or door there."
 			if not floor_ok(info["floor"], floor_type[i]):
 				return FLOOR_HINT[info["floor"]]
+	if type == "pass":
+		return pass_blocker(c, size)
 	if info["floor"] == "wall":
 		var inside := false
 		var outside := false
@@ -467,6 +471,35 @@ func furniture_blocker(type: String, c: Vector2i, dir: int, ignore = null) -> St
 		if not inside:
 			return "Hang it on a wall next to a room."
 	return ""
+
+
+## The pass sits in a wall with the kitchen on one side and the dining room on the other.
+func pass_blocker(c: Vector2i, size: Vector2i) -> String:
+	var across: Array = [Vector2i.UP, Vector2i.DOWN] if size.x >= size.y else [Vector2i.LEFT, Vector2i.RIGHT]
+	for y in size.y:
+		for x in size.x:
+			var cc := c + Vector2i(x, y)
+			var a := floor_at(cc + across[0]) if not is_wallish(cc + across[0]) else -1
+			var b := floor_at(cc + across[1]) if not is_wallish(cc + across[1]) else -1
+			var ok := (a == Data.FLOOR_KITCHEN and b == Data.FLOOR_DINER) or (a == Data.FLOOR_DINER and b == Data.FLOOR_KITCHEN)
+			if not ok:
+				return "Put it in the wall between the kitchen and the dining room."
+	return ""
+
+
+## Which way a wall runs through c: true when it goes up and down.
+func wall_runs_vertical(c: Vector2i) -> bool:
+	if is_wallish(c + Vector2i.RIGHT) or is_wallish(c + Vector2i.LEFT):
+		return false
+	return is_wallish(c + Vector2i.DOWN) or is_wallish(c + Vector2i.UP)
+
+
+## For things with a front: the way that faces away from a wall beside c, or -1.
+func dir_away_from_wall(c: Vector2i) -> int:
+	for i in 4:
+		if is_wallish(c + Data.DIRS[i]):
+			return (i + 2) % 4
+	return -1
 
 
 func place_furniture(type: String, c: Vector2i, dir: int) -> bool:
@@ -518,9 +551,12 @@ func rotate_furniture(f) -> bool:
 
 
 func remove_furniture(f) -> float:
-	if f.type == "table":
+	if f.is_table():
 		GameState.plates_clean += f.dirty_plates
 		f.dirty_plates = 0
+		if f.cash > 0.0:
+			GameState.add_money(f.cash)
+			f.cash = 0.0
 	if f.type == "sink":
 		GameState.plates_clean += f.dirty
 		f.dirty = 0
@@ -644,6 +680,12 @@ func beauty_near(c: Vector2i) -> int:
 	return mini(total, Data.MAX_BEAUTY)
 
 
+## The kitchen has what this dish needs: its station, and an ice machine for cold drinks.
+func can_make(d: String) -> bool:
+	var info: Dictionary = Data.DISHES[d]
+	return working(info["station"]) and (not info.get("ice", false) or has_type("ice"))
+
+
 func music_near(c: Vector2i) -> bool:
 	for f in furniture:
 		if f.info().get("music", false) and distance(f.cell, c) <= f.info().get("radius", 6):
@@ -669,7 +711,7 @@ func inspection() -> Dictionary:
 	var sink_backlog := 0
 	var broken := 0
 	for f in furniture:
-		if f.type == "table" and f.dirty_plates > 0:
+		if f.is_table() and f.dirty_plates > 0:
 			dirty_tables += 1
 		if f.type == "sink":
 			sink_backlog += f.dirty
@@ -764,7 +806,7 @@ func _draw() -> void:
 	for f in furniture:
 		Art.furniture(self, f, inside_dir(f) if f.on_wall() else -1)
 	for f in furniture:
-		if f.type == "table":
+		if f.is_table():
 			Art.table_food(self, f)
 	if has_entry() and GameState.grade != "":
 		Art.grade_sign(self, entry_door, entry_outside, GameState.grade)

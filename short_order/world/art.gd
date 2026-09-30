@@ -215,6 +215,15 @@ static func dish(ci: CanvasItem, d: String, p: Vector2, s: float = 1.0, on_plate
 			ci.draw_circle(p, 4.2 * s, Color("f4f4f4"))
 			ci.draw_circle(p, 3.1 * s, Color("6b4226"))
 			ci.draw_arc(p + Vector2(4.5, 0) * s, 1.6 * s, -PI / 2, PI / 2, 8, Color("f4f4f4"), 1.2 * s)
+		"soda", "icedtea":
+			# a tall glass seen from above, with ice cubes and a straw
+			ci.draw_circle(p, 4.4 * s, Color("dfeef6"))
+			ci.draw_circle(p, 3.5 * s, Color("5a2a1a") if d == "soda" else Color("c98a3a"))
+			rbox(ci, Rect2(p + Vector2(-2.6, -1.8) * s, Vector2(2.4, 2.2) * s), Color("eaf7ff"), Color("bfe3f7"), 1, 1)
+			rbox(ci, Rect2(p + Vector2(0.4, -0.2) * s, Vector2(2.2, 2.2) * s), Color("eaf7ff"), Color("bfe3f7"), 1, 1)
+			if d == "icedtea":
+				ci.draw_circle(p + Vector2(-1.2, 2.0) * s, 1.3 * s, Color("f7e27a"))
+			ci.draw_line(p, p + Vector2(3.4, -5) * s, Color("d23b30") if d == "soda" else Color("4f9a45"), 1.2 * s)
 
 
 static func ingredient(ci: CanvasItem, key: String, p: Vector2, s: float = 1.0) -> void:
@@ -395,8 +404,18 @@ static func for_sale_sign(ci: CanvasItem, c: Vector2, price: String, s: float = 
 	ci.draw_string(f, c + Vector2(-38, -1) * s, price, HORIZONTAL_ALIGNMENT_CENTER, 76 * s, int(12 * s), Color("3a2c25"))
 
 
+## Things with a front: they're drawn facing up (the front toward the top of
+## the tile, the back against the wall below), then turned to face their way.
+const TURNS := ["sink", "jukebox", "drinks", "oven", "fridge", "freezer", "handsink", "host", "till", "ice"]
+
+
 ## Draws a piece of furniture of this type filling rect r. f may be null (for icons).
 static func furniture_in(ci: CanvasItem, type: String, r: Rect2, dir: int, f = null, wall_dir: int = -1) -> void:
+	if dir % 4 != 0 and type in TURNS and absf(r.size.x - r.size.y) < 0.5:
+		ci.draw_set_transform(r.get_center(), (dir % 4) * PI * 0.5, Vector2.ONE)
+		furniture_in(ci, type, Rect2(-r.size * 0.5, r.size), 0, f, wall_dir)
+		ci.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+		return
 	var s := r.size.y / T if r.size.x >= r.size.y else r.size.x / T
 	var inner := r.grow(-3 * s)
 	var cooking: String = f.cooking if f != null else ""
@@ -410,6 +429,15 @@ static func furniture_in(ci: CanvasItem, type: String, r: Rect2, dir: int, f = n
 					var t := (i + 0.5) / n
 					var p := inner.position + Vector2(inner.size.x * t, inner.size.y * 0.5) if f.size.x >= f.size.y else inner.position + Vector2(inner.size.x * 0.5, inner.size.y * t)
 					plate(ci, p, 0.8, true)
+		"table_small":
+			var ct := r.get_center()
+			ci.draw_circle(ct + Vector2(1, 1.5) * s, 12.5 * s, Color(0, 0, 0, 0.18))
+			ci.draw_circle(ct, 12.5 * s, Color("7a5230"))
+			ci.draw_circle(ct, 11 * s, Color("b07a4a"))
+			ci.draw_circle(ct, 8 * s, Color("c08a58"))
+			if f != null and f.dirty_plates > 0:
+				for i in f.dirty_plates:
+					plate(ci, ct + Vector2(i * 3.0, -i * 2.0) * s, 0.8 * s, true)
 		"chair":
 			var seat := r.grow(-8 * s)
 			rbox(ci, seat, Color("9a6a3f"), Color("6e4a2b"), 3)
@@ -452,42 +480,66 @@ static func furniture_in(ci: CanvasItem, type: String, r: Rect2, dir: int, f = n
 				ci.draw_circle(inner.get_center() - along2, 5, Color("e3b25a"))
 				ci.draw_circle(inner.get_center() + along2, 5, Color("e3b25a"))
 		"drinks":
+			# from above: the nozzles over a drip tray at the front, the syrup tanks at the back
 			rbox(ci, inner, Color("c8403a"), Color("8c2a25"), 4)
-			rbox(ci, Rect2(inner.position + Vector2(3, 3) * s, Vector2(inner.size.x - 6 * s, 9 * s)), Color("f4efe6"), Color("d8d0c2"), 2, 1)
-			ci.draw_circle(inner.position + Vector2(7, 7.5) * s, 2 * s, Color("f2a7c3"))
-			ci.draw_circle(inner.position + Vector2(13, 7.5) * s, 2 * s, Color("6b4226"))
-			ci.draw_circle(inner.position + Vector2(19, 7.5) * s, 2 * s, Color("f7e27a"))
+			var tray := Rect2(inner.position + Vector2(3, 2.5) * s, Vector2(inner.size.x - 6 * s, 9 * s))
+			rbox(ci, tray, Color("3a3d42"), Color("25272b"), 2, 1)
+			for i in 4:
+				var tx := tray.position.x + (3.5 + i * 5.0) * s
+				ci.draw_line(Vector2(tx, tray.position.y + 1.5 * s), Vector2(tx, tray.end.y - 1.5 * s), Color("55585e"), 1.0)
+			var tanks := [Color("f2a7c3"), Color("6b4226"), Color("f7e27a")]
+			for i in 3:
+				var tp := inner.position + Vector2(inner.size.x * (0.25 + i * 0.25), inner.size.y * 0.7)
+				ci.draw_circle(tp, 3.4 * s, Color("f4efe6"))
+				ci.draw_circle(tp, 2.4 * s, tanks[i])
 			if cooking != "":
-				dish(ci, cooking, inner.get_center() + Vector2(0, 5) * s, 0.8 * s, false)
+				dish(ci, cooking, tray.get_center(), 0.75 * s, false)
 		"pass":
-			rbox(ci, inner, Color("c7ccd1"), Color("9aa1a8"), 3)
-			var horiz := inner.size.x >= inner.size.y
-			var lamp: Rect2
-			if horiz:
-				lamp = Rect2(Vector2(inner.position.x + 3 * s, inner.position.y + 2 * s), Vector2(inner.size.x - 6 * s, 2 * s))
-			else:
-				lamp = Rect2(Vector2(inner.position.x + 2 * s, inner.position.y + 3 * s), Vector2(2 * s, inner.size.y - 6 * s))
-			ci.draw_rect(lamp, Color("f0b35a"))
+			# a hatch through the wall: a steel shelf across the wall, lips on the
+			# kitchen and dining sides, and a heat lamp over the middle
+			var along := Vector2.RIGHT if r.size.x >= r.size.y else Vector2.DOWN
+			var across := Vector2(along.y, along.x)
+			var len_a := maxf(r.size.x, r.size.y) - 2 * s
+			var pc := r.get_center()
+			rbox(ci, axis_rect(pc, along, len_a, 29 * s), Color("c7ccd1"), Color("8d949c"), 3, 2)
+			for side in [-1.0, 1.0]:
+				ci.draw_rect(axis_rect(pc + across * side * 12.0 * s, along, len_a - 5 * s, 2 * s), Color("9aa1a8"))
+			ci.draw_rect(axis_rect(pc, along, len_a - 8 * s, 3.2 * s), Color("e39a3f"))
+			ci.draw_rect(axis_rect(pc, along, len_a - 10 * s, 1.2 * s), Color("fff0c8"))
 			if f != null:
 				for i in f.items.size():
-					var p: Vector2 = pass_slot(inner, i)
+					var p: Vector2 = pass_slot(r, i)
 					var it: Dictionary = f.items[i]
 					if it.get("takeout", false):
 						bag(ci, p, 0.7)
 					else:
 						dish(ci, it["dish"], p, 0.75)
 		"oven":
+			# a range from above: the door handle and knobs along the front, two
+			# burners, and the back riser against the wall
 			rbox(ci, inner, Color("4a4f57"), Color("2c3036"), 4)
-			var door := Rect2(inner.position + Vector2(4, inner.size.y / s * 0.35) * s, Vector2(inner.size.x - 8 * s, inner.size.y * 0.5))
-			rbox(ci, door, Color("2a1f1a") if cooking == "" else Color("7a3a18"), Color("8d949c"), 3, 1)
-			if cooking != "":
-				ci.draw_rect(door.grow(-3 * s), Color(1.0, 0.55, 0.15, 0.55))
-			for i in 3:
-				ci.draw_circle(inner.position + Vector2(7 + i * 6, 5) * s, 1.6 * s, Color("c9ccd1"))
+			var hot := cooking != ""
+			if hot:
+				ci.draw_rect(inner.grow(-2 * s), Color(1.0, 0.5, 0.15, 0.14))
+			ci.draw_rect(Rect2(inner.position.x + 2 * s, inner.end.y - 5.5 * s, inner.size.x - 4 * s, 3.5 * s), Color("2f333a"))
+			for bx in [0.3, 0.7]:
+				var bc := inner.position + Vector2(inner.size.x * bx, inner.size.y * 0.55)
+				ci.draw_circle(bc, 5.0 * s, Color("25282d"))
+				ci.draw_arc(bc, 3.9 * s, 0, TAU, 16, Color("ff7a2e") if hot else Color("5b6068"), 1.3 * s, true)
+				ci.draw_arc(bc, 1.9 * s, 0, TAU, 12, Color("ffb35a") if hot else Color("5b6068"), 1.0 * s, true)
+			ci.draw_rect(Rect2(inner.position.x + 3 * s, inner.position.y + 2 * s, inner.size.x - 6 * s, 1.8 * s), Color("aeb4bb"))
+			for i in 4:
+				ci.draw_circle(inner.position + Vector2(inner.size.x * (0.2 + i * 0.2), 6.5 * s), 1.4 * s, Color("d5d9de"))
 		"fridge":
+			# a reach-in fridge from above: the door handle at the front, the coils at the back
 			rbox(ci, inner, Color("e8eef2"), Color("aab4bd"), 4)
-			ci.draw_line(inner.position + Vector2(inner.size.x - 6 * s, 6 * s), inner.position + Vector2(inner.size.x - 6 * s, inner.size.y - 6 * s), Color("8d99a3"), 2.0)
-			ci.draw_line(inner.position + Vector2(4 * s, inner.size.y * 0.4), inner.position + Vector2(inner.size.x - 9 * s, inner.size.y * 0.4), Color("cfd8de"), 1.0)
+			ci.draw_rect(Rect2(inner.position.x + 3 * s, inner.end.y - 5.5 * s, inner.size.x - 6 * s, 3.5 * s), Color("b9c3cb"))
+			for i in 4:
+				var gx := inner.position.x + (6.0 + i * 4.5) * s
+				ci.draw_line(Vector2(gx, inner.end.y - 5.5 * s), Vector2(gx, inner.end.y - 2 * s), Color("8d99a3"), 1.0)
+			ci.draw_line(inner.position + Vector2(3 * s, inner.size.y * 0.5), inner.position + Vector2(inner.size.x - 3 * s, inner.size.y * 0.5), Color("cfd8de"), 1.0)
+			rbox(ci, Rect2(inner.position.x + inner.size.x * 0.22, inner.position.y + 2 * s, inner.size.x * 0.56, 3 * s), Color("8d99a3"), Color("7a8690"), 1, 1)
+			ci.draw_circle(inner.position + Vector2(inner.size.x - 5 * s, inner.size.y * 0.32), 1.3 * s, Color("5aa9d6"))
 		"toilet":
 			var face_t: Vector2 = Vector2(Data.DIRS[dir])
 			var c_t := r.get_center()
@@ -504,10 +556,13 @@ static func furniture_in(ci: CanvasItem, type: String, r: Rect2, dir: int, f = n
 				for o in [Vector2(-4, 5), Vector2(3, -4), Vector2(5, 4)]:
 					ci.draw_circle(c_t + o * s, (1.2 + f.grime * 2.5) * s, Color(0.45, 0.36, 0.2, 0.25 + f.grime * 0.5))
 		"handsink":
+			# a small basin, the tap at the back and the soap beside it
 			rbox(ci, inner, Color("e8eef2"), Color("9aa8b3"), 4)
-			ellipse(ci, inner.get_center() + Vector2(0, 2) * s, Vector2(7, 5.5) * s, Color("7fb4d6"))
-			ci.draw_line(inner.get_center() + Vector2(0, -7) * s, inner.get_center() + Vector2(0, -2) * s, Color("7d868f"), 2.0 * s)
-			rbox(ci, Rect2(inner.position + Vector2(inner.size.x - 9 * s, 3 * s), Vector2(6, 8) * s), Color("f2c14e"), Color("b8912e"), 1, 1)
+			ellipse(ci, inner.get_center() + Vector2(0, -2) * s, Vector2(7.5, 6) * s, Color("7fb4d6"))
+			var htap := Vector2(inner.get_center().x, inner.end.y - 4 * s)
+			ci.draw_circle(htap, 2.0 * s, Color("8d949c"))
+			ci.draw_line(htap, htap + Vector2(0, -6) * s, Color("7d868f"), 2.0 * s)
+			rbox(ci, Rect2(inner.position + Vector2(inner.size.x - 7 * s, inner.size.y - 9 * s), Vector2(5, 6) * s), Color("f2c14e"), Color("b8912e"), 1, 1)
 		"bin":
 			var cb := r.get_center()
 			ci.draw_circle(cb + Vector2(1, 2) * s, 10 * s, Color(0, 0, 0, 0.18))
@@ -532,13 +587,16 @@ static func furniture_in(ci: CanvasItem, type: String, r: Rect2, dir: int, f = n
 			rbox(ci, lid, Color("3f8a60"), Color("2a5e42"), 2, 1)
 			ci.draw_line(Vector2(inner.get_center().x, lid.position.y), Vector2(inner.get_center().x, lid.end.y), Color("2a5e42"), 1.5)
 		"freezer":
+			# a chest freezer from above: the lid with its handle at the front, hinges at the back
 			rbox(ci, inner, Color("d7e6f2"), Color("8fa8bd"), 4)
-			ci.draw_rect(Rect2(inner.position + Vector2(3, 3) * s, Vector2(inner.size.x - 6 * s, inner.size.y * 0.3)), Color("bcd6ea"))
-			ci.draw_line(inner.position + Vector2(inner.size.x - 6 * s, inner.size.y * 0.45), inner.position + Vector2(inner.size.x - 6 * s, inner.size.y - 5 * s), Color("7f97ab"), 2.0)
-			var fc := inner.position + Vector2(inner.size.x * 0.42, inner.size.y * 0.66)
+			rbox(ci, inner.grow(-2.5 * s), Color("c4dbec"), Color("a9c3d7"), 3, 1)
+			rbox(ci, Rect2(inner.position.x + inner.size.x * 0.28, inner.position.y + 1.5 * s, inner.size.x * 0.44, 3 * s), Color("7f97ab"), Color("6a8296"), 1, 1)
+			for hx in [0.25, 0.75]:
+				ci.draw_rect(Rect2(inner.position.x + inner.size.x * hx - 2.5 * s, inner.end.y - 4 * s, 5 * s, 2.5 * s), Color("8fa8bd"))
+			var fc := inner.get_center() + Vector2(0, 1) * s
 			for a in 3:
-				var d := Vector2.RIGHT.rotated(a * PI / 3.0) * 4.0 * s
-				ci.draw_line(fc - d, fc + d, Color("5a8fc0"), 1.1 * s)
+				var d := Vector2.RIGHT.rotated(a * PI / 3.0) * 5.0 * s
+				ci.draw_line(fc - d, fc + d, Color("5a8fc0"), 1.2 * s)
 		"prep":
 			rbox(ci, inner, Color("c7ccd1"), Color("9aa1a8"), 3)
 			var horiz_p := inner.size.x >= inner.size.y
@@ -564,12 +622,19 @@ static func furniture_in(ci: CanvasItem, type: String, r: Rect2, dir: int, f = n
 					tp = inner.position + Vector2(inner.size.x * (0.33 if i < 3 else 0.7), inner.size.y * 0.55 + (i % 3) * 7 * s + 4 * s)
 				rbox(ci, Rect2(tp - Vector2(3, 2.5) * s, Vector2(6, 5) * s), Color("f4f6f8"), Color("aab4bd"), 1, 1)
 		"sink":
+			# the basin, with the tap at the back
 			rbox(ci, inner, Color("b8c0c8"), Color("7d868f"), 4)
-			rbox(ci, inner.grow(-5 * s), Color("7fb4d6"), Color("5f93b5"), 6, 1)
+			var basin := Rect2(inner.position + Vector2(3, 3) * s, Vector2(inner.size.x - 6 * s, inner.size.y - 11 * s))
+			rbox(ci, basin, Color("7fb4d6"), Color("5f93b5"), 5, 1)
+			var tap := Vector2(inner.get_center().x, inner.end.y - 4 * s)
+			ci.draw_circle(tap, 2.2 * s, Color("8d949c"))
+			ci.draw_line(tap, tap + Vector2(0, -7) * s, Color("d5d9de"), 2.0 * s)
+			ci.draw_circle(tap + Vector2(-5.5, 0) * s, 1.4 * s, Color("e06b5e"))
+			ci.draw_circle(tap + Vector2(5.5, 0) * s, 1.4 * s, Color("5aa9d6"))
 			if f != null:
 				var n := mini(f.dirty, 5)
 				for i in n:
-					plate(ci, inner.position + Vector2(8 + i * 2.5, inner.size.y / s - 8 - i * 2.0) * s, 0.7, true)
+					plate(ci, basin.get_center() + Vector2(-4.0 + i * 2.2, 1.5 - i * 1.2) * s, 0.7 * s, true)
 		"plant":
 			var c := r.get_center()
 			ci.draw_circle(c, 9 * s, Color("b5653a"))
@@ -585,14 +650,15 @@ static func furniture_in(ci: CanvasItem, type: String, r: Rect2, dir: int, f = n
 			ci.draw_circle(c, 3.2 * s, Color("fff4c2"))
 			ci.draw_arc(c, 6 * s, 0, TAU, 20, Color("e6d09a"), 1.0 * s, true)
 		"jukebox":
+			# the speaker grille at the front, the glowing dome at the back
 			rbox(ci, inner, Color("8c2f2a"), Color("5e1d19"), 8)
-			var top := Rect2(inner.position + Vector2(3, 3) * s, Vector2(inner.size.x - 6 * s, inner.size.y * 0.55))
+			var top := Rect2(Vector2(inner.position.x + 3 * s, inner.end.y - 3 * s - inner.size.y * 0.55), Vector2(inner.size.x - 6 * s, inner.size.y * 0.55))
 			var cols := [Color("f2c14e"), Color("ef8a3a"), Color("d9463b"), Color("5aa9d6")]
 			for i in cols.size():
 				rbox(ci, top.grow(-i * 2.2 * s), cols[i], cols[i], int(8 - i * 1.5), 0)
 			rbox(ci, top.grow(-9 * s), Color("2b1d17"), Color("2b1d17"), 3, 0)
 			for i in 3:
-				ci.draw_line(Vector2(inner.position.x + 6 * s, inner.end.y - (4 + i * 3) * s), Vector2(inner.end.x - 6 * s, inner.end.y - (4 + i * 3) * s), Color("d8d0c2"), 1.0)
+				ci.draw_line(Vector2(inner.position.x + 6 * s, inner.position.y + (4 + i * 3) * s), Vector2(inner.end.x - 6 * s, inner.position.y + (4 + i * 3) * s), Color("d8d0c2"), 1.0)
 		"sofa":
 			var face: Vector2i = Data.DIRS[dir]
 			rbox(ci, inner, Color("3f8f86"), Color("2b6a63"), 6)
@@ -614,53 +680,155 @@ static func furniture_in(ci: CanvasItem, type: String, r: Rect2, dir: int, f = n
 			for cr in cushions:
 				rbox(ci, cr, Color("52a89e"), Color("3f8f86"), 4, 1)
 		"wall_art":
-			var fr := _on_wall_rect(r, wall_dir, 20 * s, 7 * s)
+			# a framed landscape hanging on the room side of the wall: wide on the
+			# top and bottom walls, tall on the side walls
+			var dw := Vector2(Data.DIRS[wall_dir if wall_dir >= 0 else 2])
+			var fsz := Vector2(15, 24) * s if dw.x != 0 else Vector2(24, 15) * s
+			var fr := Rect2(r.get_center() + dw * 6.5 * s - fsz / 2.0, fsz)
+			rbox(ci, Rect2(fr.position + (dw * 2.0 + Vector2(1, 1)) * s, fr.size), Color(0, 0, 0, 0.28), Color(0, 0, 0, 0), 2, 0)
 			rbox(ci, fr, Color("d8a63a"), Color("9c7424"), 2, 2)
-			var pic := fr.grow(-2.5 * s)
+			var pic := fr.grow(-3 * s)
 			ci.draw_rect(pic, Color("8fc3e6"))
-			var hill := PackedVector2Array([pic.position + Vector2(0, pic.size.y), pic.position + Vector2(pic.size.x * 0.35, pic.size.y * 0.35), pic.position + Vector2(pic.size.x * 0.7, pic.size.y * 0.7), pic.end])
-			ci.draw_colored_polygon(hill, Color("5c9a4a"))
-			ci.draw_circle(pic.position + Vector2(pic.size.x * 0.78, pic.size.y * 0.3), 1.6 * s, Color("f7e27a"))
+			ci.draw_colored_polygon(PackedVector2Array([Vector2(pic.position.x, pic.end.y), pic.position + Vector2(pic.size.x * 0.38, pic.size.y * 0.45),
+				pic.position + Vector2(pic.size.x * 0.7, pic.size.y * 0.72), pic.end]), Color("5c9a4a"))
+			ci.draw_colored_polygon(PackedVector2Array([Vector2(pic.position.x + pic.size.x * 0.45, pic.end.y), pic.position + Vector2(pic.size.x * 0.78, pic.size.y * 0.55), pic.end]), Color("4a8a3c"))
+			ci.draw_circle(pic.position + Vector2(pic.size.x * 0.76, pic.size.y * 0.28), 1.8 * s, Color("f7e27a"))
 		"neon":
-			var nr := _on_wall_rect(r, wall_dir, 24 * s, 9 * s)
-			ci.draw_circle(nr.get_center(), 15 * s, Color(1.0, 0.35, 0.6, 0.12))
+			# a neon EAT sign on the room side of the wall: the letters side by side
+			# on the top and bottom walls, stacked on the side walls. It only glows into the room.
+			var dn := Vector2(Data.DIRS[wall_dir if wall_dir >= 0 else 2])
+			var nsz := Vector2(13, 28) * s if dn.x != 0 else Vector2(28, 13) * s
+			var nc := r.get_center() + dn * 6.0 * s
+			half_disc(ci, nc, dn, 17 * s, Color(1.0, 0.35, 0.6, 0.13))
+			var nr := Rect2(nc - nsz / 2.0, nsz)
 			rbox(ci, nr, Color("1f1a24"), Color("15121a"), 3, 1)
-			var tube := nr.grow(-2.5 * s)
-			ci.draw_rect(tube, Color("ff5fa2"), false, 1.6 * s)
-			var mid := tube.get_center()
-			ci.draw_polyline(PackedVector2Array([mid + Vector2(-6, 1) * s, mid + Vector2(-3, -2) * s, mid + Vector2(0, 1) * s, mid + Vector2(3, -2) * s, mid + Vector2(6, 1) * s]), Color("6ff2ff"), 1.5 * s)
+			ci.draw_rect(nr.grow(-1.5 * s), Color(1.0, 0.37, 0.64, 0.5), false, 0.8 * s)
+			neon_letters(ci, nr.grow(-1.5 * s), dn.x != 0, Color("ff5fa2"), 1.6 * s)
+			neon_letters(ci, nr.grow(-1.5 * s), dn.x != 0, Color("ffd6ea"), 0.6 * s)
 		"takeout":
-			var inside: Vector2i = Data.DIRS[wall_dir if wall_dir >= 0 else 0]
-			var sill := r.grow(-4 * s)
-			rbox(ci, sill, Color("d9d4ca"), Color("a8a196"), 2, 2)
-			var awn: Rect2
-			if inside.y != 0:
-				awn = Rect2(Vector2(r.position.x - 3 * s, r.position.y + (r.size.y - 5 * s if inside.y < 0 else -4 * s)), Vector2(r.size.x + 6 * s, 9 * s))
-			else:
-				awn = Rect2(Vector2(r.position.x + (r.size.x - 5 * s if inside.x < 0 else -4 * s), r.position.y - 3 * s), Vector2(9 * s, r.size.y + 6 * s))
+			# a counter through the wall with a glass pane over the wall line and a
+			# bell on the inside; outside, a striped awning with a scalloped edge.
+			# All of it stays inside its own tile.
+			var ins := Vector2(Data.DIRS[wall_dir if wall_dir >= 0 else 0])
+			var along_w := Vector2(absf(ins.y), absf(ins.x))
+			var tc := r.get_center()
+			rbox(ci, axis_rect(tc + ins * 1.0 * s, along_w, 24 * s, 26 * s), Color("d9d4ca"), Color("a8a196"), 2, 2)
+			ci.draw_rect(axis_rect(tc, along_w, 22 * s, 2.4 * s), Color(0.62, 0.84, 0.95, 0.95))
+			ci.draw_rect(axis_rect(tc - ins * 0.7 * s, along_w, 20 * s, 0.7 * s), Color(1, 1, 1, 0.85))
+			var bell := tc + ins * 7.5 * s + along_w * 6.0 * s
+			ci.draw_circle(bell, 2.8 * s, Color("b8912e"))
+			ci.draw_circle(bell, 2.2 * s, Color("d8a63a"))
+			ci.draw_circle(bell - Vector2(0.7, 0.7) * s, 0.9 * s, Color("f7e27a"))
+			var out := -ins
+			var awn := axis_rect(tc + out * 8.5 * s, along_w, 30 * s, 9 * s)
 			ci.draw_rect(awn, Color("f4efe6"))
-			var stripes := 5
-			for i in stripes:
+			for i in 5:
+				var mid := tc + out * 8.5 * s + along_w * (-12.0 + i * 6.0) * s
 				if i % 2 == 0:
-					var st: Rect2
-					if inside.y != 0:
-						st = Rect2(Vector2(awn.position.x + awn.size.x * i / stripes, awn.position.y), Vector2(awn.size.x / stripes, awn.size.y))
-					else:
-						st = Rect2(Vector2(awn.position.x, awn.position.y + awn.size.y * i / stripes), Vector2(awn.size.x, awn.size.y / stripes))
-					ci.draw_rect(st, Color("c8403a"))
-			ci.draw_circle(sill.get_center(), 2.4 * s, Color("d8a63a"))
+					ci.draw_rect(axis_rect(mid, along_w, 6 * s, 9 * s), Color("c8403a"))
+				half_disc(ci, mid + out * 4.5 * s, out, 3.0 * s, Color("c8403a") if i % 2 == 0 else Color("f4efe6"))
+		"host":
+			# a wooden podium: a brass nameplate on the guest side (the front) and the open booking book
+			rbox(ci, inner.grow(-1 * s), Color("6e4526"), Color("4f3219"), 4)
+			rbox(ci, inner.grow(-3.5 * s), Color("9a6a3f"), Color("7a4f2c"), 3, 1)
+			ci.draw_rect(Rect2(inner.position.x + inner.size.x * 0.28, inner.position.y + 1.2 * s, inner.size.x * 0.44, 2.4 * s), Color("e0b64a"))
+			var book := Rect2(inner.position.x + 5 * s, inner.position.y + 7 * s, inner.size.x - 10 * s, 12 * s)
+			rbox(ci, book, Color("7a2a2a"), Color("5a1c1c"), 1, 1)
+			var pg := book.grow(-1.2 * s)
+			var half := pg.size.x / 2.0
+			ci.draw_rect(Rect2(pg.position, Vector2(half - 0.4 * s, pg.size.y)), Color("f7f1e3"))
+			ci.draw_rect(Rect2(pg.position + Vector2(half + 0.4 * s, 0), Vector2(half - 0.4 * s, pg.size.y)), Color("efe6d2"))
+			for i in 3:
+				var ly := pg.position.y + (2.2 + i * 2.8) * s
+				ci.draw_line(Vector2(pg.position.x + 1.2 * s, ly), Vector2(pg.position.x + half - 1.2 * s, ly), Color("9a8f7e"), 0.7 * s)
+				ci.draw_line(Vector2(pg.position.x + half + 1.2 * s, ly), Vector2(pg.end.x - 1.2 * s, ly), Color("9a8f7e"), 0.7 * s)
+			ci.draw_line(inner.position + Vector2(inner.size.x - 7, inner.size.y - 3.5) * s, inner.position + Vector2(inner.size.x - 3, inner.size.y - 7.5) * s, Color("2b3a5a"), 1.4 * s)
+		"till":
+			# a counter with a retro register: the display faces the customers (the
+			# front), the keys face the staff, and there's a tip jar
+			rbox(ci, inner, Color("8b5a2b"), Color("5e3b1a"), 3)
+			var reg := Rect2(inner.position + Vector2(3, 3.5) * s, Vector2(inner.size.x - 11 * s, inner.size.y - 7 * s))
+			rbox(ci, reg, Color("3d4148"), Color("25282d"), 3, 1)
+			rbox(ci, Rect2(reg.position + Vector2(2, 1.5) * s, Vector2(reg.size.x - 4 * s, 4.5 * s)), Color("1d2a22"), Color("111814"), 1, 1)
+			ci.draw_rect(Rect2(reg.position + Vector2(3, 2.6) * s, Vector2(reg.size.x * 0.45, 2.2 * s)), Color("7df29a"))
+			for ky in 3:
+				for kx in 3:
+					var kp := reg.position + Vector2(2.4 + kx * 3.6, 8.5 + ky * 3.0) * s
+					ci.draw_rect(Rect2(kp, Vector2(2.6, 2.0) * s), Color("d8d0c2") if not (kx == 2 and ky == 2) else Color("e06b5e"))
+			var jar := Vector2(inner.end.x - 4.5 * s, inner.position.y + 7 * s)
+			ci.draw_circle(jar, 3.4 * s, Color(0.85, 0.93, 0.98, 0.9))
+			ci.draw_arc(jar, 3.4 * s, 0, TAU, 14, Color("9fb7ca"), 0.8 * s, true)
+			ci.draw_circle(jar + Vector2(0.6, 0.8) * s, 1.4 * s, Color("7fb24a"))
+			ci.draw_circle(jar + Vector2(-1.0, -0.6) * s, 1.0 * s, Color("e0b64a"))
+		"ice":
+			# an ice machine from above: the bin full of cubes at the front, the ice maker at the back
+			rbox(ci, inner, Color("c5ccd3"), Color("8d969f"), 4)
+			var bin := Rect2(inner.position + Vector2(3, 2.5) * s, Vector2(inner.size.x - 6 * s, inner.size.y * 0.52))
+			rbox(ci, bin, Color("e9f6fd"), Color("9fb7ca"), 3, 1)
+			for i in 6:
+				var cp := bin.position + Vector2(3.0 + (i % 3) * 6.2, 2.6 + floorf(i / 3.0) * 5.2) * s
+				rbox(ci, Rect2(cp, Vector2(4.2, 3.8) * s), Color("cdeefd"), Color("8fc3e6"), 1, 1)
+			ci.draw_rect(Rect2(inner.position.x + 3 * s, inner.end.y - 8.5 * s, inner.size.x - 6 * s, 5.5 * s), Color("a7b0b8"))
+			ci.draw_rect(Rect2(inner.position.x + inner.size.x * 0.55, inner.end.y - 7.5 * s, 7 * s, 3.5 * s), Color("2a3a4a"))
+			ci.draw_rect(Rect2(inner.position.x + inner.size.x * 0.55 + 1 * s, inner.end.y - 6.8 * s, 3.2 * s, 2 * s), Color("6ff2ff"))
 	if f != null and f.broken:
 		ci.draw_rect(inner, Color(0.1, 0.1, 0.12, 0.45))
 		for o in [Vector2(-4, -6), Vector2(3, -9), Vector2(-1, -13)]:
 			ci.draw_circle(r.get_center() + o * s, (3.5 + absf(o.y) * 0.15) * s, Color(0.35, 0.35, 0.38, 0.7))
 
 
-## Where the i-th item sits on a pass counter whose inside rect is `inner`.
-static func pass_slot(inner: Rect2, i: int) -> Vector2:
-	var t: float = (i + 0.5) / float(Data.PASS_SLOTS)
-	if inner.size.x >= inner.size.y:
-		return inner.position + Vector2(inner.size.x * t, inner.size.y * 0.55)
-	return inner.position + Vector2(inner.size.x * 0.55, inner.size.y * t)
+## Where the i-th item sits on a pass counter filling rect r: two rows, one
+## each side of the heat lamp.
+static func pass_slot(r: Rect2, i: int) -> Vector2:
+	var per := maxi(1, Data.PASS_SLOTS / 2)
+	var t: float = ((i % per) + 0.5) / float(per)
+	var side := -7.0 if i < per else 7.0
+	if r.size.x >= r.size.y:
+		return Vector2(r.position.x + 5.0 + (r.size.x - 10.0) * t, r.get_center().y + side)
+	return Vector2(r.get_center().x + side, r.position.y + 5.0 + (r.size.y - 10.0) * t)
+
+
+## An axis-aligned rect centred on c, len_a long along `along` (a unit axis) and len_b across it.
+static func axis_rect(c: Vector2, along: Vector2, len_a: float, len_b: float) -> Rect2:
+	var sz := Vector2(absf(along.x) * len_a + absf(along.y) * len_b, absf(along.y) * len_a + absf(along.x) * len_b)
+	return Rect2(c - sz / 2.0, sz)
+
+
+## Half a disc on the `toward` side of c (for glows that stay in the room).
+static func half_disc(ci: CanvasItem, c: Vector2, toward: Vector2, radius: float, color: Color) -> void:
+	var pts := PackedVector2Array([c])
+	var a0 := toward.angle() - PI * 0.5
+	for i in 13:
+		pts.append(c + Vector2.from_angle(a0 + PI * i / 12.0) * radius)
+	ci.draw_colored_polygon(pts, color)
+
+
+## E, A and T in neon tubes: side by side, or stacked for a sign on a side wall.
+static func neon_letters(ci: CanvasItem, box: Rect2, stacked: bool, col: Color, w: float) -> void:
+	for i in 3:
+		var cell: Rect2
+		if stacked:
+			cell = Rect2(box.position + Vector2(0, box.size.y / 3.0 * i), Vector2(box.size.x, box.size.y / 3.0))
+		else:
+			cell = Rect2(box.position + Vector2(box.size.x / 3.0 * i, 0), Vector2(box.size.x / 3.0, box.size.y))
+		var g := cell.grow(-minf(cell.size.x, cell.size.y) * 0.2)
+		var l := g.position.x
+		var rt := g.end.x
+		var tp := g.position.y
+		var bt := g.end.y
+		var mx := g.get_center().x
+		var my := g.get_center().y
+		var lines: Array = []
+		match i:
+			0:
+				lines = [[Vector2(rt, tp), Vector2(l, tp), Vector2(l, bt), Vector2(rt, bt)], [Vector2(l, my), Vector2(lerpf(l, rt, 0.8), my)]]
+			1:
+				var cy := lerpf(my, bt, 0.2)
+				lines = [[Vector2(l, bt), Vector2(mx, tp), Vector2(rt, bt)], [Vector2(lerpf(l, mx, 0.45), cy), Vector2(lerpf(rt, mx, 0.45), cy)]]
+			2:
+				lines = [[Vector2(l, tp), Vector2(rt, tp)], [Vector2(mx, tp), Vector2(mx, bt)]]
+		for pl in lines:
+			ci.draw_polyline(PackedVector2Array(pl), col, w, true)
 
 
 ## A smaller rect hugging the room side of a wall tile (for pictures and signs).
@@ -672,20 +840,39 @@ static func _on_wall_rect(r: Rect2, wall_dir: int, length: float, depth: float) 
 	return Rect2(c - Vector2(depth, length) / 2.0, Vector2(depth, length))
 
 
+## Dishes being eaten, each in front of its chair, and any money left behind.
+## Everything stays well inside the tabletop so nothing looks about to fall off.
 static func table_food(ci: CanvasItem, f) -> void:
-	# dishes being eaten, placed toward each chair
-	var foods: Array = f.food_on_table
-	if foods.is_empty():
-		return
 	var c: Vector2 = f.center_px()
-	var slots: Array = []
-	for ch in f.chairs:
-		slots.append(c.lerp(ch.center_px(), 0.42))
-	if slots.is_empty():
-		slots.append(c)
-	for i in foods.size():
-		var p: Vector2 = slots[i % slots.size()] + Vector2((i / slots.size()) * 6.0, 0)
-		dish(ci, foods[i], p, 0.72)
+	var top: Rect2 = f.rect_px().grow(-10.0)
+	if top.size.x < 1.0 or top.size.y < 1.0:
+		top = Rect2(c, Vector2.ZERO)
+	var foods: Array = f.food_on_table
+	if not foods.is_empty():
+		var slots: Array = []
+		for ch in f.chairs:
+			var toward: Vector2 = ch.center_px() - c
+			slots.append(c + Vector2(toward.x * 0.7, toward.y * 0.7))
+		if slots.is_empty():
+			slots.append(c)
+		for i in foods.size():
+			var p: Vector2 = slots[i % slots.size()]
+			# a second dish for the same person sits a little further in
+			var extra := int(i / float(slots.size()))
+			if extra > 0:
+				p = p.lerp(c, 0.45) + Vector2(extra * 5.0 - 2.5, 0)
+			p = Vector2(clampf(p.x, top.position.x, top.end.x), clampf(p.y, top.position.y, top.end.y))
+			dish(ci, foods[i], p, 0.66)
+	if f.cash > 0.0:
+		# the check folder with the money tucked in, on the side away from the chairs
+		var away := Vector2.ZERO
+		for ch in f.chairs:
+			away -= ch.center_px() - c
+		var mp := c + (away.normalized() * 8.0 if away.length() > 1.0 else Vector2.ZERO)
+		mp = Vector2(clampf(mp.x, top.position.x, top.end.x), clampf(mp.y, top.position.y, top.end.y))
+		rbox(ci, Rect2(mp - Vector2(5, 3.5), Vector2(10, 7)), Color("2b2622"), Color("171412"), 1, 1)
+		ci.draw_rect(Rect2(mp - Vector2(3.5, 4.8), Vector2(7, 3)), Color("8fc27a"))
+		ci.draw_circle(mp + Vector2(3.5, 2.5), 1.6, Color("e0b64a"))
 
 
 # ------------------------------------------------------------------ bubbles and icons

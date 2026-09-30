@@ -64,6 +64,12 @@ func _draw_glow() -> void:
 			continue
 		var c: Vector2 = f.center_px()
 		var col := Color(1.0, 0.75, 0.4) if f.type == "lamp" else Color(1.0, 0.35, 0.65)
+		if f.on_wall():
+			# a sign on a wall only lights up the room it faces
+			var d := Vector2(Data.DIRS[main.lot.inside_dir(f)])
+			for i in 6:
+				Art.half_disc(glow, c + d * 6.0, d, 18.0 + i * 12.0, Color(col.r, col.g, col.b, 0.05 * e))
+			continue
 		for i in 6:
 			var r := 18.0 + i * 12.0
 			glow.draw_circle(c, r, Color(col.r, col.g, col.b, 0.05 * e))
@@ -126,11 +132,10 @@ func _draw() -> void:
 					draw_string(Art.font(), r.position + Vector2(w - 13, 15), "+", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color("3a2c25"))
 	# steam over hot food on the pass; food that's been sitting there gets a chilly blue ring
 	for f in lot.of_type("pass"):
-		var inner: Rect2 = f.rect_px().grow(-3)
 		for i in f.items.size():
 			var it: Dictionary = f.items[i]
 			var age: float = GameState.minute - it.get("t", GameState.minute)
-			var p: Vector2 = Art.pass_slot(inner, i)
+			var p: Vector2 = Art.pass_slot(f.rect_px(), i)
 			if age <= Data.PASS_HOT:
 				for k in 2:
 					var ph := fmod(t * 0.9 + i * 0.37 + k * 0.5, 1.0)

@@ -95,11 +95,21 @@ func rotate_pressed() -> void:
 
 
 ## Which way a piece will face if placed at c.
+## Until you press R: chairs face the nearest table, the pass lines up with
+## the wall it's in, and kitchen machines turn their backs to the wall.
 func dir_for(t: String, c: Vector2i) -> int:
-	if t == "chair" and not rot_touched:
+	if rot_touched:
+		return rot
+	if t == "chair":
 		var auto: int = lot.chair_dir_toward_table(c)
 		if auto >= 0:
 			return auto
+	elif t == "pass":
+		return 1 if lot.wall_runs_vertical(c) else 0
+	elif t in Art.TURNS:
+		var away: int = lot.dir_away_from_wall(c)
+		if away >= 0:
+			return away
 	return rot
 
 
@@ -228,7 +238,7 @@ func _draw() -> void:
 		Art.furniture(self, ghost, lot.inside_dir(ghost) if ghost.on_wall() else -1)
 		draw_rect(ghost.rect_px(), tint)
 		# a small arrow showing which way it faces
-		if tool in ["chair", "sofa"]:
+		if tool in ["chair", "sofa"] or tool in Art.TURNS:
 			var c := ghost.center_px()
 			var f := Vector2(Data.DIRS[d])
 			var side := Vector2(-f.y, f.x)

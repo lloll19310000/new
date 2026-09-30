@@ -550,6 +550,8 @@ func can_take(j) -> bool:
 					needs_fridge = true
 			if needs_fridge and lot.of_type("fridge").is_empty():
 				return false
+			if needs_ice(j.items) and lot.of_type("ice").is_empty():
+				return false
 			if GameState.plates_clean < plates_for(j):
 				return false
 			return GameState.has_items(j.items)
@@ -577,6 +579,13 @@ func can_take(j) -> bool:
 			return lot.dirt[lot.idx(j.cell)] >= Data.DIRT_SHOW and lot.walkable(j.cell)
 		"repair":
 			return j.furniture != null and j.furniture.broken and lot.furniture.has(j.furniture) and j.furniture.user == null and GameState.can_afford(Data.REPAIR_COST)
+	return false
+
+
+static func needs_ice(items: Array) -> bool:
+	for d in items:
+		if Data.DISHES[d].get("ice", false):
+			return true
 	return false
 
 
@@ -933,6 +942,12 @@ func plan_cook(j, extra: Array = []) -> void:
 			job = null
 			steps = []
 			return true))
+	# cold drinks: a scoop of ice on the way
+	if needs_ice(all_items):
+		var ice = nearest("ice", current_cell())
+		if ice != null:
+			steps.append(go_step(lot.access_cells(ice), "Getting ice"))
+			steps.append(work_step(0.2, "Scooping ice", false, ice.center_px()))
 	steps.append(go_step(lot.access_cells(st), "Going to the " + st.info()["name"].to_lower()))
 	# nobody restocked it last night: set it up first
 	if not st.stocked:

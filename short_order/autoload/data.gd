@@ -91,8 +91,11 @@ const DISHES := {
 	"pie":       {"name": "Apple pie", "station": "oven",    "minutes": 5.0, "needs": {"fruit": 1, "bread": 1}, "price": 6.0,  "plate": true,  "kind": "dessert", "prep": true},
 	"milkshake": {"name": "Milkshake", "station": "drinks",  "minutes": 2.0, "needs": {"icecream": 1, "dairy": 1}, "price": 6.0, "plate": false, "kind": "drink", "prep": false},
 	"coffee":    {"name": "Coffee",    "station": "drinks",  "minutes": 1.0, "needs": {},                       "price": 3.0,  "plate": false, "kind": "drink", "prep": false},
+	## ice: needs an ice machine. The cook scoops the ice on the way to the drinks machine.
+	"soda":      {"name": "Soda",      "station": "drinks",  "minutes": 0.8, "needs": {},                       "price": 3.0,  "plate": false, "kind": "drink", "prep": false, "ice": true},
+	"icedtea":   {"name": "Iced tea",  "station": "drinks",  "minutes": 0.8, "needs": {},                       "price": 3.0,  "plate": false, "kind": "drink", "prep": false, "ice": true},
 }
-const DISH_ORDER := ["burger", "pancakes", "omelette", "meatloaf", "fries", "pie", "milkshake", "coffee"]
+const DISH_ORDER := ["burger", "pancakes", "omelette", "meatloaf", "fries", "pie", "milkshake", "coffee", "soda", "icedtea"]
 const SPECIAL_PICKS := 3          # customers pick today's special this many times as often
 const SPECIAL_REVIEW := 0.2       # and like getting it this much
 
@@ -174,7 +177,7 @@ const PLOTS := [
 const BILL_EVERY := 7
 ## Gas, power and water per week for each thing that uses them, plus the lights.
 const UTILITIES := {"grill": 25, "fryer": 25, "griddle": 25, "oven": 25, "drinks": 15, "fridge": 20, "freezer": 20,
-	"sink": 8, "jukebox": 6, "neon": 5, "lamp": 2}
+	"sink": 8, "ice": 15, "jukebox": 6, "neon": 5, "lamp": 2}
 const UTILITIES_BASE := 40
 ## Bank loans: borrow now, pay back a little with every week's bills.
 const LOAN_OPTIONS := [5000, 10000, 20000]
@@ -200,17 +203,19 @@ const REP_LEVELS := [
 ## floor: which floor it must stand on ("any", "diner", "kitchen", "staff", "inside" = diner or
 ## kitchen, or "wall" = hangs on a wall tile). beauty/radius: how much it cheers up nearby tables.
 const FURNITURE := {
-	"table":    {"name": "Table",          "size": [2, 1], "cost": 150, "solid": true,  "cat": "dining",  "floor": "diner",   "desc": "Seats up to 4. Put chairs next to it."},
+	"table":    {"name": "Table",          "size": [2, 1], "cost": 150, "solid": true,  "cat": "dining",  "floor": "diner",   "seats": 4, "desc": "Seats up to 4. Put chairs next to it."},
+	"table_small": {"name": "Single table", "size": [1, 1], "cost": 90, "solid": true, "cat": "dining",  "floor": "diner",   "seats": 1, "desc": "A small table for one, with a chair beside it. Solo diners (truckers, regulars, critics) sit here and leave the big tables for groups."},
 	"chair":    {"name": "Chair",          "size": [1, 1], "cost": 45,  "solid": false, "cat": "dining",  "floor": "diner",   "desc": "Place beside a table. It turns to face the table; press R to turn it yourself."},
 	"grill":    {"name": "Grill",          "size": [2, 1], "cost": 900, "solid": true,  "cat": "kitchen", "floor": "kitchen", "desc": "Cooks burgers."},
 	"fryer":    {"name": "Fryer",          "size": [1, 1], "cost": 650, "solid": true,  "cat": "kitchen", "floor": "kitchen", "desc": "Cooks fries."},
 	"griddle":  {"name": "Griddle",        "size": [2, 1], "cost": 600, "solid": true,  "cat": "kitchen", "floor": "kitchen", "desc": "Cooks pancakes and omelettes."},
 	"drinks":   {"name": "Drinks machine", "size": [1, 1], "cost": 500, "solid": true,  "cat": "kitchen", "floor": "kitchen", "desc": "Makes coffee and milkshakes."},
 	"oven":     {"name": "Oven",           "size": [1, 1], "cost": 700, "solid": true,  "cat": "kitchen", "floor": "kitchen", "desc": "Bakes meatloaf and apple pie."},
-	"pass":     {"name": "Pass counter",   "size": [2, 1], "cost": 180, "solid": true,  "cat": "kitchen", "floor": "inside",  "desc": "Finished food waits here for a server. Holds 6. Put it between the kitchen and the dining room."},
+	"pass":     {"name": "Pass counter",   "size": [2, 1], "cost": 180, "solid": true,  "cat": "kitchen", "floor": "wall",    "desc": "A hatch in the wall between the kitchen and the dining room. Cooks put finished food on it from the kitchen side and servers pick it up from the dining side. Holds 8."},
 	"fridge":   {"name": "Fridge",         "size": [1, 1], "cost": 450, "solid": true,  "cat": "kitchen", "floor": "kitchen", "desc": "Cooks fetch ingredients here. Holds 240 portions of chilled food, plus a little freezer box (50)."},
 	"freezer":  {"name": "Freezer",        "size": [1, 1], "cost": 500, "solid": true,  "cat": "kitchen", "floor": "kitchen", "desc": "Holds 200 portions of frozen food (fries and ice cream). Frozen food lasts a month."},
 	"prep":     {"name": "Prep counter",   "size": [2, 1], "cost": 350, "solid": true,  "cat": "kitchen", "floor": "kitchen", "desc": "Before opening, cooks chop, mix and portion here. Prepped dishes cook 40% faster. Leftover prep is thrown out at night."},
+	"ice":      {"name": "Ice machine",    "size": [1, 1], "cost": 1200, "solid": true, "cat": "kitchen", "floor": "kitchen", "desc": "Makes ice for sodas and iced tea. Without one, cold drinks are off the menu. Press R to turn it."},
 	"sink":     {"name": "Sink",           "size": [1, 1], "cost": 300, "solid": true,  "cat": "kitchen", "floor": "kitchen", "desc": "Dirty plates are washed here."},
 	"plant":    {"name": "Potted plant",   "size": [1, 1], "cost": 60,  "solid": true,  "cat": "decor",   "floor": "any",     "beauty": 1, "radius": 3, "desc": "Cheers up tables nearby."},
 	"lamp":     {"name": "Floor lamp",     "size": [1, 1], "cost": 90,  "solid": true,  "cat": "decor",   "floor": "any",     "beauty": 1, "radius": 3, "glow": true, "desc": "Cheers up tables nearby and glows in the evening."},
@@ -241,8 +246,8 @@ const MAX_BEAUTY := 4           # beauty above this doesn't help any more
 ## The build menu, one list per category, left to right.
 const BUILD_MENU := [
 	{"key": "structure", "name": "Structure", "icon": "structure", "items": ["land", "floor_diner", "floor_kitchen", "wall", "door", "takeout", "dumpster"]},
-	{"key": "dining",    "name": "Dining",    "icon": "dining",    "items": ["table", "chair", "host", "till"]},
-	{"key": "kitchen",   "name": "Kitchen",   "icon": "kitchen",   "items": ["grill", "fryer", "griddle", "drinks", "oven", "pass", "prep", "fridge", "freezer", "sink", "bin", "trap"]},
+	{"key": "dining",    "name": "Dining",    "icon": "dining",    "items": ["table", "table_small", "chair", "host", "till"]},
+	{"key": "kitchen",   "name": "Kitchen",   "icon": "kitchen",   "items": ["grill", "fryer", "griddle", "drinks", "oven", "ice", "pass", "prep", "fridge", "freezer", "sink", "bin", "trap"]},
 	{"key": "restroom",  "name": "Restroom",  "icon": "restroom",  "items": ["floor_restroom", "toilet", "handsink"]},
 	{"key": "decor",     "name": "Decor",     "icon": "decor",     "items": ["plant", "lamp", "wall_art", "neon", "jukebox"]},
 	{"key": "staff",     "name": "Staff room", "icon": "staff_room", "items": ["floor_staff", "sofa"]},
