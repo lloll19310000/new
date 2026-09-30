@@ -164,7 +164,7 @@ func apply_click(c: Vector2i) -> void:
 			Sfx.play("error", -8.0)
 		elif GameState.buy_plot(p["id"]):
 			Sfx.play("cash")
-			lot.queue_redraw()
+			lot.redraw()
 		return
 	var ok := false
 	if tool == "paste":

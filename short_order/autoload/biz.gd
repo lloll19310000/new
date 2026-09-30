@@ -6,15 +6,11 @@ extends Node
 ##   catering: now and then someone asks you to cater a wedding or a team
 ##     banquet. Accept it, and the cooks prep the order that morning; the van
 ##     picks it up at noon and you're paid for what's ready.
-##   a sister diner: once you're a Destination diner, open a second one. The
-##     other diner keeps running under its manager and its weekly profit comes
-##     in with the bills.
 
 signal changed
 
 var reps: Dictionary = {}        # rep key -> {"rel": 0..100, "contract": bool}
 var catering: Array = []         # {"id", "client", "day", "dishes": {dish: n}, "pay", "state"}
-var sister: Dictionary = {}      # {"name", "slot", "weekly"}
 var next_id := 1
 
 
@@ -23,7 +19,6 @@ func reset() -> void:
 	for k in Data.SUPPLIER_REPS:
 		reps[k] = {"rel": 50.0, "contract": false}
 	catering = []
-	sister = {}
 	next_id = 1
 
 
@@ -181,25 +176,10 @@ func tick(_minutes: float) -> void:
 	changed.emit()
 
 
-# ------------------------------------------------------------------ a sister diner
-
-func can_open_second() -> bool:
-	return sister.is_empty() and GameState.rep_level >= Data.SECOND_AT_LEVEL and GameState.money >= Data.SECOND_COST
-
-
-## With the weekly bills: the other diner's week, run by its manager.
-func sister_week() -> float:
-	if sister.is_empty():
-		return 0.0
-	var v: float = sister.get("weekly", 0.0) * randf_range(0.8, 1.2)
-	GameState.add_money(v)
-	return v
-
-
 # ------------------------------------------------------------------ saves
 
 func save_data() -> Dictionary:
-	return {"reps": reps, "catering": catering, "sister": sister, "next_id": next_id}
+	return {"reps": reps, "catering": catering, "next_id": next_id}
 
 
 func load_data(d: Dictionary) -> void:
@@ -213,5 +193,4 @@ func load_data(d: Dictionary) -> void:
 			if Data.DISHES.has(k):
 				dishes[k] = int(c["dishes"][k])
 		catering.append({"id": int(c["id"]), "client": str(c["client"]), "day": int(c["day"]), "dishes": dishes, "pay": float(c["pay"]), "state": str(c["state"])})
-	sister = d.get("sister", {})
 	next_id = int(d.get("next_id", 1))

@@ -65,7 +65,7 @@ func used_toilet(t, g = null) -> void:
 	GameState.today["restroom_uses"] += 1
 	if t.grime >= Data.TOILET_SCRUB_AT and not JobBoard.has_open("scrub", "furniture", t):
 		JobBoard.post("clean", "scrub", {"furniture": t})
-	main.lot.queue_redraw()
+	main.lot.redraw()
 
 
 # ------------------------------------------------------------------ trash
@@ -88,7 +88,7 @@ func add_trash(near: Vector2i, amount: float) -> void:
 	bin.fill = minf(1.5, bin.fill + amount)
 	if bin.fill >= Data.BIN_EMPTY_AT and not JobBoard.has_open("trash", "furniture", bin):
 		JobBoard.post("clean", "trash", {"furniture": bin})
-	main.lot.queue_redraw()
+	main.lot.redraw()
 
 
 func overflowing() -> Array:

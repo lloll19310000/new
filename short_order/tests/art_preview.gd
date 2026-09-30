@@ -112,7 +112,7 @@ static func run(main, _args: PackedStringArray) -> void:
 	tb2.food_q = [0.9, 0.8, 0.3, 0.8]
 	tb2.cash = 42.0
 	st.cash = 18.0
-	lot.queue_redraw()
+	lot.redraw()
 	GameState.phase = GameState.Phase.SERVICE
 	GameState.minute = 21 * 60.0
 	var tree: SceneTree = main.get_tree()

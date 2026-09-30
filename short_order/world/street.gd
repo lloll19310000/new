@@ -39,7 +39,7 @@ func _process(delta: float) -> void:
 		var lane := randi() % 2
 		var is_bus := randf() < 0.12 and not cars.any(func(c): return c["bus"])
 		cars.append({"x": -80.0 if lane == 0 else w + 80.0, "lane": lane, "speed": randf_range(90.0, 150.0) * (0.7 if is_bus else 1.0),
-			"color": Color("f2c14e") if is_bus else CAR_COLORS.pick_random(), "bus": is_bus, "stop_t": 0.0, "len": 88.0 if is_bus else 50.0})
+			"color": Color("f2c14e") if is_bus else CAR_COLORS.pick_random(), "bus": is_bus, "stop_t": 0.0, "len": 100.0 if is_bus else 68.0})
 	for c in cars:
 		var dir := 1.0 if c["lane"] == 0 else -1.0
 		# the bus pulls in at its stop for a moment

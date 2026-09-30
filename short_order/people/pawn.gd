@@ -106,12 +106,13 @@ func face_toward(p: Vector2) -> void:
 
 
 func _draw() -> void:
-	Art.person(self, Vector2.ZERO, facing, shirt, skin, hair, step_anim, is_staff, wears_hat, sitting, look, body_scale, style)
+	Art.person(self, Vector2.ZERO, facing, shirt, skin, hair, step_anim if is_moving() else -1.0, is_staff, wears_hat, sitting, look, body_scale, style)
 	if carry.is_empty():
 		return
+	# held in front, at chest height; plates go behind when walking away
 	var side := Vector2(-facing.y, facing.x)
 	for i in carry.size():
-		var p := facing * 10.0 + side * (float(i) - (carry.size() - 1) / 2.0) * 7.0 - Vector2(0, 3)
+		var p := Vector2(facing.x * 8.0, facing.y * 4.0 - 4.0) + side * (float(i) - (carry.size() - 1) / 2.0) * 7.0
 		if carry[i] == "trash":
 			Art.trash_bag(self, p, 0.9)
 		elif carry[i] == "pot":

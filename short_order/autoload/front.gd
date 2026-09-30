@@ -136,7 +136,7 @@ func hold_table(b: Dictionary) -> void:
 		best.reserved = b
 		b["table"] = best
 		b["state"] = "held"
-		main.lot.queue_redraw()
+		main.lot.redraw()
 
 
 func release(b: Dictionary) -> void:
@@ -145,7 +145,7 @@ func release(b: Dictionary) -> void:
 		t.reserved = null
 	b["table"] = null
 	if main != null:
-		main.lot.queue_redraw()
+		main.lot.redraw()
 
 
 func bookings_left() -> Array:

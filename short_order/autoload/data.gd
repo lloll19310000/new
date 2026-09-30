@@ -486,10 +486,6 @@ const CATERING_CLIENTS := ["the Henderson wedding", "the high school football ba
 	"the fire station's open day", "a funeral lunch for old Mr. Pruitt", "the county clerk's retirement party", "the Little League team"]
 const HISTORY_DAYS := 120          # nights kept for the Books
 const SCRAPBOOK_MAX := 80
-## A sister diner.
-const SECOND_AT_LEVEL := 3          # Destination diner
-const SECOND_COST := 100000.0       # what you move across to get it started
-const SISTER_SHARE := 0.6           # of this diner's weekly profit, as a guess at the other's
 
 ## Careers (see Career): each role's ladder, [skill, shifts worked] for each
 ## step, and the perks you pick when someone moves up.

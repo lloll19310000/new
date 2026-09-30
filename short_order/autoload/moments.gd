@@ -152,7 +152,7 @@ func pick_eotm() -> void:
 	for s in GameState.staff:
 		s.jobs_month = 0
 	if Crew.main != null:
-		Crew.main.lot.queue_redraw()
+		Crew.main.lot.redraw()
 
 
 ## A page for the scrapbook (see the Scrapbook tab): kind picks the icon.

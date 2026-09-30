@@ -238,8 +238,6 @@ func show_report(r: Dictionary) -> void:
 			row(money, "Supplier contracts", "-$%d" % int(bills["contracts"]), UiKit.CHERRY)
 		if bills.get("benefits", 0.0) > 0.0:
 			row(money, "Staff benefits", "-$%d" % int(bills["benefits"]), UiKit.CHERRY)
-		if absf(bills.get("sister", 0.0)) >= 1.0:
-			row(money, "Your other diner", ("+$%d" if bills["sister"] >= 0.0 else "-$%d") % int(absf(bills["sister"])), UiKit.MINT if bills["sister"] >= 0.0 else UiKit.CHERRY)
 	if r.get("supplies", 0.0) > 0.0:
 		row(money, "Delivery (this morning)", "-$%d" % int(r["supplies"]), UiKit.CHERRY)
 	if r.get("staff_meal", 0.0) > 0.0:

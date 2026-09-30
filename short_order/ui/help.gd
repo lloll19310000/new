@@ -50,7 +50,7 @@ func build_text() -> String:
 	t += "%s  [b]The schedule[/b] writes itself every night (Staff > Schedule): day, mid and night shifts so every shift has cooks and servers, and two days off a week each. Set someone's shift by hand and it stays put.\n" % ic("calendar")
 	t += "%s  People are sometimes late, and now and then don't show up at all. When someone's sick you choose: send them home, or let them work slower and maybe pass it on.\n" % ic("sick", "#6cc3a0")
 	t += "%s  [b]Training:[/b] pair a beginner with someone much better (school button on their card) and they learn twice as fast.\n" % ic("school")
-	t += "%s  Everyone has a hometown and a story. Coworkers form opinions of each other: [color=#6cc3a0]friends[/color] work faster side by side, [color=#e75a4e]rivals[/color] bicker. The [b]Crew[/b] tab shows who feels what, and the staff log says why.\n" % ic("crew", "#e27fa8")
+	t += "%s  Everyone has a hometown and a story. Coworkers form opinions of each other: [color=#6cc3a0]friends[/color] work faster side by side, [color=#e75a4e]rivals[/color] bicker. The [b]Morale[/b] page (under Staff) lists only what needs you, worst first, with a button to deal with each; click someone to see who they like and can't stand.\n" % ic("crew", "#e27fa8")
 	t += "%s  Idle staff sneak onto their phones. Click them to catch them.\n" % ic("phone", "#6aa6d9")
 	t += "%s  [b]Careers:[/b] people climb their role's ladder (trainee cook, line cook, senior line cook, sous chef) with a raise and a perk you pick. They ask for days off for their own lives, and some can't work mornings or nights. Pick a [b]morning huddle[/b] focus and offer [b]benefits[/b] in the Office.\n" % ic("school")
 	t += "%s  [b]Breaks:[/b] a 30-minute meal break and 10-minute rest breaks, staggered so nobody leaves the floor empty. A missed meal break costs an hour's pay. People not on the morning shift stay home until their shift; at the end of a shift, someone stays on if nobody else in their role is there yet.\n" % ic("sun")
@@ -70,7 +70,7 @@ func build_text() -> String:
 	t += "%s  Mix-ups get sent back and remade, some customers have [b]allergies[/b], and plates left on the pass go cold. You can see how well a plate was cooked: a garnish on a good one, a smear on a sloppy one.\n" % ic("plate")
 	t += "%s  Coffee drinkers like a [b]refill[/b]: servers go round with the pot when the floor's calm, and refilled tables tip better.\n\n" % ic("serve")
 	t += "[font_size=16][b][color=#f2c14e]Menu and money[/color][/b][/font_size]\n"
-	t += "%s  [b]Combos[/b] (10%% off) on the Menu, and servers who suggest a pie or a shake. [b]Catering[/b] jobs and [b]supplier[/b] contracts are in the Office, and once you're famous you can open a [b]second diner[/b]. Switch on late nights (to 02:00) for the bar crowd.\n" % ic("van")
+	t += "%s  [b]Combos[/b] (10%% off) on the Menu, and servers who suggest a pie or a shake. [b]Catering[/b] jobs and [b]supplier[/b] contracts are in the Office. Switch on late nights (to 02:00) for the bar crowd.\n" % ic("van")
 	t += "%s  The Menu page is your printed menu: tap − and + (or drag the price) and see what each plate makes after ingredients. Star a dish to make it [b]today's special[/b]. New recipes unlock as your reputation grows, from goals, and from your cooks.\n" % ic("menu")
 	t += "%s  Pick a [b]supplier[/b] on the Supplies page: Budget is cheap, Farm fresh makes better food. The van comes every morning; sometimes it's late or short.\n" % ic("van")
 	t += "%s  [b]Rent and utilities[/b] are due every 7 days. The report shows food cost (aim for about 30%%), staff cost (with California wages, about 40%%) and profit margin. Short on cash? The Office has bank loans from $5,000 to $250,000.\n" % ic("office")
@@ -88,7 +88,7 @@ func build_text() -> String:
 	t += "%s  The [b]health inspector[/b], unannounced, soon after you open and then two to four times a year (sooner after a reported allergic reaction): floors, the kitchen, the restroom, hand-washing, trash and mice.\n\n" % ic("inspector", "#6cc3a0")
 	t += "[font_size=16][b][color=#f2c14e]Controls[/color][/b][/font_size]\n"
 	t += "Right-drag, middle-drag or WASD: move.  Scroll: zoom.  R: turn.  Esc: stop building, then the menu.\n"
-	t += "Space: pause.  1, 2, 3: speed.  Tab: show or hide the side panel.  V: map overlays (dirt, foot traffic, table waits, station wear).\n"
+	t += "Space: pause.  1, 2, 3, 4: speed (up to 8x).  Tab: show or hide the side panel.  V: map overlays (dirt, foot traffic, table waits, station wear).\n"
 	t += "Messages drop in under the top bar; the bell keeps them all. 4: 8x speed. P: a photo for the scrapbook. Ctrl+Z: undo.\n"
-	t += "The [b]Books[/b] tab charts your nights; the [b]Scrapbook[/b] keeps the big moments. Click the jukebox to change the playlist, or the kitchen radio for the station."
+	t += "Under [b]Office[/b], the Books chart your nights and the Scrapbook keeps the big moments. Click the jukebox to change the playlist, or the kitchen radio for the station."
 	return t

@@ -1,16 +1,28 @@
 extends Control
-## The panel on the right with Staff, Menu, Supplies, Crew and Office pages.
-## Click an icon on the rail to open that page; click it again (or the
+## The panel on the right. Five buttons on the rail (Staff, Menu, Office,
+## Goals, Reviews); pages that belong together share one, with a row of
+## sub-tabs at the top (Staff: Team and Crew; Menu: Menu and Supplies;
+## Office: Office, Books and Scrapbook). Click a rail button again (or the
 ## arrow, or press Tab) to slide the panel away and see more of the diner.
 
 signal hire_requested(index: int)
 signal fire_requested(who)
 
+## Rail button -> the pages under it, first one shown by default.
+const GROUPS := {
+	"staff": ["staff", "crew"],
+	"menu": ["menu", "supplies"],
+	"office": ["office", "books", "scrapbook"],
+	"goals": ["goals"],
+	"reviews": ["reviews"],
+}
+const SUBTAB_NAMES := {"staff": "Team", "crew": "Morale", "menu": "Menu", "supplies": "Supplies", "office": "Office",
+	"books": "Books", "scrapbook": "Scrapbook"}
 const PAGES := {
 	"staff": {"title": "Staff", "icon": "staff"},
 	"menu": {"title": "Menu", "icon": "menu"},
 	"supplies": {"title": "Supplies", "icon": "supplies"},
-	"crew": {"title": "Crew", "icon": "crew"},
+	"crew": {"title": "Morale", "icon": "crew"},
 	"office": {"title": "Office", "icon": "office"},
 	"goals": {"title": "Goals", "icon": "star"},
 	"reviews": {"title": "Reviews", "icon": "chat"},
@@ -24,6 +36,7 @@ var main
 var is_open := true
 var current := "staff"
 var _tween: Tween
+var subtabs: HBoxContainer
 
 @onready var panel: PanelContainer = %Panel
 @onready var title: Label = %Title
@@ -65,11 +78,55 @@ func _ready() -> void:
 	pages["staff"].fire_requested.connect(func(w): fire_requested.emit(w))
 	for k in tabs:
 		tabs[k].pressed.connect(toggle.bind(k))
+		# only the first page of each group keeps its button on the rail
+		tabs[k].visible = GROUPS.has(k)
+	# the rail in order: Staff, Menu, Office, Goals, Reviews
+	var rail: Node = tabs["staff"].get_parent()
+	var order := 0
+	for g in GROUPS:
+		rail.move_child(tabs[g], order)
+		order += 1
+	# crew news shows on the Staff button now
+	crew_badge.reparent(tabs["staff"], false)
+	subtabs = HBoxContainer.new()
+	subtabs.name = "SubTabs"
+	subtabs.add_theme_constant_override("separation", 4)
+	var box: Node = title.get_parent().get_parent()
+	box.add_child(subtabs)
+	box.move_child(subtabs, title.get_parent().get_index() + 1)
 	close_button.pressed.connect(close)
 	Crew.big_moment.connect(func():
 		if not (is_open and current == "crew"):
 			crew_badge.visible = true)
 	show_page(current)
+
+
+## The rail button a page lives under.
+static func group_of(key: String) -> String:
+	for g in GROUPS:
+		if key in GROUPS[g]:
+			return g
+	return key
+
+
+func _build_subtabs(key: String) -> void:
+	for c in subtabs.get_children():
+		c.queue_free()
+	var g := group_of(key)
+	var list: Array = GROUPS.get(g, [key])
+	subtabs.visible = list.size() > 1
+	if list.size() < 2:
+		return
+	for k in list:
+		var b := Button.new()
+		b.text = SUBTAB_NAMES.get(k, PAGES[k]["title"])
+		b.toggle_mode = true
+		b.focus_mode = Control.FOCUS_NONE
+		b.theme_type_variation = &"CategoryButton"
+		b.set_pressed_no_signal(k == key)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.pressed.connect(show_page.bind(k))
+		subtabs.add_child(b)
 
 
 ## A page built in code, with its own button on the rail.
@@ -89,7 +146,7 @@ func _add_page(key: String, page: Control, icon_name: String, tip: String) -> vo
 
 
 func toggle(key: String) -> void:
-	if is_open and current == key:
+	if is_open and (current == key or (GROUPS.has(key) and group_of(current) == key)):
 		close()
 	else:
 		open(key)
@@ -97,13 +154,16 @@ func toggle(key: String) -> void:
 
 func show_page(key: String) -> void:
 	current = key
+	var g := group_of(key)
 	for k in pages:
 		pages[k].visible = k == key
-		tabs[k].set_pressed_no_signal(is_open and k == key)
-	title.text = PAGES[key]["title"]
+		tabs[k].set_pressed_no_signal(is_open and k == g)
+	title.text = PAGES[g]["title"] if GROUPS.has(g) else PAGES[key]["title"]
+	if subtabs != null:
+		_build_subtabs(key)
 	# a page with something wide could have stretched the panel; snap it back
 	panel.offset_right = panel.offset_left + PANEL_W
-	title_icon.texture = UiKit.icon(PAGES[key]["icon"])
+	title_icon.texture = UiKit.icon(PAGES[g]["icon"] if GROUPS.has(g) else PAGES[key]["icon"])
 	if key == "crew":
 		crew_badge.visible = false
 	if key == "goals":

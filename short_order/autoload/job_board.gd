@@ -5,6 +5,9 @@ extends Node
 const Job = preload("res://people/job.gd")
 
 var jobs: Array = []
+var version := 0              # goes up whenever a job is posted, claimed, released or finished
+var _open_cache: Array = []
+var _open_key := Vector2(-1, -1)
 
 
 func post(type: String, kind: String, fields: Dictionary = {}):
@@ -15,12 +18,18 @@ func post(type: String, kind: String, fields: Dictionary = {}):
 	for k in fields:
 		j.set(k, fields[k])
 	jobs.append(j)
+	version += 1
 	return j
 
 
 func open_jobs() -> Array:
 	var now := GameState.sim_time
-	return jobs.filter(func(j): return j.claimed_by == null and not j.done and j.retry_at <= now)
+	# many idle staff look at the board in the same step: work it out once
+	var k := Vector2(version, now)
+	if k != _open_key:
+		_open_key = k
+		_open_cache = jobs.filter(func(j): return j.claimed_by == null and not j.done and j.retry_at <= now)
+	return _open_cache
 
 
 ## Customer jobs (cooking, serving, washing) nobody has picked up yet: how swamped the crew is.
@@ -34,12 +43,14 @@ func waiting_count() -> int:
 
 func claim(j, who) -> void:
 	j.claimed_by = who
+	version += 1
 
 
 func release(j, cooldown: float = 0.0) -> void:
 	if j != null and not j.done:
 		j.claimed_by = null
 		j.retry_at = GameState.sim_time + cooldown
+		version += 1
 
 
 func finish(j) -> void:
@@ -47,6 +58,7 @@ func finish(j) -> void:
 		return
 	j.done = true
 	jobs.erase(j)
+	version += 1
 
 
 func has_open(kind: String, match_field: String, value) -> bool:
@@ -134,6 +146,7 @@ func cancel_for_group(group) -> void:
 
 func clear() -> void:
 	jobs.clear()
+	version += 1
 
 
 func count_by_type() -> Dictionary:

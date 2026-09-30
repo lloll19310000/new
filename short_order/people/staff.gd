@@ -25,6 +25,9 @@ var job = null
 var steps: Array = []
 var status := "Idle"
 var think_timer := 0.0
+var _break_check_at := 0.0     # the game minute an idle person next asks whether a break is due
+var _scan_version := -1        # the job board's version when a look found nothing to do
+var _scan_at := 0.0
 var reserved := {}              # things to give back if a job is dropped
 var on_break := false
 var rest_sofa = null            # the sofa they're resting on, if any
@@ -62,16 +65,28 @@ var sched_off := -1             # a day off the schedule gave them
 var streak := 0                 # days in a row they've worked
 var shift_locked := false       # you set their shift by hand: the schedule leaves it alone
 var break_asked := false        # a manager told them to take a break after this job
-var away := false               # having that day off right now
+var away := false:   # having that day off right now
+	set(v):
+		away = v
+		Crew.forget_present()
 var _burnt_day := -1
 # the morning
 var dirty_hands := false        # after the restroom or the trash, until they wash up
 var _toilet_first := false      # this break starts with a trip to the restroom
 # shifts (see autoload/shifts.gd)
 var shift := "double"           # "open", "close" or "double"
-var at_work := true             # in the building today (walking in counts)
-var arriving := false           # walking in from the street
-var heading_home := false       # walking out at the end of their shift
+var at_work := true:   # in the building today (walking in counts)
+	set(v):
+		at_work = v
+		Crew.forget_present()
+var arriving := false:   # walking in from the street
+	set(v):
+		arriving = v
+		Crew.forget_present()
+var heading_home := false:   # walking out at the end of their shift
+	set(v):
+		heading_home = v
+		Crew.forget_present()
 var stayed_late := false        # stayed past their shift to help out today
 var break_kind := ""            # "meal" or "rest" while on a timed break, else ""
 var break_left := 0.0
@@ -332,7 +347,11 @@ func tick(dt: float, minutes: float) -> void:
 	if job != null:
 		practice(minutes)
 	if job == null and not on_break:
-		var due := break_due() if GameState.phase == GameState.Phase.SERVICE else ""
+		# breaks go by the minute: no need to ask every step
+		var due := ""
+		if GameState.phase == GameState.Phase.SERVICE and Crew.now() >= _break_check_at:
+			_break_check_at = Crew.now() + 1.0
+			due = break_due()
 		if due != "":
 			start_timed_break(due)
 		elif (energy < Data.BREAK_AT or break_asked) and active:
@@ -395,17 +414,15 @@ func end_phone() -> void:
 
 func _draw() -> void:
 	super()
-	var f := facing.normalized() if facing.length() > 0.01 else Vector2.DOWN
-	var side := Vector2(-f.y, f.x)
-	if manager:
+	if manager and facing.y >= -0.5:
 		# a little gold badge on the shirt
-		var b := f * 2.5 + side * 4.0
-		draw_circle(b, 2.6, Color("f2c14e"))
-		draw_arc(b, 2.6, 0, TAU, 12, Color("8a6414"), 0.8, true)
+		draw_rect(Rect2(Vector2(2, -2), Vector2(4, 4)), Color("8a6414"))
+		draw_rect(Rect2(Vector2(3, -1), Vector2(2, 2)), Color("f2c14e"))
 	if on_phone:
-		var p := f * 8.0 - Vector2(0, 2)
+		# held up to the ear
+		var p := Vector2(8 if facing.x >= 0.0 else -8, -12)
 		draw_rect(Rect2(p - Vector2(3, 4), Vector2(6, 8)), Color("25252b"))
-		draw_rect(Rect2(p - Vector2(2, 3), Vector2(4, 5.5)), Color("8fd3ff"))
+		draw_rect(Rect2(p - Vector2(2, 3), Vector2(4, 5)), Color("8fd3ff"))
 
 
 ## Shift over: walk out to the street.
@@ -696,6 +713,9 @@ func end_break() -> void:
 func choose_job() -> void:
 	if clock_out:
 		return
+	# nothing new on the board since the last look turned up nothing: don't look again yet
+	if _scan_version == JobBoard.version and GameState.sim_time - _scan_at < 2.0:
+		return
 	var here := current_cell()
 	var best = null
 	var best_score := INF
@@ -717,7 +737,11 @@ func choose_job() -> void:
 			best_score = score
 			best = j
 	if best != null:
+		_scan_version = -1
 		start_job(best)
+	else:
+		_scan_version = JobBoard.version
+		_scan_at = GameState.sim_time
 
 
 ## Paying can be handled from the Host or the Serve column (whichever they
@@ -1008,7 +1032,7 @@ func abort() -> void:
 		if st.user == self:
 			st.user = null
 			st.cooking = ""
-		lot.queue_redraw()
+		lot.redraw()
 	GameState.plates_clean += reserved.get("plate", 0)
 	if reserved.get("wash", 0) > 0:
 		var sink = job.furniture
@@ -1137,18 +1161,19 @@ func plan_mediate(j) -> void:
 	var b = j.who2
 	steps = [
 		go_step(lot.access_cells_near(a.current_cell()), "Going to settle an argument"),
+		# (the lambdas read them through the job: either might leave before the talk)
 		call_step(func():
-			if not Crew.valid_here(a) or not Crew.valid_here(b):
+			if not Crew.valid_here(j.who) or not Crew.valid_here(j.who2):
 				return false
-			a.pause_left = maxf(a.pause_left, 1.5)
-			b.pause_left = maxf(b.pause_left, 1.5)
-			face_toward(a.position)
+			j.who.pause_left = maxf(j.who.pause_left, 1.5)
+			j.who2.pause_left = maxf(j.who2.pause_left, 1.5)
+			face_toward(j.who.position)
 			Crew.say(self, "mediate", "chat")
 			return true),
 		work_step(1.5, "Talking it out with %s and %s" % [a.person_name, b.person_name], false, Vector2.ZERO),
 		call_step(func():
-			if Crew.valid_here(a) and Crew.valid_here(b):
-				Crew.mediate(self, a, b)
+			if Crew.valid_here(j.who) and Crew.valid_here(j.who2):
+				Crew.mediate(self, j.who, j.who2)
 			return true),
 	]
 
@@ -1159,14 +1184,14 @@ func plan_checkin(j) -> void:
 	steps = [
 		go_step(lot.access_cells_near(t.current_cell()), "Checking on %s" % t.person_name),
 		call_step(func():
-			if not Crew.valid_here(t):
+			if not Crew.valid_here(j.who):
 				return false
-			face_toward(t.position)
+			face_toward(j.who.position)
 			return true),
 		work_step(0.8, "Checking on %s" % t.person_name, false, Vector2.ZERO),
 		call_step(func():
-			if Crew.valid_here(t):
-				Crew.check_in(self, t)
+			if Crew.valid_here(j.who):
+				Crew.check_in(self, j.who)
 			return true),
 	]
 
@@ -1263,7 +1288,7 @@ func plan_cook(j, extra: Array = []) -> void:
 		if st.broken:
 			return false
 		st.cooking = all_items[0]
-		lot.queue_redraw()
+		lot.redraw()
 		return true))
 	steps.append(work_step(cook_min, "Cooking " + what, true, st.center_px()))
 	steps.append(call_step(func():
@@ -1285,7 +1310,7 @@ func plan_cook(j, extra: Array = []) -> void:
 		lot.add_dirt(nearest_floor_near(st), 0.06 * mess)
 		Health.add_trash(nearest_floor_near(st), Data.TRASH_PER_ITEM * n)
 		wear_out(st)
-		lot.queue_redraw()
+		lot.redraw()
 		return true))
 	# a server who poured the drinks takes them straight to the table
 	var direct: bool = j.station == "drinks" and extra.is_empty() and priorities.get("serve", 0) > 0 and group_ok(j.group) and not j.group.takeout
@@ -1331,7 +1356,7 @@ func plan_cook(j, extra: Array = []) -> void:
 		carry = []
 		reserved.erase("plate")
 		Sfx.play("bell", -8.0)
-		lot.queue_redraw()
+		lot.redraw()
 		queue_redraw()
 		return true))
 
@@ -1361,7 +1386,7 @@ func plan_prep(j) -> void:
 	steps.append(go_step(lot.access_cells(st), "Going to the prep counter"))
 	steps.append(call_step(func():
 		st.cooking = dish
-		lot.queue_redraw()
+		lot.redraw()
 		steps.insert(0, work_step(reserved.get("prep_n", 0) * Data.PREP_MINUTES_EACH * (1.3 - cooking * 0.05), "Prepping %s" % name_, true, st.center_px()))
 		return true))
 	steps.append(call_step(func():
@@ -1374,7 +1399,7 @@ func plan_prep(j) -> void:
 		st.user = null
 		reserved.erase("station")
 		lot.add_dirt(nearest_floor_near(st), 0.04 * mess)
-		lot.queue_redraw()
+		lot.redraw()
 		return true))
 
 
@@ -1457,7 +1482,7 @@ func plan_scrub(j) -> void:
 			if not lot.furniture.has(t):
 				return false
 			t.grime = 0.0
-			lot.queue_redraw()
+			lot.redraw()
 			return true),
 		wash_up(),
 	]
@@ -1473,7 +1498,7 @@ func plan_trash(j) -> void:
 			if not lot.furniture.has(bin):
 				return false
 			bin.fill = 0.0
-			lot.queue_redraw()
+			lot.redraw()
 			var spot: Array = Health.trash_spot()
 			if spot.is_empty():
 				return true
@@ -1514,7 +1539,7 @@ func release_reservations() -> void:
 			st.cooking = ""
 	GameState.plates_clean += reserved.get("plate", 0)
 	reserved = {}
-	lot.queue_redraw()
+	lot.redraw()
 
 
 func nearest_floor_near(f) -> Vector2i:
@@ -1552,7 +1577,7 @@ func plan_deliver(j) -> void:
 			reserved["q"] = qualities
 			if pass_with_items(j.group) != null and not JobBoard.has_unclaimed("deliver", "group", j.group):
 				JobBoard.post("serve", "deliver", {"group": j.group})
-			lot.queue_redraw()
+			lot.redraw()
 			queue_redraw()
 			return true),
 		call_step(func():
@@ -1590,8 +1615,8 @@ func plan_crayons(j) -> void:
 		go_step(lot.access_cells(g.table), "Bringing crayons"),
 		work_step(0.15, "Bringing crayons", false, g.table.center_px()),
 		call_step(func():
-			if group_ok(g):
-				g.got_crayons()
+			if group_ok(j.group):
+				j.group.got_crayons()
 			return true),
 	]
 
@@ -1615,8 +1640,8 @@ func plan_refill(j) -> void:
 		call_step(func():
 			carry = []
 			queue_redraw()
-			if group_ok(g):
-				g.got_refill(self)
+			if group_ok(j.group):
+				j.group.got_refill(self)
 			return true),
 	]
 
@@ -1638,7 +1663,7 @@ func plan_bus(j) -> void:
 			carry = []
 			for i in n:
 				carry.append("dirty")
-			lot.queue_redraw()
+			lot.redraw()
 			queue_redraw()
 			return true),
 		call_step(func():
@@ -1658,7 +1683,7 @@ func plan_bus(j) -> void:
 			carry = []
 			if not JobBoard.has_open("wash", "furniture", sink):
 				JobBoard.post("wash", "wash", {"furniture": sink})
-			lot.queue_redraw()
+			lot.redraw()
 			queue_redraw()
 			return true),
 	]
@@ -1669,7 +1694,7 @@ func plan_wash(j) -> void:
 	var n: int = mini(sink.dirty, 6)
 	sink.dirty -= n
 	reserved["wash"] = n
-	lot.queue_redraw()
+	lot.redraw()
 	steps = [
 		go_step(lot.access_cells(sink), "Going to the sink"),
 		work_step(0.5 * n, "Washing dishes", false, sink.center_px()),
@@ -1719,7 +1744,7 @@ func plan_service(j) -> void:
 			st.user = null
 			reserved.erase("station")
 			GameState.today["serviced"] = GameState.today.get("serviced", 0) + 1
-			lot.queue_redraw()
+			lot.redraw()
 			return true),
 	]
 
@@ -1742,6 +1767,6 @@ func plan_repair(j) -> void:
 			st.broke_by = null
 			GameState.toast.emit("%s fixed the %s." % [person_name, st.info()["name"].to_lower()], "good")
 			Sfx.play("repair", -4.0)
-			lot.queue_redraw()
+			lot.redraw()
 			return true),
 	]

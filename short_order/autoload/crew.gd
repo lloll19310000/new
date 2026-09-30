@@ -39,6 +39,10 @@ var _chat_min := {}                    # pair -> minutes chatted since their las
 var _snack_done := {}                  # pair -> true once this break together has had its snack roll
 var _teamwork_day := -1                # the day a great order was last logged
 var _checked := {}                     # id -> when a manager last checked on them
+var _present: Array = []
+var _present_key := Vector3(-1, -1, -1)
+var _op_cache := {}                    # "id>id" -> opinion, worked out once until it changes
+var _touched := {}                     # pair -> [a, b] whose opinions moved since labels were last worked out
 var _mediated := {}                    # pair -> true once a manager has sat them down today
 
 
@@ -58,6 +62,8 @@ func reset() -> void:
 	_snap_last = {}
 	_chat_min = {}
 	_snack_done = {}
+	_touched = {}
+	_op_cache = {}
 	_teamwork_day = -1
 	reset_today()
 
@@ -77,9 +83,19 @@ func team() -> Array:
 	return GameState.staff.filter(func(s): return is_instance_valid(s))
 
 
-## Everyone at work today (not on a day off).
+## Everyone at work today (not on a day off). Many people ask in the same
+## step, so it's worked out once per step (and whenever someone comes or goes).
 func present() -> Array:
-	return GameState.staff.filter(func(s): return is_instance_valid(s) and s.is_here())
+	var k := Vector3(GameState.sim_time, GameState.day, GameState.staff.size())
+	if k != _present_key:
+		_present_key = k
+		_present = GameState.staff.filter(func(s): return is_instance_valid(s) and s.is_here())
+	return _present
+
+
+## Someone arrived, left or went home: the next present() looks again.
+func forget_present() -> void:
+	_present_key = Vector3(-1, -1, -1)
 
 
 ## Still on the team and in the building right now.
@@ -163,7 +179,10 @@ func first_impression(a, b, chem: int) -> Dictionary:
 
 
 func opinion(a, b) -> float:
-	var rec: Dictionary = opinions.get(key(a, b), {})
+	var k := key(a, b)
+	if _op_cache.has(k):
+		return _op_cache[k]
+	var rec: Dictionary = opinions.get(k, {})
 	if rec.is_empty():
 		return 0.0
 	var v := 0.0
@@ -171,7 +190,9 @@ func opinion(a, b) -> float:
 		v += rec["base"][r]
 	for r in rec["hist"]:
 		v += rec["hist"][r]
-	return clampf(v, -100.0, 100.0)
+	v = clampf(v, -100.0, 100.0)
+	_op_cache[k] = v
+	return v
 
 
 ## [[reason text, points], ...], biggest first.
@@ -247,6 +268,8 @@ func add(a, b, ev: String, pts: float = INF, cap: float = 0.0) -> float:
 			return 0.0
 		rec["day"][ev] = used + pts
 	rec["hist"][ev] = rec["hist"].get(ev, 0.0) + pts
+	_op_cache.erase(key(a, b))
+	_touched[pair_key(a, b)] = [a, b]
 	if pts < 0.0:
 		a.last_bad = now()
 		a.add_stress(-pts * Data.STRESS_FROM_BAD, "a clash with %s" % b.person_name.split(" ")[0])
@@ -263,19 +286,39 @@ func both(a, b, ev: String, pts: float = INF, cap: float = 0.0) -> void:
 
 ## Works out every pair's label; announces new friends and rivals unless quiet.
 func refresh_labels(quiet: bool = true) -> void:
+	_touched.clear()
 	var t := team()
 	for i in t.size():
 		for j in range(i + 1, t.size()):
-			var a = t[i]
-			var b = t[j]
-			var pk := pair_key(a, b)
-			var l := label(a, b)
-			var was: String = labels.get(pk, "")
-			labels[pk] = l
-			if quiet or was == "" or was == l:
-				continue
-			announce(a, b, was, l)
+			_relabel(t[i], t[j], quiet)
 	changed.emit()
+
+
+## Only the pairs whose opinions moved since last time: labels can't change otherwise.
+func refresh_touched() -> void:
+	if _touched.is_empty():
+		return
+	var pairs: Array = _touched.values()
+	_touched.clear()
+	var any := false
+	for p in pairs:
+		if is_instance_valid(p[0]) and is_instance_valid(p[1]) and p[0] in GameState.staff and p[1] in GameState.staff:
+			any = _relabel(p[0], p[1], false) or any
+	if any:
+		changed.emit()
+
+
+## Returns true if the label changed.
+func _relabel(a, b, quiet: bool) -> bool:
+	var pk := pair_key(a, b)
+	var l := label(a, b)
+	var was: String = labels.get(pk, "")
+	labels[pk] = l
+	if was == l:
+		return false
+	if not quiet and was != "":
+		announce(a, b, was, l)
+	return true
 
 
 ## A little written moment, from Data.STORIES, about the two of them.
@@ -367,6 +410,10 @@ func active() -> bool:
 	return GameState.is_active()
 
 
+## Pairs further apart than this can't work side by side, chat or bicker.
+const FAR_TILES := 4.0
+
+
 func tile_dist(a, b) -> float:
 	return a.position.distance_to(b.position) / Data.TILE
 
@@ -392,11 +439,12 @@ func check_bumps() -> void:
 		for j in range(i + 1, t.size()):
 			var a = t[i]
 			var b = t[j]
-			var pk := pair_key(a, b)
 			var d := tile_dist(a, b)
 			if d > 0.9:
-				_overlap.erase(pk)
+				if not _overlap.is_empty():
+					_overlap.erase(pair_key(a, b))
 				continue
+			var pk := pair_key(a, b)
 			if d > 0.6 or _overlap.has(pk) or not a.is_moving() or not b.is_moving():
 				continue
 			if lot.floor_at(a.current_cell()) != Data.FLOOR_KITCHEN:
@@ -421,8 +469,13 @@ func minute_step() -> void:
 		for j in range(i + 1, t.size()):
 			var a = t[i]
 			var b = t[j]
-			var pk := pair_key(a, b)
 			var d := tile_dist(a, b)
+			if d > FAR_TILES:
+				# too far apart for anything to happen between them
+				if not _snack_done.is_empty() and not (a.on_break and b.on_break):
+					_snack_done.erase(pair_key(a, b))
+				continue
+			var pk := pair_key(a, b)
 			var l := label(a, b)
 			var working: bool = a.is_working() and b.is_working()
 			# working side by side, in the same room
@@ -476,7 +529,7 @@ func minute_step() -> void:
 			say(s, "", "music")
 	if int(GameState.minute) % 10 == 0:
 		post_checkins(t)
-	refresh_labels(false)
+	refresh_touched()
 
 
 ## One exchange between two people chatting. Each side enjoys it or not,
@@ -891,6 +944,7 @@ func nightly() -> void:
 			log_line("%s and %s worked side by side for %d hours." % [a.person_name, b.person_name, int(w[1] / 60)], "people", [a, b])
 	for k in opinions:
 		var rec: Dictionary = opinions[k]
+		_op_cache.clear()
 		for e in rec["hist"].keys():
 			rec["hist"][e] *= 1.0 - Data.REL_FADE
 			if absf(rec["hist"][e]) < 0.05:

@@ -68,6 +68,7 @@ func _ready() -> void:
 	overlay = Overlay.new()
 	overlay.name = "Overlay"
 	overlay.main = self
+	overlay.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR   # its text stays smooth
 	lot.add_child(overlay)
 	cam = Cam.new()
 	cam.name = "Camera"
@@ -88,12 +89,12 @@ func _ready() -> void:
 	Crew.big_moment.connect(func(): Sfx.play("fanfare", -10.0))
 	lot.layout_changed.connect(hud.refresh_checklist)
 	lot.layout_changed.connect(func(): GameState.seats = lot.seats())
-	GameState.land_changed.connect(lot.queue_redraw)
+	GameState.land_changed.connect(lot.redraw)
 	# the storefront shows OPEN or CLOSED, whether you're hiring, and lights up at night
-	GameState.staff_changed.connect(lot.queue_redraw)
-	GameState.phase_changed.connect(func(_p): lot.queue_redraw())
+	GameState.staff_changed.connect(lot.redraw)
+	GameState.phase_changed.connect(func(_p): lot.redraw())
 	var args := OS.get_cmdline_user_args()
-	if "--autotest" in args or "--shot" in args or "--uitest" in args or "--balance" in args or "--art" in args:
+	if "--autotest" in args or "--shot" in args or "--uitest" in args or "--balance" in args or "--art" in args or "--stress" in args:
 		# the tests never touch your real saves
 		save_dir = "user://test_saves"
 		OLD_SAVE = "user://test_old_save.json"
@@ -105,6 +106,9 @@ func _ready() -> void:
 		return
 	if "--balance" in args:
 		(func(): await Autotest.run_balance(self, args)).call_deferred()
+		return
+	if "--stress" in args:
+		(func(): await preload("res://tests/stress.gd").run(self, args)).call_deferred()
 		return
 	hud.show_start()
 	if "--uitest" in args:
@@ -121,10 +125,13 @@ func _run_autotest(args: PackedStringArray) -> void:
 
 
 func _process(delta: float) -> void:
+	# a slow frame (a hitch, a save) doesn't make the world jump ahead: past a
+	# tenth of a second the game just runs a little slower for that frame
+	var d := minf(delta, 0.1)
 	# at high speed, break the frame into steps of at most ~1/15 of a game minute
-	var steps := clampi(int(ceil(delta * GameState.sim_speed() / 0.07)), 1, 8)
+	var steps := clampi(int(ceil(d * GameState.sim_speed() / 0.07)), 1, 12)
 	for i in steps:
-		simulate(delta / steps)
+		simulate(d / steps)
 	slow_timer -= delta
 	if slow_timer <= 0.0:
 		slow_timer = 0.25
@@ -143,7 +150,7 @@ func update_loops() -> Array:
 	var sizzle := cooking and playing
 	var music: bool = GameState.is_open() and playing and lot.has_type("jukebox")
 	if GameState.is_active() and GameState.minute >= 18.0 * 60.0 and int(GameState.minute) % 10 == 0:
-		lot.queue_redraw()   # the sign warms up as it gets dark
+		lot.redraw()   # the sign warms up as it gets dark
 	Sfx.set_loops(sizzle, music)
 	return [sizzle, music]
 
@@ -596,7 +603,7 @@ func end_day() -> void:
 		"best": t["best"].duplicate(), "worst": t["worst"].duplicate(), "mvp": mvp(),
 		"combos": t.get("combos", 0), "upsells": t.get("upsells", 0), "catering": t.get("catering", 0.0), "town": Town.today_lines().slice(0, 2),
 	}
-	var bills_paid: float = bills.get("rent", 0.0) + bills.get("utilities", 0.0) + bills.get("loan", 0.0) + bills.get("contracts", 0.0) + bills.get("benefits", 0.0) - bills.get("sister", 0.0)
+	var bills_paid: float = bills.get("rent", 0.0) + bills.get("utilities", 0.0) + bills.get("loan", 0.0) + bills.get("contracts", 0.0) + bills.get("benefits", 0.0)
 	last_report["net"] = t["revenue"] - wages - bills_paid - last_report["supplies"] - t["staff_meal"]
 	# the Books: a line for tonight
 	GameState.history.append({"day": GameState.day, "revenue": t["revenue"], "wages": wages, "food": t["food_used"] + t["waste"], "bills": bills_paid,
@@ -773,9 +780,6 @@ func save_game(to: String = "") -> bool:
 	if slot == "":
 		slot = new_slot()
 	DirAccess.make_dir_recursive_absolute(save_dir)
-	# keep the sister diner's idea of how this one's doing up to date
-	if not Biz.sister.is_empty() and str(Biz.sister.get("slot", "")) != slot:
-		_patch_sister(str(Biz.sister["slot"]), {"name": GameState.diner_name, "slot": slot, "weekly": GameState.weekly_profit() * Data.SISTER_SHARE})
 	var furn := []
 	for f in lot.furniture:
 		furn.append({"type": f.type, "x": f.cell.x, "y": f.cell.y, "dir": f.dir, "wear": f.wear, "broken": f.broken, "tier": f.tier})
@@ -976,10 +980,6 @@ func load_game(from: String = "") -> bool:
 	return true
 
 
-## A fresh diner in a new save slot.
-## Opens a second diner: $100,000 goes across to get it started; this diner
-## keeps running under its crew, and its weekly profit comes in with the other
-## one's bills (and the other way round).
 ## A page in the scrapbook, with a snapshot of the diner right now (when
 ## there's a screen to take it from).
 func scrapbook_add(kind: String, title: String, text: String) -> void:
@@ -1012,40 +1012,7 @@ func take_photo() -> void:
 	GameState.toast.emit("Snap! It's in the scrapbook.", "good")
 
 
-func open_second_location(new_name: String) -> bool:
-	if not Biz.can_open_second():
-		return false
-	var old_name := GameState.diner_name
-	var weekly := GameState.weekly_profit() * Data.SISTER_SHARE
-	GameState.add_money(-Data.SECOND_COST)
-	save_game()
-	var old_slot := slot
-	new_game(new_name)
-	GameState.money = Data.SECOND_COST
-	GameState.money_changed.emit(GameState.money)
-	Biz.sister = {"name": old_name, "slot": old_slot, "weekly": weekly}
-	save_game()
-	_patch_sister(old_slot, {"name": GameState.diner_name, "slot": slot, "weekly": 0.0})
-	GameState.toast.emit("%s is open! %s keeps running without you; its weekly takings come in with the bills here." % [GameState.diner_name, old_name], "good")
-	return true
-
-
-## Writes a sister diner's details into another diner's save.
-func _patch_sister(other_slot: String, sister: Dictionary) -> void:
-	var path := save_path(other_slot)
-	if not FileAccess.file_exists(path):
-		return
-	var data = JSON.parse_string(FileAccess.get_file_as_string(path))
-	if typeof(data) != TYPE_DICTIONARY:
-		return
-	var b: Dictionary = data.get("biz", {})
-	b["sister"] = sister
-	data["biz"] = b
-	var f := FileAccess.open(path, FileAccess.WRITE)
-	f.store_string(JSON.stringify(data))
-	f.close()
-
-
+## A fresh diner in a new save slot.
 func new_game(diner_name: String = "") -> void:
 	clear_world()
 	GameState.reset()

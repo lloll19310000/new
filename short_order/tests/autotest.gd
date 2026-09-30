@@ -70,7 +70,33 @@ static func build_sample(lot) -> void:
 	lot.place_furniture("dumpster", Vector2i(22, 1), 0)
 
 
+## The side panel keeps its width, so it never covers the rail of buttons.
+static func check_panel_width(main, what: String) -> void:
+	var sp = main.hud.side_panel
+	var w: float = sp.panel.get_combined_minimum_size().x
+	check(w <= sp.PANEL_W + 0.5, "the side panel fits its width on %s (%d)" % [what, int(w)])
+
+
+## Every script in the game loads and compiles. (A broken one otherwise just
+## prints errors while the checks that never reach it carry on passing.)
+static func scripts_compile() -> void:
+	var bad: Array = []
+	var dirs: Array = ["res://"]
+	while not dirs.is_empty():
+		var d: String = dirs.pop_back()
+		for sub in DirAccess.get_directories_at(d):
+			if not sub.begins_with("."):
+				dirs.append(d.path_join(sub))
+		for f in DirAccess.get_files_at(d):
+			if f.ends_with(".gd"):
+				var sc = load(d.path_join(f))
+				if sc == null or not (sc as GDScript).can_instantiate():
+					bad.append(f)
+	check(bad.is_empty(), "every script compiles %s" % ("" if bad.is_empty() else str(bad)))
+
+
 static func run(main, args: PackedStringArray) -> void:
+	scripts_compile()
 	# a fixed seed, so a run's customers and mishaps are the same every time
 	seed(20260930)
 	var lot = main.lot
@@ -462,7 +488,9 @@ static func drop_fake_group(main, g) -> void:
 static func set_opinion(a, b, v: float) -> void:
 	var rec: Dictionary = Crew.ensure(a, b)
 	rec["hist"]["test"] = 0.0
+	Crew._op_cache.clear()
 	rec["hist"]["test"] = v - Crew.opinion(a, b)
+	Crew._op_cache.clear()
 
 
 static func crew_checks(main) -> void:
@@ -1796,6 +1824,7 @@ static func frame_build_area(main) -> void:
 
 
 static func run_ui(main, args: PackedStringArray) -> void:
+	scripts_compile()
 	var tree: SceneTree = main.get_tree()
 	var prefix := ""
 	for a in args:
@@ -1942,6 +1971,7 @@ static func run_ui(main, args: PackedStringArray) -> void:
 	await tree.process_frame
 	check(staff_page.candidates_box.get_child_count() >= Data.CANDIDATES_PER_DAY, "the Hire tab lists %d people" % staff_page.candidates_box.get_child_count())
 	await snap(main, "hire", prefix)
+	check_panel_width(main, "hire")
 	for r in ["cook", "server"]:
 		staff_page.filter_buttons[r].pressed.emit()
 		await tree.process_frame
@@ -2010,11 +2040,13 @@ static func run_ui(main, args: PackedStringArray) -> void:
 	await tree.process_frame
 	check(a.who.role == "cook" and a.who.priorities["cook"] == 1, "the role list puts them back on the line")
 	await snap(main, "staff", prefix)
+	check_panel_width(main, "staff")
 	staff_page.show_tab("schedule")
 	await tree.process_frame
 	await tree.process_frame
 	check(staff_page.board.get_child_count() >= 2 and staff_page.auto_switch.button_pressed, "the Schedule tab shows today's shifts")
 	await snap(main, "schedule", prefix)
+	check_panel_width(main, "schedule")
 	staff_page.show_tab("crew")
 	# menu, supplies and goals pages
 	hud.side_panel.tabs["menu"].pressed.emit()
@@ -2029,6 +2061,7 @@ static func run_ui(main, args: PackedStringArray) -> void:
 	check(GameState.special == "meatloaf" and menu_page.rows["meatloaf"].note.text == "Today's special", "the star makes meatloaf today's special")
 	check(menu_page.price_note.text.contains("above usual"), "the menu says how prices affect customers (%s)" % menu_page.price_note.text)
 	await snap(main, "menu", prefix)
+	check_panel_width(main, "menu")
 	menu_page.scroll_vertical = 100000
 	await tree.process_frame
 	menu_page.prep_rows["burger"]["spin"].value = 9
@@ -2054,6 +2087,7 @@ static func run_ui(main, args: PackedStringArray) -> void:
 	check(GameState.supplier == "fresh" and GameState.reorder_cost() > bill_std, "choosing a Farm fresh supplier raises the delivery bill")
 	sup.supplier_buttons["standard"].pressed.emit()
 	await snap(main, "supplies", prefix)
+	check_panel_width(main, "supplies")
 	hud.side_panel.tabs["office"].pressed.emit()
 	await tree.process_frame
 	var office = hud.side_panel.pages["office"]
@@ -2089,14 +2123,17 @@ static func run_ui(main, args: PackedStringArray) -> void:
 		hud.side_panel.open(tab)
 		await tree.process_frame
 		check(hud.side_panel.pages[tab].visible, "the %s tab opens" % tab)
+		check(hud.side_panel.panel.get_combined_minimum_size().x <= hud.side_panel.PANEL_W + 0.5,
+			"the %s page fits the panel's width (%d)" % [tab, int(hud.side_panel.panel.get_combined_minimum_size().x)])
 		check_fits(main, "with the %s tab open" % tab)
 	office.scroll_vertical = 0
 	hud.side_panel.tabs["crew"].pressed.emit()
 	await tree.process_frame
 	var crew_page = hud.side_panel.pages["crew"]
-	check(crew_page.visible and crew_page.grid.visible and crew_page.log_text.get_parsed_text().contains("joined the crew"),
-		"the Crew tab shows who gets along and the staff log")
+	check(crew_page.visible and crew_page.attention.visible and crew_page.log_text.get_parsed_text().contains("joined the crew"),
+		"the Crew tab shows what needs attention and the staff log")
 	await snap(main, "crew_morning", prefix)
+	check_panel_width(main, "crew_morning")
 	hud.side_panel.tabs["crew"].pressed.emit()
 	await tree.process_frame
 	check(not hud.side_panel.is_open, "clicking the open tab again hides the panel")

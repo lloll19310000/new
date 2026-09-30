@@ -65,7 +65,6 @@ func nightly_bills() -> Dictionary:
 	var out := {"rent": rent_week(), "utilities": utilities_week(), "loan": loan_week(), "paid_off": false}
 	GameState.add_money(-(out["rent"] + out["utilities"] + out["loan"]))
 	out["contracts"] = Biz.weekly()
-	out["sister"] = Biz.sister_week()
 	out["benefits"] = Career.benefits_week()
 	GameState.add_money(-out["benefits"])
 	if not loan.is_empty():
@@ -157,7 +156,7 @@ func collect_table(t, _by = null) -> bool:
 	t.cash_server = null
 	t.cash_servers = []
 	if main != null:
-		main.lot.queue_redraw()
+		main.lot.redraw()
 	return true
 
 

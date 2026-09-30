@@ -51,7 +51,6 @@ Each diner has its own save and saves itself every morning. The main menu can co
 | **Suppliers** | Relationships and weekly contracts. |
 | **Catering** | Accept a job, prep it in the morning, the van collects at noon. |
 | **Combos and upselling** | Combos on the menu; servers suggest a pie or a shake. |
-| **A second diner** | Open one once you're a Destination diner; each diner's weekly profit comes in with the other's bills. |
 | **Late nights** | Open to 02:00 for the bar crowd and night owls. |
 | **Careers and perks** | Each role has a ladder; every step brings a raise and a perk you choose. |
 | **Time off and availability** | Days off for their own lives; some can't work mornings or nights. |
@@ -198,7 +197,7 @@ Each diner has its own save and saves itself every morning. The main menu can co
 | `autoload/moments.gd` | Crew moments: birthdays, milestones, the hometown dish, the employee of the month |
 | `autoload/goals.gd` | The Goals board: progress and rewards |
 | `autoload/town.gd` | The calendar, seasons, holidays, weather, the events board and the rival |
-| `autoload/biz.gd` | Suppliers, catering and a sister diner |
+| `autoload/biz.gd` | Suppliers and catering |
 | `autoload/career.gd` | Careers and perks, time off, the morning huddle and benefits |
 | `autoload/shifts.gd` | Opening hours, **the schedule** (shifts and days off), California overtime, lateness, no-shows, sick days, training and closing duties |
 | `world/lot.gd` | The grid, building rules, pathfinding (one grid for staff, one for customers), dirt, decor, the inspection |

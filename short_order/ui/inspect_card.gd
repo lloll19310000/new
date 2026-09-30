@@ -42,7 +42,7 @@ func _ready() -> void:
 			thing.tier = 1
 			GameState.toast.emit("The %s is now Pro: 25%% faster, and it wears out half as fast." % thing.info()["name"].to_lower(), "good")
 			Sfx.play("repair", -4.0)
-			main.lot.queue_redraw()
+			main.lot.redraw()
 			refresh())
 	# the jukebox's playlist, or the kitchen radio's station
 	choice_row = HFlowContainer.new()
@@ -62,7 +62,7 @@ func _ready() -> void:
 		var p := GameState.plot_at(thing)
 		if not p.is_empty() and GameState.buy_plot(p["id"]):
 			Sfx.play("cash")
-			main.lot.queue_redraw()
+			main.lot.redraw()
 			refresh())
 	rotate_button.pressed.connect(func():
 		if thing != null and main.lot.rotate_furniture(thing):

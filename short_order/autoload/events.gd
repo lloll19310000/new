@@ -411,7 +411,7 @@ func start_grease_fire() -> void:
 	GameState.toast.emit("Grease fire at the %s! %s put it out, but it needs a repair." % [what, cook.person_name], "bad")
 	Crew.log_line("Grease fire at the %s! %s put it out." % [what, cook.person_name], "alert", [cook])
 	note("fix", "#e75a4e", "A grease fire at the %s." % what)
-	main.lot.queue_redraw()
+	main.lot.redraw()
 
 
 # ------------------------------------------------------------------ staff blow-up

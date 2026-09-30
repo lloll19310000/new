@@ -203,9 +203,15 @@ func _hire_tab() -> VBoxContainer:
 	var arow := HBoxContainer.new()
 	arow.add_theme_constant_override("separation", 6)
 	ad.add_child(arow)
-	arow.add_child(UiKit.label("Need more?", 12, UiKit.MUTED, &"SmallLabel"))
+	var need := UiKit.label("Need more?", 12, UiKit.MUTED, &"SmallLabel")
+	need.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	need.custom_minimum_size = Vector2(24, 0)
+	arow.add_child(need)
 	ad_role = OptionButton.new()
 	ad_role.add_theme_font_size_override("font_size", 12)
+	ad_role.fit_to_longest_item = false      # so the row fits the panel
+	ad_role.clip_text = true
+	ad_role.custom_minimum_size = Vector2(80, 0)
 	ad_role.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	for r in Data.ROLE_ORDER:
 		ad_role.add_item(Data.ROLES[r]["name"])
@@ -213,7 +219,7 @@ func _hire_tab() -> VBoxContainer:
 	arow.add_child(ad_role)
 	ad_button = Button.new()
 	ad_button.theme_type_variation = &"SmallButton"
-	ad_button.text = "Post an ad ($%d)" % Data.JOB_AD_COST
+	ad_button.text = "Post ad ($%d)" % Data.JOB_AD_COST
 	ad_button.add_theme_font_size_override("font_size", 12)
 	ad_button.tooltip_text = "A job ad brings %d more people for that role today. Everyone here goes when the day ends; new people come every morning." % Data.JOB_AD_PEOPLE
 	ad_button.pressed.connect(func():

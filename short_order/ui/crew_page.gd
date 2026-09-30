@@ -1,49 +1,32 @@
 extends ScrollContainer
-## The Crew page: a picture of who gets along (see RelationWeb), then the
-## same in plain words (who's friends, where there's trouble and what to do
-## about it, who's stressed), and the staff log underneath, newest first.
-## Click a face to see only the log lines about that person.
+## The Crew page (under Staff): not a picture of every pair, which stops
+## meaning anything past a dozen people, but the handful of things that need
+## you, worst first, each with a button that deals with it. Who someone
+## likes and can't stand is on their own card (click them).
 
 const ICON_COLORS := {"heart": "#e27fa8", "storm": "#e75a4e", "alert": "#f2c14e", "phone": "#6aa6d9",
 	"star": "#f2c14e", "fix": "#6cc3a0", "people": "#6cc3a0", "staff": "#6cc3a0", "walkout": "#e75a4e", "chat": "#6aa6d9", "clock": "#6aa6d9"}
-const LEGEND := [["best", "Best friends"], ["friends", "Friends"], ["friendly", "Friendly"], ["tense", "Tense"], ["rivals", "Rivals"]]
-const Art = preload("res://world/art.gd")
+## Log lines worth seeing when there are dozens of people: the rest is under "Everything".
+const IMPORTANT := ["storm", "walkout", "alert", "star", "staff"]
+const MAX_ISSUES := 5
+const LOG_LINES := 25
 
-@onready var grid: RelationWeb = %Grid
-@onready var glance: VBoxContainer = %Glance
+@onready var summary: Label = %Summary
+@onready var attention: VBoxContainer = %Attention
 @onready var empty_note: Label = %EmptyNote
 @onready var log_title: Label = %LogTitle
 @onready var show_all: Button = %ShowAll
 @onready var log_text: RichTextLabel = %Log
-@onready var legend: HFlowContainer = %Legend
 
-var filter_id := -1
 var _dirty := false
-var _glance_key := ""
+var _key := ""
 
 
 func _ready() -> void:
-	for l in LEGEND:
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 4)
-		var sw := ColorRect.new()
-		sw.color = RelationWeb.STYLE[l[0]]["color"]
-		sw.custom_minimum_size = Vector2(16, 4)
-		sw.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		row.add_child(sw)
-		row.add_child(UiKit.label(l[1], 11, UiKit.MUTED, &"SmallLabel"))
-		legend.add_child(row)
-	grid.person_clicked.connect(func(s):
-		filter_id = -1 if filter_id == s.id else s.id
-		refresh_log())
-	show_all.pressed.connect(func():
-		filter_id = -1
-		grid.selected = -1
-		grid.queue_redraw()
-		refresh_log())
+	show_all.toggled.connect(func(_on): refresh_log())
 	Crew.log_added.connect(func(_e): _dirty = true)
 	Crew.changed.connect(func(): _dirty = true)
-	GameState.staff_changed.connect(refresh)
+	GameState.staff_changed.connect(func(): _dirty = true)
 	visibility_changed.connect(func():
 		if is_visible_in_tree():
 			refresh())
@@ -53,90 +36,128 @@ func _ready() -> void:
 func _process(_delta: float) -> void:
 	if _dirty and is_visible_in_tree():
 		_dirty = false
-		refresh_glance()
-		refresh_log()
+		refresh()
 
 
 func refresh() -> void:
-	var n := Crew.team().size()
-	grid.visible = n >= 2
-	legend.visible = n >= 2
-	glance.visible = n >= 2
-	empty_note.visible = n < 2
-	grid.queue_redraw()
-	if filter_id >= 0 and Crew.by_id(filter_id) == null:
-		filter_id = -1
-	refresh_glance()
+	var t := Crew.team()
+	empty_note.visible = t.size() < 2
+	summary.text = summary_text(t)
+	refresh_issues(t)
 	refresh_log()
 
 
-## The picture in words: the closest pairs, the trouble, and who's stressed.
-func refresh_glance() -> void:
-	var t := Crew.team()
-	var good: Array = []
-	var bad: Array = []
+## "12 cheerful, 20 okay, 3 fed up · 4 pairs of friends, 1 pair of rivals"
+static func summary_text(t: Array) -> String:
+	if t.is_empty():
+		return ""
+	var moods := {"cheerful": 0, "okay": 0, "fed_up": 0}
+	for s in t:
+		moods[s.mood] = moods.get(s.mood, 0) + 1
+	var friends := 0
+	var rivals := 0
+	for k in Crew.labels:
+		match Crew.labels[k]:
+			"best", "friends":
+				friends += 1
+			"rivals":
+				rivals += 1
+	return "%d cheerful, %d okay, %d fed up  ·  %d %s of friends, %d %s of rivals" % [moods["cheerful"], moods["okay"], moods["fed_up"],
+		friends, "pair" if friends == 1 else "pairs", rivals, "pair" if rivals == 1 else "pairs"]
+
+
+## Everything that needs the owner, worst first: [{score, who, title, detail, action, fix}].
+static func issues(t: Array) -> Array:
+	var out: Array = []
+	var has_manager: bool = t.any(func(s): return s.manager and s.is_here())
+	for s in t:
+		if s.burnout_warned or s.burnout_nights > 0:
+			var left: int = maxi(1, Data.BURNOUT_QUIT_NIGHTS - s.burnout_nights)
+			out.append({"score": 100.0 + s.burnout_nights * 10.0, "who": [s], "title": "%s is burning out" % s.person_name,
+				"detail": "%d more bad %s and they quit." % [left, "night" if left == 1 else "nights"],
+				"action": "Tomorrow off" if s.away_day != GameState.day + 1 else "", "fix": day_off.bind(s)})
+		elif s.raise_refused >= Data.RAISE_REFUSALS_QUIT - 1:
+			out.append({"score": 90.0, "who": [s], "title": "%s wants a raise" % s.person_name,
+				"detail": "Turned down %d times. Once more and they find another job." % s.raise_refused,
+				"action": "+$0.50/hr", "fix": give_raise.bind(s)})
+		elif s.stress >= Data.STRESS_FED_UP:
+			var why: String = s.stress_reasons_text(2)
+			out.append({"score": 40.0 + s.stress * 0.5, "who": [s], "title": "%s is fed up (%d%% stress)" % [s.person_name, int(s.stress)],
+				"detail": why if why != "" else "Breaks, a sofa and friends nearby help.",
+				"action": "Take a break" if s.is_here() and not s.on_break and not s.break_asked else "", "fix": send_on_break.bind(s)})
 	for i in t.size():
 		for j in range(i + 1, t.size()):
-			var l := Crew.label(t[i], t[j])
-			var avg := (Crew.opinion(t[i], t[j]) + Crew.opinion(t[j], t[i])) / 2.0
-			if l == "best" or l == "friends":
-				good.append([avg, t[i], t[j], l])
-			elif l == "rivals" or l == "tense":
-				bad.append([avg, t[i], t[j], l])
-	good.sort_custom(func(a, b): return a[0] > b[0])
-	bad.sort_custom(func(a, b): return a[0] < b[0])
-	var stressed: Array = t.filter(func(s): return s.stress >= Data.STRESS_FED_UP or s.burnout_warned)
-	stressed.sort_custom(func(a, b): return a.stress > b.stress)
+			var a = t[i]
+			var b = t[j]
+			if Crew.labels.get(Crew.pair_key(a, b), "") != "rivals":
+				continue
+			var together: bool = a.shift == b.shift or a.shift == "double" or b.shift == "double"
+			var avg := (Crew.opinion(a, b) + Crew.opinion(b, a)) / 2.0
+			var fix: Callable = split_shifts.bind(a, b)
+			var action := "Split shifts" if together else ""
+			if has_manager and a.is_here() and b.is_here():
+				fix = talk_it_out.bind(a, b)
+				action = "Manager talk"
+			out.append({"score": (65.0 if together else 30.0) - avg * 0.2, "who": [a, b], "title": "%s and %s are rivals" % [a.person_name, b.person_name],
+				"detail": ("On the same shift: they bicker and slow down." if together else "Kept apart on different shifts."),
+				"action": action, "fix": fix})
+	out.sort_custom(func(x, y): return x["score"] > y["score"])
+	return out
+
+
+func refresh_issues(t: Array) -> void:
+	var list: Array = issues(t).slice(0, MAX_ISSUES)
 	var key := ""
-	for g in good.slice(0, 5) + bad.slice(0, 6):
-		key += "%d-%d-%s," % [g[1].id, g[2].id, g[3]]
-	for s in stressed:
-		key += "s%d-%d," % [s.id, int(s.stress / 5)]
-	if key == _glance_key:
+	for it in list:
+		key += "%s|%s|" % [it["title"], it["action"]]
+	if key == _key and attention.get_child_count() > 0:
 		return
-	_glance_key = key
-	for c in glance.get_children():
+	_key = key
+	for c in attention.get_children():
 		c.queue_free()
-	var has_manager: bool = t.any(func(s): return s.manager)
-	if not bad.is_empty():
-		glance.add_child(_heading("Trouble", "storm", UiKit.CHERRY))
-		for b in bad.slice(0, 6):
-			var hint := "A manager on shift will sit them down." if has_manager else "Put them on different shifts, or hire a manager to settle it."
-			glance.add_child(_pair_row(b[1], b[2], b[3], _top_reason(b[1], b[2], false), hint))
-	if not good.is_empty():
-		glance.add_child(_heading("Getting along", "heart", UiKit.MINT))
-		for g in good.slice(0, 5):
-			glance.add_child(_pair_row(g[1], g[2], g[3], _top_reason(g[1], g[2], true), "They work faster side by side."))
-	if not stressed.is_empty():
-		glance.add_child(_heading("Stressed", "alert", UiKit.GOLD))
-		for s in stressed.slice(0, 5):
-			var what := "burning out: a day off would help" if s.burnout_warned else "fed up: breaks, a sofa and friends nearby help"
-			glance.add_child(_person_row(s, "%d%% stress, %s" % [int(s.stress), what]))
-	if bad.is_empty() and good.is_empty() and stressed.is_empty():
-		glance.add_child(UiKit.label("No close friends or rivals yet: they're still getting to know each other.", 12, UiKit.MUTED, &"SmallLabel"))
+	if list.is_empty():
+		if t.size() >= 2:
+			attention.add_child(UiKit.label("Nothing right now. Everyone's getting on with it.", 12, UiKit.MUTED, &"SmallLabel"))
+		return
+	for it in list:
+		attention.add_child(_issue_row(it))
 
 
-func _heading(text: String, icon_name: String, col: Color) -> Control:
-	var h := HBoxContainer.new()
-	h.add_theme_constant_override("separation", 5)
-	h.add_child(UiKit.icon_rect(icon_name, 13, col))
-	h.add_child(UiKit.label(text, 13, col, &"StatLabel"))
-	return h
+func _issue_row(it: Dictionary) -> Control:
+	var panel := PanelContainer.new()
+	panel.add_theme_stylebox_override("panel", UiKit.row_style(Color("2a221d")))
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 4)
+	panel.add_child(row)
+	for s in it["who"]:
+		row.add_child(_face(s))
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", -2)
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(col)
+	var title := UiKit.label(it["title"], 13, UiKit.INK, &"StatLabel")
+	title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	col.add_child(title)
+	var d := UiKit.label(it["detail"], 11, UiKit.MUTED, &"SmallLabel")
+	d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	d.custom_minimum_size = Vector2(80, 0)
+	col.add_child(d)
+	if it["action"] != "":
+		var b := Button.new()
+		b.text = it["action"]
+		b.theme_type_variation = &"SmallButton"
+		b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		b.focus_mode = Control.FOCUS_NONE
+		var fix: Callable = it["fix"]
+		b.pressed.connect(func():
+			fix.call()
+			_key = ""
+			refresh())
+		row.add_child(b)
+	return panel
 
 
-func _top_reason(a, b, positive: bool) -> String:
-	var all: Array = Crew.reasons(a, b) + Crew.reasons(b, a)
-	all = all.filter(func(r): return (r[1] > 0.0) == positive)
-	all.sort_custom(func(x, y): return absf(x[1]) > absf(y[1]))
-	if all.is_empty():
-		return ""
-	var why: String = all[0][0]
-	if why == "Chemistry":
-		why = "They just clicked" if positive else "Their personalities clash"
-	return why
-
-
-func _face(s, px: float = 24.0) -> Portrait:
+func _face(s, px: float = 26.0) -> Portrait:
 	var p := Portrait.new()
 	p.custom_minimum_size = Vector2(px, px)
 	p.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -146,63 +167,58 @@ func _face(s, px: float = 24.0) -> Portrait:
 	return p
 
 
-func _pair_row(a, b, l: String, why: String, hint: String) -> Control:
-	var panel := PanelContainer.new()
-	panel.add_theme_stylebox_override("panel", UiKit.row_style(Color("2a221d")))
-	panel.tooltip_text = hint
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 3)
-	panel.add_child(row)
-	row.add_child(_face(a))
-	row.add_child(_face(b))
-	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", -2)
-	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(col)
-	var names := UiKit.label("%s & %s" % [a.person_name, b.person_name], 13, UiKit.INK, &"StatLabel")
-	names.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	col.add_child(names)
-	if why != "":
-		col.add_child(UiKit.label(why, 11, UiKit.MUTED, &"SmallLabel"))
-	var st: Dictionary = RelationWeb.STYLE[l]
-	var chip := UiKit.tag_chip(Crew.LABEL_NAMES[l], "heart" if l in ["best", "friends"] else "storm", Color(st["color"], 1.0), hint)
-	row.add_child(chip)
-	return panel
+# ------------------------------------------------------------------ the fixes
+
+static func day_off(s) -> void:
+	s.away_day = GameState.day + 1
+	s.add_stress(-10.0, "a day off coming")
+	Crew.say(s, "thanks", "heart")
+	Crew.log_line("You gave %s tomorrow off." % s.person_name, "sun", [s])
+	GameState.staff_changed.emit()
 
 
-func _person_row(s, text: String) -> Control:
-	var panel := PanelContainer.new()
-	panel.add_theme_stylebox_override("panel", UiKit.row_style(Color("2a221d")))
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 6)
-	panel.add_child(row)
-	row.add_child(_face(s))
-	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", -2)
-	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(col)
-	col.add_child(UiKit.label(s.person_name, 13, UiKit.INK, &"StatLabel"))
-	var l := UiKit.label(text, 11, UiKit.MUTED, &"SmallLabel")
-	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	l.custom_minimum_size = Vector2(80, 0)
-	col.add_child(l)
-	return panel
+static func give_raise(s) -> void:
+	s.raises += 0.5
+	s.wage += 0.5
+	s.raise_refused = 0
+	s.add_stress(-8.0, "a raise")
+	Crew.log_line("You gave %s a raise ($%.2f an hour)." % [s.person_name, s.wage], "star", [s])
+	GameState.staff_changed.emit()
+
+
+static func send_on_break(s) -> void:
+	s.break_asked = true
+	Crew.log_line("You told %s to take a break after this job." % s.person_name, "clock", [s])
+
+
+## One on the day shift, one on nights, and the schedule leaves them there.
+static func split_shifts(a, b) -> void:
+	a.shift = "open"
+	b.shift = "close"
+	a.shift_locked = true
+	b.shift_locked = true
+	Crew.log_line("You put %s on days and %s on nights, well apart." % [a.person_name, b.person_name], "clock", [a, b])
+	GameState.staff_changed.emit()
+
+
+static func talk_it_out(a, b) -> void:
+	if Crew.ask_mediation(a, b):
+		Crew.log_line("You asked a manager to sit %s and %s down." % [a.person_name, b.person_name], "chat", [a, b])
 
 
 func refresh_log() -> void:
-	var who = Crew.by_id(filter_id) if filter_id >= 0 else null
-	log_title.text = "Staff log" if who == null else "Staff log: %s" % who.person_name
-	show_all.visible = who != null
+	var everything := show_all.button_pressed
+	log_title.text = "Staff log" if everything else "Recent"
 	var lines: Array = []
 	for i in range(Crew.entries.size() - 1, -1, -1):
 		var e: Dictionary = Crew.entries[i]
-		if who != null and not e["who"].has(filter_id):
+		if not everything and not e["icon"] in IMPORTANT and e["day"] < GameState.day:
 			continue
 		var m := int(e["min"])
 		var col: String = ICON_COLORS.get(e["icon"], "#b9a797")
 		lines.append("[color=#7d6d61]Day %d, %02d:%02d[/color]  [img width=13 height=13 color=%s]res://ui/icons/%s.svg[/img] %s" % [
 			e["day"], (m / 60) % 24, m % 60, col, e["icon"], e["text"]])
-		if lines.size() >= 60:
+		if lines.size() >= LOG_LINES:
 			break
 	if lines.is_empty():
 		log_text.text = "[color=#b9a797]Nothing yet. Open the diner and see what happens.[/color]"

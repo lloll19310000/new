@@ -1,7 +1,7 @@
 extends RefCounted
 ## Checks for version 9: the town (calendar, seasons, holidays, weather,
 ## events, the rival), the business (suppliers, catering, combos, upselling,
-## a sister diner, late nights), the crew's working lives (careers, perks,
+## late nights), the crew's working lives (careers, perks,
 ## time off, availability, the huddle, benefits), kids, the review wall,
 ## carhops, the Books, undo and blueprints, the scrapbook and the music.
 ## Called from autotest.gd.
@@ -96,10 +96,7 @@ static func biz_checks(main) -> void:
 	GameState.set_service("latenight", true)
 	check(GameState.close_min() >= 26 * 60 - 1, "late nights run to 02:00")
 	GameState.set_service("latenight", false)
-	# a sister diner
-	GameState.rep_level = Data.SECOND_AT_LEVEL
-	check(Biz.can_open_second(), "a Destination diner with money to spare can open a second diner")
-	GameState.rep_level = 0
+	check(not Biz.has_method("can_open_second"), "there's no pretend second diner any more")
 
 
 static func career_checks(main) -> void:

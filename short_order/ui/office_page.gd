@@ -30,9 +30,6 @@ var huddle_note: Label
 var benefit_switches := {}
 var catering_box: VBoxContainer
 var supplier_box: VBoxContainer
-var second_box: VBoxContainer
-var second_name: LineEdit
-var second_note: Label
 var _biz_key := ""
 var _regulars_key := ""
 
@@ -192,22 +189,6 @@ func _ready() -> void:
 	Biz.changed.connect(func():
 		_biz_key = ""
 		refresh())
-	# ---- expansion
-	header("A second diner", "structure")
-	second_note = note("")
-	second_box = VBoxContainer.new()
-	box.add_child(second_box)
-	second_name = LineEdit.new()
-	second_name.placeholder_text = "Name the new diner"
-	second_box.add_child(second_name)
-	var open_b := Button.new()
-	open_b.text = "Open it ($%s)" % UiKit.thousands(int(Data.SECOND_COST))
-	open_b.theme_type_variation = &"PrimaryButton"
-	open_b.pressed.connect(func():
-		var n := second_name.text.strip_edges()
-		if main != null and main.open_second_location(n if n != "" else Data.DINER_NAMES.pick_random()):
-			main.hud.refresh_all())
-	second_box.add_child(open_b)
 	# ---- regulars
 	header("Regulars", "heart")
 	note("Locals who keep coming back. They have a usual order and a favourite server. Treat them well and they tip more; let them down too often and they stop coming.")
@@ -402,13 +383,6 @@ func refresh_biz() -> void:
 			cb.toggled.connect(func(on: bool): Biz.set_contract(kk, on))
 			row.add_child(cb)
 			supplier_box.add_child(row)
-	second_box.visible = Biz.can_open_second()
-	if not Biz.sister.is_empty():
-		second_note.text = "Your other diner, %s, makes about $%d a week without you; it comes in with the bills. Open it from the main menu to run it yourself." % [Biz.sister["name"], int(Biz.sister.get("weekly", 0.0))]
-	elif Biz.can_open_second():
-		second_note.text = "You're famous enough for a second diner. $%s goes across to get it started; this one keeps running under its crew, and its weekly takings come in with the new one's bills." % UiKit.thousands(int(Data.SECOND_COST))
-	else:
-		second_note.text = "Once you're a Destination diner with $%s to spare, you can open a second diner." % UiKit.thousands(int(Data.SECOND_COST))
 
 
 func refresh_regulars() -> void:

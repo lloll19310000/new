@@ -111,7 +111,7 @@ func start(lot_ref, size: int, parent: Node, kind_: String = "regular", window =
 		# they stay in the car: park it and wait for a carhop
 		for m in members:
 			m.visible = false
-		lot.queue_redraw()
+		lot.redraw()
 	if Data.DASH_KIND.has(kind) or kind in ["takeout", "driver", "critic", "celebrity"]:
 		if randf() < Data.ALLERGY_CHANCE:
 			allergy = Data.ALLERGENS.keys().pick_random()
@@ -648,7 +648,7 @@ func receive(dishes: Array, qs: Array, server = null, cooks: Array = []) -> void
 		bill += GameState.price(d)
 		if i < qs.size():
 			qualities.append(qs[i])
-	lot.queue_redraw()
+	lot.redraw()
 	check_all_served()
 
 
@@ -933,7 +933,7 @@ func leave_table() -> void:
 			ch.occupant = null
 	if table.group == self:
 		table.group = null
-	lot.queue_redraw()
+	lot.redraw()
 
 
 # ------------------------------------------------------------------ paying
@@ -1216,7 +1216,7 @@ func grade_diner() -> void:
 		text += " Spotless!"
 	GameState.toast.emit(text, "good" if r["grade"] == "A" else ("bad" if r["grade"] == "C" else ""))
 	Sfx.play("good_review" if r["grade"] == "A" else ("bad_review" if r["grade"] == "C" else "pop"))
-	lot.queue_redraw()
+	lot.redraw()
 	leave(0.0, "", true)
 
 
@@ -1296,7 +1296,7 @@ func leave(score: float, complaint: String, paid: bool) -> void:
 				if it.get("plated", false):
 					GameState.plates_clean += 1
 	JobBoard.cancel_for_group(self)
-	lot.queue_redraw()
+	lot.redraw()
 	state = "leaving"
 	for m in members:
 		if m.has_method("cancel_errand"):

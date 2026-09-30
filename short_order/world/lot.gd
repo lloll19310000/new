@@ -29,6 +29,7 @@ var fx: Node2D
 
 
 func _ready() -> void:
+	_make_layers()
 	init_grid()
 
 
@@ -160,7 +161,7 @@ func refresh() -> void:
 	link_tables()
 	find_entry()
 	layout_changed.emit()
-	queue_redraw()
+	repaint_layout()
 
 
 func nearest_walkable(c: Vector2i, customer: bool = false) -> Vector2i:
@@ -776,7 +777,7 @@ func update_cleaners() -> void:
 			cleaner_on_shift = true
 			break
 	if was != cleaner_on_shift:
-		queue_redraw()
+		redraw_floor_marks()
 
 
 func dirt_visible(c: Vector2i) -> bool:
@@ -791,7 +792,7 @@ func wear_path(c: Vector2i) -> void:
 	var before := scuff[i]
 	scuff[i] = minf(1.0, scuff[i] + Data.SCUFF_PER_STEP)
 	if int(before * 5) != int(scuff[i] * 5):
-		queue_redraw()
+		redraw_floor_marks()
 
 
 ## Overnight the worn paths fade a little.
@@ -809,7 +810,7 @@ func add_dirt(c: Vector2i, amount: float) -> void:
 	if dirt[i] >= (Data.DIRT_SHOW if cleaner_on_shift else Data.DIRT_JOB):
 		post_sweep(c)
 	if int(before * 8) != int(dirt[i] * 8) or (before < Data.DIRT_SHOW and dirt[i] >= Data.DIRT_SHOW):
-		queue_redraw()
+		redraw_floor_marks()
 
 
 func post_sweep(c: Vector2i) -> void:
@@ -832,7 +833,7 @@ func clean_cell(c: Vector2i, radius: int = 0) -> void:
 			var cc := c + Vector2i(dx, dy)
 			if in_lot(cc) and indoors(cc):
 				dirt[idx(cc)] = 0.0
-	queue_redraw()
+	redraw_floor_marks()
 
 
 ## 0 = spotless, 1 = filthy. Looks at the floor around a spot.
@@ -963,54 +964,150 @@ func ready_to_open() -> bool:
 
 # ------------------------------------------------------------------ drawing
 
-func _draw() -> void:
+## The lot is drawn in layers so a spilled drink doesn't repaint the whole
+## floor: floor tiles (a TileMapLayer, set when you build), dirt and land
+## signs, walls (redrawn when you build), and the furniture with what's on it.
+class Layer extends Node2D:
+	var paint: Callable
+
+	func _draw() -> void:
+		paint.call(self)
+
+
+var floor_layer: TileMapLayer
+var decal_layer: Layer
+var wall_layer: Layer
+var furn_layer: Layer
+
+
+func _make_layers() -> void:
+	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	floor_layer = TileMapLayer.new()
+	floor_layer.name = "Floors"
+	floor_layer.tile_set = Sprites.floor_tileset()
+	floor_layer.scale = Vector2(2, 2)
+	add_child(floor_layer)
+	decal_layer = _layer("Decals", _draw_decals)
+	wall_layer = _layer("Walls", _draw_walls)
+	furn_layer = _layer("Furniture", _draw_furniture)
+
+
+func _layer(n: String, fn: Callable) -> Layer:
+	var l := Layer.new()
+	l.name = n
+	l.paint = fn
+	add_child(l)
+	return l
+
+
+## Something on the lot changed (dirt, food on a table, a machine running):
+## repaint the layers that change during the day, at most once a frame.
+func redraw() -> void:
+	if decal_layer != null:
+		decal_layer.queue_redraw()
+		furn_layer.queue_redraw()
+
+
+## Dirt and worn paths only.
+func redraw_floor_marks() -> void:
+	if decal_layer != null:
+		decal_layer.queue_redraw()
+
+
+## Floors and walls: only when something is built.
+func repaint_layout() -> void:
+	if floor_layer == null:
+		return
 	for y in H:
 		for x in W:
 			var c := Vector2i(x, y)
-			var i := idx(c)
-			Art.ground(self, c, floor_type[i], noise[i])
-			if scuff[i] > 0.2 and floor_type[i] > 0:
-				Art.scuff(self, c, scuff[i], noise[i])
-			if dirt_visible(c):
-				var d := dirt[i]
-				var p := cell_center(c) + Vector2(noise[i] * 8 - 4, noise[(i + 7) % noise.size()] * 8 - 4)
-				Art.ellipse(self, p, Vector2(7, 5) * (0.6 + d * 0.6), Color(0.36, 0.26, 0.15, 0.2 + d * 0.45))
-				if d > 0.3:
-					Art.ellipse(self, p + Vector2(6, 5), Vector2(4, 3) * (0.5 + d * 0.5), Color(0.36, 0.26, 0.15, 0.15 + d * 0.35))
-	# land you own is outlined; plots for sale are darker, with a sign
+			var id: Array = Sprites.floor_id(_floor_name(c))
+			floor_layer.set_cell(c, id[0], id[1])
+	wall_layer.queue_redraw()
+	redraw()
+
+
+func _floor_name(c: Vector2i) -> String:
+	if c.y > Data.SIDEWALK_Y:
+		return "road"
+	if c.y == Data.SIDEWALK_Y:
+		return "sidewalk"
+	var ft := int(floor_type[idx(c)])
+	if ft == 0 and wall[idx(c)] == 2:
+		# a doorway takes the floor of the room it opens into
+		for d in Data.DIRS:
+			var n: Vector2i = c + d
+			if in_lot(n) and wall[idx(n)] == 0 and floor_type[idx(n)] > 0:
+				ft = floor_type[idx(n)]
+				break
+	match ft:
+		Data.FLOOR_DINER:
+			return "diner"
+		Data.FLOOR_KITCHEN:
+			return "kitchen"
+		Data.FLOOR_STAFF:
+			return "staff"
+		Data.FLOOR_RESTROOM:
+			return "restroom"
+	return "grass2" if noise[idx(c)] > 0.7 else "grass"
+
+
+func _draw_decals(ci: CanvasItem) -> void:
+	var show := Data.DIRT_SHOW_CLEANER if cleaner_on_shift else Data.DIRT_SHOW
+	for y in H:
+		for x in W:
+			var i := y * W + x
+			if floor_type[i] == 0:
+				continue
+			if scuff[i] > 0.2:
+				Art.scuff(ci, Vector2i(x, y), scuff[i], noise[i])
+			if dirt[i] >= show:
+				var p := cell_center(Vector2i(x, y)) + Vector2(noise[i] * 8 - 4, noise[(i + 7) % noise.size()] * 8 - 4)
+				Art.spill(ci, p, dirt[i])
+	# the road: a kerb along the sidewalk and a dashed line down the middle
 	var t := float(Data.TILE)
+	ci.draw_rect(Rect2(0, (Data.SIDEWALK_Y + 1) * t - 2, W * t, 2), Color("6f737d"))
+	for x in range(0, W * Data.TILE, 64):
+		ci.draw_rect(Rect2(x + 16, (Data.SIDEWALK_Y + 2) * t - 1, 32, 2), Color("e8c75a"))
+	# land you own is outlined; plots for sale are darker, with a sign
 	for p in Data.PLOTS:
 		var r := Rect2(Vector2((p["rect"] as Rect2i).position) * t, Vector2((p["rect"] as Rect2i).size) * t)
 		if GameState.owned.has(p["id"]):
-			draw_rect(r, Color(1, 1, 1, 0.12), false, 2.0)
+			ci.draw_rect(r, Color(1, 1, 1, 0.12), false, 2.0)
 		else:
-			draw_rect(r, Color(0.05, 0.08, 0.04, 0.28))
-			draw_rect(r.grow(-1), Color(1, 1, 1, 0.08), false, 1.0)
-			Art.for_sale_sign(self, r.get_center(), "$%d" % p["cost"])
+			ci.draw_rect(r, Color(0.05, 0.08, 0.04, 0.28))
+			ci.draw_rect(r.grow(-1), Color(1, 1, 1, 0.08), false, 1.0)
+			Art.for_sale_sign(ci, r.get_center(), "$%d" % p["cost"])
+
+
+func _draw_walls(ci: CanvasItem) -> void:
 	for y in H:
 		for x in W:
 			var c := Vector2i(x, y)
 			var w := wall[idx(c)]
 			if w == 1:
-				Art.wall_tile(self, c, is_wallish(c + Vector2i.UP), is_wallish(c + Vector2i.DOWN), is_wallish(c + Vector2i.LEFT), is_wallish(c + Vector2i.RIGHT))
+				Art.wall_tile(ci, c, is_wallish(c + Vector2i.UP), is_wallish(c + Vector2i.DOWN), is_wallish(c + Vector2i.LEFT), is_wallish(c + Vector2i.RIGHT))
 			elif w == 2:
 				var horizontal := is_wallish(c + Vector2i.LEFT) or is_wallish(c + Vector2i.RIGHT)
-				Art.door_tile(self, c, horizontal)
+				Art.door_tile(ci, c, horizontal)
+
+
+func _draw_furniture(ci: CanvasItem) -> void:
 	for f in furniture:
-		Art.furniture(self, f, inside_dir(f) if f.on_wall() else -1)
+		Art.furniture(ci, f, inside_dir(f) if f.on_wall() else -1)
 	for f in furniture:
 		if f.is_table():
-			Art.table_food(self, f)
+			Art.table_food(ci, f)
 	# a birthday: cake in the staff room, on the sofa's arm
 	if Moments.cake_for != "" and GameState.phase != GameState.Phase.REPORT:
 		var sofas: Array = of_type("sofa")
 		if not sofas.is_empty():
-			Art.cake(self, sofas[0].center_px() + Vector2(0, -2), 1.0)
+			Art.cake(ci, sofas[0].center_px() + Vector2(0, -2), 1.0)
 	if has_entry() and GameState.grade != "":
-		Art.grade_sign(self, entry_door, entry_outside, GameState.grade)
+		Art.grade_sign(ci, entry_door, entry_outside, GameState.grade)
 	if has_entry():
 		var lit := clampf((GameState.minute - 18.0 * 60.0) / 120.0, 0.0, 1.0) if GameState.phase != GameState.Phase.PLANNING else 0.0
-		Art.storefront(self, entry_door, entry_outside, GameState.diner_name, GameState.is_open(), lit, GameState.staff.size() < 4, GameState.rep_level)
+		Art.storefront(ci, entry_door, entry_outside, GameState.diner_name, GameState.is_open(), lit, GameState.staff.size() < 4, GameState.rep_level)
 
 
 ## For wall-hung things: which side the room is on (0-3), so they face into it.
