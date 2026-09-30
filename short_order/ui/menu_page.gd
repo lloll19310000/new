@@ -11,6 +11,7 @@ var prep_note: Label
 var prep_rows := {}          # dish -> {"spin": SpinBox, "info": Label}
 var paper: PanelContainer
 var paper_title: Label
+var combo_rows := {}
 var _t := 0.0
 
 @onready var rows_box: VBoxContainer = %Rows
@@ -55,6 +56,40 @@ func _ready() -> void:
 		row.setup(d)
 		col.add_child(row)
 		rows[d] = row
+	# combos: a few dishes together for less
+	var ch := UiKit.label("~ Combos (%d%% off) ~" % int(Data.COMBO_DISCOUNT * 100), 13, Color("b23a2e"), &"StatLabel")
+	ch.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	ch.custom_minimum_size.y = 26
+	ch.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	col.add_child(ch)
+	for cb in Data.COMBOS:
+		var r := HBoxContainer.new()
+		r.add_theme_constant_override("separation", 6)
+		var info := VBoxContainer.new()
+		info.add_theme_constant_override("separation", -2)
+		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		info.add_child(UiKit.label(cb["name"], 14, Color("3a2e26"), &"StatLabel"))
+		var dl := UiKit.label(", ".join(cb["dishes"].map(func(d): return Data.DISHES[d]["name"].to_lower())), 11, Color("7a6a5a"), &"SmallLabel")
+		info.add_child(dl)
+		r.add_child(info)
+		var pl := UiKit.label("", 14, Color("b23a2e"), &"StatLabel")
+		r.add_child(pl)
+		var pill := PanelContainer.new()
+		var ps := StyleBoxFlat.new()
+		ps.bg_color = Color("3a2e26")
+		ps.set_corner_radius_all(12)
+		pill.add_theme_stylebox_override("panel", ps)
+		pill.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		var sw := CheckButton.new()
+		sw.tooltip_text = "Offer this combo. Someone ordering the %s often takes the whole combo." % Data.DISHES[cb["dishes"][0]]["name"].to_lower()
+		var key: String = cb["key"]
+		sw.toggled.connect(func(on: bool):
+			GameState.combos[key] = on
+			refresh())
+		pill.add_child(sw)
+		r.add_child(pill)
+		col.add_child(r)
+		combo_rows[key] = {"price": pl, "switch": sw, "row": r, "combo": cb}
 	build_prep_list()
 	GameState.menu_changed.connect(refresh)
 	visibility_changed.connect(refresh)
@@ -114,6 +149,12 @@ func build_prep_list() -> void:
 
 func refresh() -> void:
 	paper_title.text = (GameState.diner_name if GameState.diner_name != "" else "Menu")
+	for k in combo_rows:
+		var cr: Dictionary = combo_rows[k]
+		var ok: bool = cr["combo"]["dishes"].all(func(d): return GameState.dish_known(d))
+		cr["row"].visible = ok
+		cr["price"].text = "$%.2f" % GameState.combo_price(cr["combo"])
+		cr["switch"].set_pressed_no_signal(GameState.combos.get(k, false))
 	var lvl := GameState.price_level()
 	var pct := int(round((lvl - 1.0) * 100.0))
 	var effect := int(round((GameState.price_demand() - 1.0) * 100.0))

@@ -79,6 +79,7 @@ var meal_break_done := false
 var meal_missed := false        # worked past the 5th hour without a meal break today
 var rest_breaks := 0            # rest breaks taken today
 var _snacked := false
+var upsells_today := 0
 var clock_out := false          # their shift is over: finish up and go home
 var arrive_at := -1.0           # game minute they're due in today
 var came_at := -1.0             # when they actually got here
@@ -464,6 +465,14 @@ func start_break() -> void:
 				if f.resters[c] != null:
 					others.append(f.resters[c])
 		Crew.sofa_full(self, others)
+
+
+## How likely they are to talk a table into a pie or a shake.
+func upsell_chance() -> float:
+	var p: float = Data.UPSELL_BASE + Data.UPSELL_PER_SERVICE * service
+	if has_trait("chatty") or has_trait("friendly"):
+		p += 0.03
+	return p
 
 
 ## Minutes on the clock today.

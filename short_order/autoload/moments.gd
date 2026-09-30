@@ -21,7 +21,7 @@ func reset() -> void:
 
 
 func day_of_year(day: int) -> int:
-	return posmod(day - 1, Data.YEAR_DAYS) + 1
+	return Town.doy(day)
 
 
 ## A new hire: their first day, and a birthday (now and then a soon one).
@@ -151,6 +151,12 @@ func pick_eotm() -> void:
 		s.jobs_month = 0
 	if Crew.main != null:
 		Crew.main.lot.queue_redraw()
+
+
+## A page for the scrapbook (see the Scrapbook tab): kind picks the icon.
+func note_scrapbook(kind: String, title: String, text: String) -> void:
+	if Crew.main != null and Crew.main.has_method("scrapbook_add"):
+		Crew.main.scrapbook_add(kind, title, text)
 
 
 func eotm_look() -> Dictionary:

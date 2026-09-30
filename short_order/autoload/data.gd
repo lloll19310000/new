@@ -79,7 +79,21 @@ const SERVICES := [
 	{"key": "breakfast", "name": "Breakfast", "from": 7 * 60, "to": 10 * 60},
 	{"key": "lunch",     "name": "Lunch",     "from": 10 * 60, "to": 16 * 60},
 	{"key": "dinner",    "name": "Dinner",    "from": 16 * 60, "to": 22 * 60},
+	{"key": "latenight", "name": "Late night", "from": 22 * 60, "to": 26 * 60},
 ]
+## Combos on the menu: the dishes together for less (see the Menu page).
+const COMBOS := [
+	{"key": "classic", "name": "The Classic", "dishes": ["burger", "fries", "soda"]},
+	{"key": "sunrise", "name": "Sunrise special", "dishes": ["pancakes", "coffee"]},
+	{"key": "piecoffee", "name": "Pie and coffee", "dishes": ["pie", "coffee"]},
+	{"key": "blueplate", "name": "Blue plate", "dishes": ["meatloaf", "fries", "icedtea"]},
+]
+const COMBO_DISCOUNT := 0.1
+const COMBO_TAKE := 0.45            # chance someone whose pick is in a combo takes the whole combo
+## Upselling: a server suggests a pie or a milkshake.
+const UPSELL_BASE := 0.04
+const UPSELL_PER_SERVICE := 0.015
+const UPSELL_DISHES := ["pie", "milkshake", "coffee", "fries"]
 ## Dishes people pick more at breakfast time.
 const BREAKFAST_LIKES := ["pancakes", "omelette", "coffee"]
 
@@ -89,6 +103,8 @@ const RUSHES := [
 	{"from": 12 * 60, "to": 14 * 60, "mult": 1.5, "name": "Lunch rush"},
 	{"from": 15 * 60, "to": 17 * 60, "mult": 0.6, "name": "Quiet afternoon"},
 	{"from": 18 * 60, "to": 20 * 60, "mult": 1.45, "name": "Dinner rush"},
+	{"from": 22 * 60 + 30, "to": 24 * 60, "mult": 0.7, "name": "The late lull"},
+	{"from": 25 * 60, "to": 25 * 60 + 50, "mult": 1.7, "name": "Bar-close rush"},
 ]
 ## A new diner isn't known yet: fewer customers on days 1, 2 and 3.
 const NEW_DINER_RAMP := [0.7, 0.85, 0.95]
@@ -351,8 +367,89 @@ const PREP_WALKINS := 0.2
 const STAY_LATE_MAX := 90.0
 const STAY_LATE_BUSY := 8
 
+## The town (see Town): seasons, holidays, the weather, the events board and the rival.
+const SEASON_CROWD := {"spring": 1.0, "summer": 1.08, "fall": 1.0, "winter": 0.92}
+const SEASON_DISHES := {
+	"spring": {"omelette": 1.2, "pancakes": 1.2, "waffles": 1.2, "icedtea": 1.1},
+	"summer": {"soda": 1.6, "icedtea": 1.8, "milkshake": 1.6, "soup": 0.6, "chili": 0.6, "coffee": 0.75, "burger": 1.15},
+	"fall": {"pie": 1.4, "chili": 1.3, "soup": 1.2, "meatloaf": 1.2},
+	"winter": {"soup": 1.7, "chili": 1.6, "coffee": 1.4, "meatloaf": 1.3, "icedtea": 0.5, "soda": 0.7, "milkshake": 0.6},
+}
+const SEASON_PRICES := {
+	"spring": {"veg": 0.95, "fruit": 1.0},
+	"summer": {"veg": 0.8, "fruit": 0.75, "dairy": 1.05},
+	"fall": {"fruit": 0.9, "veg": 1.0},
+	"winter": {"veg": 1.3, "fruit": 1.35, "eggs": 1.1},
+}
+const WEATHER_ODDS := {
+	"spring": {"clear": 0.72, "rain": 0.22, "storm": 0.06},
+	"summer": {"clear": 0.8, "heat": 0.15, "storm": 0.05},
+	"fall": {"clear": 0.66, "rain": 0.26, "storm": 0.08},
+	"winter": {"clear": 0.5, "rain": 0.25, "snow": 0.18, "storm": 0.07},
+}
+const WEATHER_CROWD := {"rain": 0.8, "storm": 0.65, "snow": 0.7, "heat": 0.92}
+## Holidays: a fixed date ("dom") or the nth weekday of a month (0 = Monday).
+const HOLIDAYS := [
+	{"key": "newyear", "name": "New Year's Day", "month": 1, "dom": 1, "crowd": 1.2, "dishes": {"pancakes": 2.0, "coffee": 1.6, "waffles": 2.0}, "note": "Brunch, and a lot of coffee."},
+	{"key": "superbowl", "name": "Super Bowl Sunday", "month": 2, "weekday": 6, "nth": 2, "crowd": 0.8, "takeout": 3.0, "dishes": {"burger": 1.6, "fries": 1.8, "chili": 2.0}, "note": "Takeout for the game: burgers, fries and chili."},
+	{"key": "valentine", "name": "Valentine's Day", "month": 2, "dom": 14, "crowd": 1.2, "kinds": {"regular": 1.4, "family": 0.5}, "dishes": {"pie": 2.0, "milkshake": 1.8}, "note": "Couples in the booths, sharing milkshakes and pie."},
+	{"key": "mothers", "name": "Mother's Day", "month": 5, "weekday": 6, "nth": 2, "crowd": 1.4, "kinds": {"family": 3.0}, "dishes": {"pancakes": 1.6, "waffles": 1.8}, "tips": 1.2, "note": "Families all day. Book the big tables."},
+	{"key": "july4", "name": "the Fourth of July", "month": 7, "dom": 4, "crowd": 1.4, "dishes": {"burger": 2.0, "double": 2.0, "fries": 1.5, "pie": 1.4}, "note": "Burgers and pie before the fireworks."},
+	{"key": "halloween", "name": "Halloween", "month": 10, "dom": 31, "crowd": 1.1, "kinds": {"student": 2.0, "family": 1.5}, "dishes": {"pie": 1.6, "milkshake": 1.4}, "note": "Costumes and candy-high kids."},
+	{"key": "thanksgiving", "name": "Thanksgiving", "month": 11, "weekday": 3, "nth": 4, "crowd": 0.7, "dishes": {"pie": 3.0, "meatloaf": 1.8, "soup": 1.5}, "tips": 1.3, "note": "Quiet, except for pie. Lots of pie."},
+	{"key": "xmaseve", "name": "Christmas Eve", "month": 12, "dom": 24, "crowd": 0.6, "tips": 1.5, "dishes": {"coffee": 1.5, "pie": 1.6}, "note": "A quiet night and generous tippers."},
+	{"key": "xmas", "name": "Christmas Day", "month": 12, "dom": 25, "crowd": 0.45, "tips": 1.8, "kinds": {"trucker": 2.0}, "note": "Hardly anyone, but the ones who come are grateful you're open."},
+]
+## The town events board.
+const TOWN_EVENTS := {
+	"fair": {"name": "The county fair", "days": [3, 5], "season": "summer", "hours": [11, 15], "hours_crowd": 0.7, "crowd": 1.1, "note": "Lunch goes to the fairground, but the evenings are busy."},
+	"roadwork": {"name": "Roadwork out front", "days": [3, 5], "crowd": 0.75, "note": "The street's half closed: fewer people walk in."},
+	"market": {"name": "Farmers' market", "days": [1, 2], "hours": [8, 13], "hours_crowd": 1.3, "note": "Cheaper fruit, vegetables and eggs, and a busy morning."},
+	"marathon": {"name": "The town marathon", "days": [1, 1], "hours": [8, 11], "hours_crowd": 1.8, "note": "Hungry runners for breakfast."},
+	"concert": {"name": "Summer concerts in the park", "days": [2, 4], "season": "summer", "hours": [18, 22], "hours_crowd": 1.4, "note": "A crowd before and after the music."},
+	"harvest": {"name": "The harvest festival", "days": [2, 3], "season": "fall", "crowd": 1.2, "note": "Out-of-towners, and they want pie."},
+	"convention": {"name": "A trucking convention", "days": [2, 3], "crowd": 1.1, "note": "The lot is full of big rigs."},
+	"parade": {"name": "The holiday parade", "days": [1, 1], "season": "winter", "hours": [10, 14], "hours_crowd": 1.6, "note": "Cold people who want coffee and soup."},
+}
+const TOWN_EVENT_CHANCE := 0.18
+const FOOTBALL_CROWD := 1.6
+## The rival diner across the street.
+const RIVAL_AT_LEVEL := 2               # opens once you're a Town favourite
+const RIVAL_NAMES := ["Dina's Diner", "The Chrome Spoon", "Starlite Grill", "Blue Moon Cafe", "Pop's Place"]
+const RIVAL_START := 0.12               # share of your trade they take at first
+const RIVAL_MAX := 0.3
+const RIVAL_GROW := 0.005               # a day, while you're under 4 stars
+const RIVAL_BEAT_RATING := 4.3
+const RIVAL_BEAT_DAYS := 14             # days in a row at 4.3+ and they close
+const RIVAL_MOVE_CHANCE := 0.12
+const LOYALTY_CARD_COST := 0.05         # of each regular's bill
+const PRICE_MATCH_CUT := 0.1            # your prices, for as long as you match
+
+## Suppliers (see Biz): who brings what, and how much they like you.
+const SUPPLIER_REPS := {
+	"farm": {"name": "Rosa from Green Acres Farm", "items": ["veg", "fruit", "eggs"]},
+	"baker": {"name": "Hal from Hal's Bakery", "items": ["bread"]},
+	"dairy": {"name": "Meadow Dairy's Bev", "items": ["dairy", "icecream"]},
+	"butcher": {"name": "Stan Kowalski, the butcher", "items": ["meat", "potatoes"]},
+}
+const CONTRACT_DISCOUNT := 0.1
+const CONTRACT_FEE := 40.0          # a week, per contract
+const REP_PAID := 1.5
+const REP_UNPAID := 12.0
+## Catering jobs.
+const CATERING_CHANCE := 0.14
+const CATERING_PAY := 0.9           # of menu price per plate
+const CATERING_PICKUP := 12 * 60
+const CATERING_CLIENTS := ["the Henderson wedding", "the high school football banquet", "the Rotary Club lunch", "a baby shower at the church hall",
+	"the fire station's open day", "a funeral lunch for old Mr. Pruitt", "the county clerk's retirement party", "the Little League team"]
+const HISTORY_DAYS := 120          # nights kept for the Books
+## A sister diner.
+const SECOND_AT_LEVEL := 3          # Destination diner
+const SECOND_COST := 100000.0       # what you move across to get it started
+const SISTER_SHARE := 0.6           # of this diner's weekly profit, as a guess at the other's
+
 ## Crew moments (see Moments).
-const YEAR_DAYS := 364
+const YEAR_DAYS := 365
 const SHIFT_MILESTONES := [10, 50, 100, 250]
 const BIRTHDAY_STRESS := 10.0
 const MILESTONE_STRESS := 6.0
@@ -405,6 +502,8 @@ const CUSTOMERS := {
 	"student": {"name": "Students",    "weight": 18.0, "size": [2, 4], "hours": [13, 22], "patience": 1.15, "price": 2.0, "tip": 0.5, "likes": ["fries", "milkshake"], "look": "backpack", "order": [0.6, 0.7, 0.75, 0.3]},
 	"family":  {"name": "A family",    "weight": 14.0, "size": [2, 4], "hours": [8, 20], "patience": 0.85, "price": 1.2, "tip": 1.1, "likes": ["pancakes", "milkshake", "pie"], "look": "family", "order": [0.8, 0.35, 0.8, 0.55]},
 	"trucker": {"name": "A trucker",   "weight": 12.0, "size": [1, 1], "hours": [6, 22], "patience": 0.75, "price": 0.6, "tip": 1.6, "likes": ["burger", "meatloaf", "fries", "coffee"], "look": "cap", "order": [1.0, 0.8, 0.8, 0.45]},
+	"barcrowd": {"name": "The bar crowd", "weight": 16.0, "size": [2, 4], "hours": [22, 26], "patience": 0.8, "price": 1.3, "tip": 1.1, "likes": ["fries", "burger", "double", "chili"], "look": "", "order": [1.0, 0.8, 0.5, 0.3]},
+	"nightowl": {"name": "Night owls", "weight": 10.0, "size": [1, 2], "hours": [22, 26], "patience": 1.2, "price": 1.0, "tip": 1.2, "likes": ["coffee", "pie", "pancakes"], "look": "", "order": [0.6, 0.3, 1.0, 0.7]},
 	"party":   {"name": "A big party", "weight": 2.0, "size": [5, 8], "hours": [11, 21], "patience": 1.3, "price": 1.1, "tip": 1.2, "likes": ["burger", "pie", "milkshake"], "look": "", "order": [0.95, 0.6, 0.8, 0.5], "min_seats": 5},
 	"tourist": {"name": "Tourists",    "weight": 10.0, "size": [2, 4], "hours": [9, 20], "patience": 0.9,  "price": 0.7, "tip": 1.3, "likes": ["pancakes", "meatloaf", "pie", "milkshake"], "look": "camera", "order": [0.9, 0.5, 0.8, 0.5], "min_level": 2},
 	"critic":  {"name": "A food critic", "weight": 0.0, "size": [1, 1], "hours": [11, 20], "patience": 0.9, "price": 1.5, "tip": 1.0, "likes": [], "look": "beret", "order": [1.0, 0.5, 1.0, 0.8], "review_weight": 5, "picky": 2.0},

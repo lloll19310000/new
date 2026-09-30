@@ -234,6 +234,12 @@ func show_report(r: Dictionary) -> void:
 		row(money, "Utilities (weekly)", "-$%d" % int(bills["utilities"]), UiKit.CHERRY)
 		if bills.get("loan", 0.0) > 0.0:
 			row(money, "Loan payment", "-$%d" % int(ceil(bills["loan"])), UiKit.CHERRY)
+		if bills.get("contracts", 0.0) > 0.0:
+			row(money, "Supplier contracts", "-$%d" % int(bills["contracts"]), UiKit.CHERRY)
+		if bills.get("benefits", 0.0) > 0.0:
+			row(money, "Staff benefits", "-$%d" % int(bills["benefits"]), UiKit.CHERRY)
+		if absf(bills.get("sister", 0.0)) >= 1.0:
+			row(money, "Your other diner", ("+$%d" if bills["sister"] >= 0.0 else "-$%d") % int(absf(bills["sister"])), UiKit.MINT if bills["sister"] >= 0.0 else UiKit.CHERRY)
 	if r.get("supplies", 0.0) > 0.0:
 		row(money, "Delivery (this morning)", "-$%d" % int(r["supplies"]), UiKit.CHERRY)
 	if r.get("staff_meal", 0.0) > 0.0:
@@ -356,6 +362,17 @@ func build_notes(r: Dictionary) -> String:
 				(" ($%d in meals on the house)" % int(fr["comped"])) if fr["comped"] > 0.0 else ""])
 		if fr["dashes"] > 0:
 			t += line("walkout", "#e75a4e", "[b]%d dine and dash%s[/b]: $%d walked out the door. Keep someone near the tables, or build a till." % [fr["dashes"], "" if fr["dashes"] == 1 else "es", int(fr["dash_lost"])])
+	var extras: Array = []
+	if r.get("combos", 0) > 0:
+		extras.append("%d combo%s" % [r["combos"], "" if r["combos"] == 1 else "s"])
+	if r.get("upsells", 0) > 0:
+		extras.append("%d upsell%s (a pie or a shake a server suggested)" % [r["upsells"], "" if r["upsells"] == 1 else "s"])
+	if not extras.is_empty():
+		t += line("menu", "#6cc3a0", "Sold today: " + ", ".join(extras) + ".")
+	if r.get("catering", 0.0) > 0.0:
+		t += line("van", "#6cc3a0", "Catering brought in [b]$%d[/b]." % int(r["catering"]))
+	for tl in r.get("town", []):
+		t += line("calendar", "#b9a797", tl)
 	if r.get("level_up", "") != "":
 		t += line("star", "#f2c14e", "Your diner is now a [b]%s[/b]! More customers will come." % r["level_up"])
 	for c in r.get("events", []):

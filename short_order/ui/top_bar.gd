@@ -38,6 +38,7 @@ var fastest_button: Button
 
 var _last_money := 0.0
 var today_label: Label
+var date_chip: Label
 var inbox_button: Button
 var unread_badge: Label
 var _clock_t := 0.0
@@ -111,6 +112,11 @@ func _ready() -> void:
 	Sfx.settings_changed.connect(func():
 		sound_button.set_pressed_no_signal(not Sfx.sound_on)
 		sound_button.icon = SOUND_OFF if not Sfx.sound_on else SOUND_ON)
+	# the date and the weather, beside the day
+	date_chip = UiKit.label("", 12, UiKit.MUTED, &"SmallLabel")
+	date_chip.mouse_filter = Control.MOUSE_FILTER_PASS
+	day.get_parent().add_child(date_chip)
+	Town.changed.connect(refresh)
 	# today's takings, beside the cash
 	today_label = UiKit.label("", 11, Color("8ae596"), &"SmallLabel")
 	today_label.tooltip_text = "Sales so far today (tips go to the staff)."
@@ -161,6 +167,10 @@ func refresh() -> void:
 	var days := Books.days_to_bills()
 	money.tooltip_text = "Cash. Weekly bills (about $%d) are due %s." % [int(Books.bills_week()), "tonight" if days == 0 else "in %d day%s" % [days, "" if days == 1 else "s"]]
 	day.text = "Day %d" % GameState.day
+	var hol: Dictionary = Town.holiday()
+	date_chip.text = "%s · %s%s" % [Town.date_text(), Town.weather_name(), (" · " + hol["name"]) if not hol.is_empty() else ""]
+	date_chip.add_theme_color_override("font_color", UiKit.GOLD if not hol.is_empty() else UiKit.MUTED)
+	date_chip.tooltip_text = "\n".join(Town.today_lines()) + "\nTomorrow: %s." % Town.weather_name(Town.forecast).to_lower()
 	clock.text = GameState.clock_text()
 	stars.value = GameState.rating
 	rating.text = "%.1f" % GameState.rating

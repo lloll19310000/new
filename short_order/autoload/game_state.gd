@@ -30,6 +30,8 @@ var review_count: int = 0          # every review ever
 var rating: float = 3.0
 var menu: Dictionary = {}          # dish -> {"on": bool, "price": float}
 var unlocked: Array = []           # recipes you've unlocked (see Data.RECIPES)
+var combos: Dictionary = {}        # combo key -> on (see Data.COMBOS)
+var history: Array = []            # one entry a night: the day's numbers, for the Books
 var hometown: Dictionary = {}      # {"cook", "dish"}: the hometown dish a cook taught you
 var stock: Dictionary = {}         # ingredient -> int
 var target: Dictionary = {}        # ingredient -> int, topped up every night
@@ -70,6 +72,8 @@ func reset() -> void:
 	review_count = 0
 	rating = 3.0
 	menu = {}
+	history = []
+	combos = {"classic": true}
 	unlocked = []
 	hometown = {}
 	Data.DISHES["hometown"]["name"] = "Hometown special"
@@ -221,6 +225,25 @@ func dish_on(dish: String) -> bool:
 	return menu.has(dish) and menu[dish]["on"] and dish_known(dish)
 
 
+## About what this diner makes in a week, from the last seven nights.
+func weekly_profit() -> float:
+	var last: Array = history.slice(maxi(0, history.size() - 7))
+	if last.is_empty():
+		return 0.0
+	var t := 0.0
+	for h in last:
+		t += float(h.get("net", 0.0))
+	return t * 7.0 / last.size()
+
+
+## A combo's price: its dishes together, less the combo discount.
+func combo_price(cb: Dictionary) -> float:
+	var t := 0.0
+	for d in cb["dishes"]:
+		t += price(d)
+	return t * (1.0 - Data.COMBO_DISCOUNT)
+
+
 ## Locked recipes are off the menu until you unlock them.
 func dish_known(dish: String) -> bool:
 	return not Data.DISHES[dish].get("locked", false) or unlocked.has(dish)
@@ -271,7 +294,7 @@ func hometown_name() -> String:
 
 
 func price(dish: String) -> float:
-	return menu[dish]["price"]
+	return menu[dish]["price"] * ((1.0 - Data.PRICE_MATCH_CUT) if Town.price_match and Town.rival_open() else 1.0)
 
 
 func has_ingredients(dish: String, count: int = 1) -> bool:
@@ -441,7 +464,7 @@ func groups_per_hour() -> float:
 		base *= rush["mult"]
 	if day <= Data.NEW_DINER_RAMP.size():
 		base *= Data.NEW_DINER_RAMP[day - 1]
-	base *= level_info()["mult"] * price_demand() * Events.crowd_mult() * seat_demand()
+	base *= level_info()["mult"] * price_demand() * Events.crowd_mult() * seat_demand() * Town.crowd_mult()
 	return base * Data.GRADE_EFFECT.get(grade, 1.0)
 
 

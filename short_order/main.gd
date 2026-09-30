@@ -186,6 +186,7 @@ func simulate(real_dt: float) -> void:
 			spawn_tick(minutes)
 			rush_tick()
 			kitchen_tick(minutes)
+			Biz.tick(minutes)
 			Front.tick(minutes)
 			if GameState.minute >= GameState.close_min():
 				GameState.set_phase(GameState.Phase.CLEANUP)
@@ -193,7 +194,7 @@ func simulate(real_dt: float) -> void:
 				Sfx.play("day_end", -4.0)
 				lot.post_closing_sweeps()
 				Shifts.closing()
-		elif GameState.minute >= Data.END_MIN or (groups.is_empty() and GameState.minute >= GameState.close_min() + 20 and not cleaning_left() and not Shifts.closing_left()):
+		elif GameState.minute >= maxf(Data.END_MIN, GameState.close_min() + 120.0) or (groups.is_empty() and GameState.minute >= GameState.close_min() + 20 and not cleaning_left() and not Shifts.closing_left()):
 			end_day()
 			return
 	for g in groups.duplicate():
@@ -340,10 +341,10 @@ func pick_kind() -> String:
 		if c.get("min_seats", 0) > 0 and not lot.merge_pairs().any(func(p): return p[2] >= c["min_seats"] and p[0].table_free() and p[1].table_free()):
 			continue   # a big party only comes in if there's somewhere to push tables together now
 		options.append(k)
-		total += c["weight"]
+		total += c["weight"] * Town.kind_mult(k)
 	var roll := randf() * total
 	for k in options:
-		roll -= Data.CUSTOMERS[k]["weight"]
+		roll -= Data.CUSTOMERS[k]["weight"] * Town.kind_mult(k)
 		if roll <= 0.0:
 			return k
 	return "regular"
@@ -409,6 +410,7 @@ func open_diner() -> void:
 	Front.plan_day()
 	Stock.schedule_delivery()
 	Stock.post_prep_jobs()
+	Biz.post_prep()
 	GameState.set_phase(GameState.Phase.PREP)
 	start_staff_meal()
 	GameState.toast.emit("The staff are in. Doors open at %s." % clock_of(o), "good")
@@ -529,6 +531,8 @@ func end_day() -> void:
 	Crew.nightly()
 	Front.nightly()
 	Moments.nightly()
+	Town.nightly()
+	Biz.nightly()
 	Goals.check()
 	lot.fade_scuffs()
 	# tomorrow's schedule: days off and who works days or nights
@@ -573,9 +577,16 @@ func end_day() -> void:
 		"level_up": GameState.level_info()["name"] if level_up else "",
 		"breakdowns": t["breakdowns"], "types": t["types"].duplicate(),
 		"best": t["best"].duplicate(), "worst": t["worst"].duplicate(), "mvp": mvp(),
+		"combos": t.get("combos", 0), "upsells": t.get("upsells", 0), "catering": t.get("catering", 0.0), "town": Town.today_lines().slice(0, 2),
 	}
-	var bills_paid: float = bills.get("rent", 0.0) + bills.get("utilities", 0.0) + bills.get("loan", 0.0)
+	var bills_paid: float = bills.get("rent", 0.0) + bills.get("utilities", 0.0) + bills.get("loan", 0.0) + bills.get("contracts", 0.0) + bills.get("benefits", 0.0) - bills.get("sister", 0.0)
 	last_report["net"] = t["revenue"] - wages - bills_paid - last_report["supplies"] - t["staff_meal"]
+	# the Books: a line for tonight
+	GameState.history.append({"day": GameState.day, "revenue": t["revenue"], "wages": wages, "food": t["food_used"] + t["waste"], "bills": bills_paid,
+		"net": last_report["net"], "served": t["served"], "left": t["left"], "rating": GameState.rating, "by_hour": t.get("by_hour", {}).duplicate(),
+		"dishes": t["dishes"].duplicate(), "tips": t["tips"], "upsells": t.get("upsells", 0), "combos": t.get("combos", 0)})
+	if GameState.history.size() > Data.HISTORY_DAYS:
+		GameState.history = GameState.history.slice(GameState.history.size() - Data.HISTORY_DAYS)
 	GameState.set_phase(GameState.Phase.REPORT)
 	hud.show_report(last_report)
 
@@ -600,10 +611,12 @@ func start_next_day() -> void:
 	GameState.minute = GameState.prep_min()
 	GameState.reset_today()
 	Crew.reset_today()
+	Town.morning()
 	Moments.morning()
 	for s in GameState.staff:
 		s.energy = 100.0
 		s.jobs_today = 0
+		s.upsells_today = 0
 	GameState.roll_candidates()
 	GameState.set_phase(GameState.Phase.PLANNING)
 	Shifts.morning_view()
@@ -743,6 +756,9 @@ func save_game(to: String = "") -> bool:
 	if slot == "":
 		slot = new_slot()
 	DirAccess.make_dir_recursive_absolute(save_dir)
+	# keep the sister diner's idea of how this one's doing up to date
+	if not Biz.sister.is_empty() and str(Biz.sister.get("slot", "")) != slot:
+		_patch_sister(str(Biz.sister["slot"]), {"name": GameState.diner_name, "slot": slot, "weekly": GameState.weekly_profit() * Data.SISTER_SHARE})
 	var furn := []
 	for f in lot.furniture:
 		furn.append({"type": f.type, "x": f.cell.x, "y": f.cell.y, "dir": f.dir, "wear": f.wear, "broken": f.broken, "tier": f.tier})
@@ -762,7 +778,7 @@ func save_game(to: String = "") -> bool:
 		"version": SAVE_VERSION, "name": GameState.diner_name, "saved_at": Time.get_datetime_string_from_system(false, true), "day": GameState.day, "money": GameState.money, "reviews": GameState.reviews,
 		"review_count": GameState.review_count,
 		"menu": GameState.menu, "stock": GameState.stock, "target": GameState.target,
-		"unlocked": GameState.unlocked, "hometown": GameState.hometown, "moments": Moments.save_data(), "goals": Goals.save_data(),
+		"unlocked": GameState.unlocked, "hometown": GameState.hometown, "combos": GameState.combos, "moments": Moments.save_data(), "goals": Goals.save_data(), "town": Town.save_data(), "biz": Biz.save_data(), "history": GameState.history,
 		"plates_total": GameState.plates_total, "plates": plates, "totals": GameState.totals,
 		"grade": GameState.grade, "crew": Crew.save_data(),
 		"supplier": GameState.supplier, "special": GameState.special, "owned": GameState.owned, "rep_level": GameState.rep_level,
@@ -813,6 +829,8 @@ func load_game(from: String = "") -> bool:
 		for r in GameState.reviews:
 			sum += r
 		GameState.rating = sum / GameState.reviews.size()
+	for k in data.get("combos", {}):
+		GameState.combos[str(k)] = bool(data["combos"][k])
 	for d in data.get("unlocked", []):
 		if Data.DISHES.has(str(d)):
 			GameState.unlocked.append(str(d))
@@ -829,6 +847,9 @@ func load_game(from: String = "") -> bool:
 	Books.load_data(data.get("books", {}))
 	Front.load_data(data.get("front", {}))
 	Moments.load_data(data.get("moments", {}))
+	Town.load_data(data.get("town", {}))
+	Biz.load_data(data.get("biz", {}))
+	GameState.history = data.get("history", [])
 	# very old saves kept a list of tutorial goals under "goals": ignore that
 	var gd = data.get("goals", {})
 	Goals.load_data(gd if gd is Dictionary else {})
@@ -931,6 +952,43 @@ func load_game(from: String = "") -> bool:
 
 
 ## A fresh diner in a new save slot.
+## Opens a second diner: $100,000 goes across to get it started; this diner
+## keeps running under its crew, and its weekly profit comes in with the other
+## one's bills (and the other way round).
+func open_second_location(new_name: String) -> bool:
+	if not Biz.can_open_second():
+		return false
+	var old_name := GameState.diner_name
+	var weekly := GameState.weekly_profit() * Data.SISTER_SHARE
+	GameState.add_money(-Data.SECOND_COST)
+	save_game()
+	var old_slot := slot
+	new_game(new_name)
+	GameState.money = Data.SECOND_COST
+	GameState.money_changed.emit(GameState.money)
+	Biz.sister = {"name": old_name, "slot": old_slot, "weekly": weekly}
+	save_game()
+	_patch_sister(old_slot, {"name": GameState.diner_name, "slot": slot, "weekly": 0.0})
+	GameState.toast.emit("%s is open! %s keeps running without you; its weekly takings come in with the bills here." % [GameState.diner_name, old_name], "good")
+	return true
+
+
+## Writes a sister diner's details into another diner's save.
+func _patch_sister(other_slot: String, sister: Dictionary) -> void:
+	var path := save_path(other_slot)
+	if not FileAccess.file_exists(path):
+		return
+	var data = JSON.parse_string(FileAccess.get_file_as_string(path))
+	if typeof(data) != TYPE_DICTIONARY:
+		return
+	var b: Dictionary = data.get("biz", {})
+	b["sister"] = sister
+	data["biz"] = b
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	f.store_string(JSON.stringify(data))
+	f.close()
+
+
 func new_game(diner_name: String = "") -> void:
 	clear_world()
 	GameState.reset()
@@ -962,5 +1020,7 @@ func clear_world() -> void:
 	Shifts.reset()
 	Moments.reset()
 	Goals.reset()
+	Town.reset()
+	Biz.reset()
 	JobBoard.clear()
 	lot.init_grid()

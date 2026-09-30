@@ -47,8 +47,7 @@ func reset_day() -> void:
 
 func crowd_mult() -> float:
 	var m := 1.0
-	if raining:
-		m *= Data.RAIN_CROWD
+	# (rain and the rest of the weather are in Town.crowd_mult)
 	if festival_from >= 0.0 and GameState.minute >= festival_from:
 		m *= Data.FESTIVAL_CROWD
 	if GameState.day <= buzz_until_day:
@@ -57,7 +56,7 @@ func crowd_mult() -> float:
 
 
 func takeout_mult() -> float:
-	return 2.0 if raining else 1.0
+	return Town.takeout_mult()
 
 
 func powered() -> bool:
@@ -69,7 +68,7 @@ func plan_day() -> void:
 	reset_day()
 	if GameState.day < 2:
 		return
-	raining = randf() < Data.RAIN_CHANCE
+	raining = Town.weather in ["rain", "storm"]
 	if raining:
 		GameState.toast.emit("It's raining today: fewer people walk in, but more order takeout.", "")
 		note("info", "#6aa6d9", "A rainy day: fewer walk-ins, more takeout.")
@@ -156,6 +155,31 @@ func choose(i: int) -> void:
 	if current.is_empty() and not queue.is_empty():
 		current = queue.pop_front()
 		ask.emit(current)
+
+
+## The rival across the street offers one of your people a job.
+func ask_poach(s, rival_name: String) -> void:
+	var offer: float = snappedf(s.wage + randf_range(1.5, 3.0), 0.25)
+	ask_player("poach", "%s wants %s" % [rival_name, s.person_name],
+		"%s offered %s $%.2f an hour to cook and serve for them. %s hasn't said yes yet." % [rival_name, s.person_name, offer, s.person_name],
+		[{"label": "Match it ($%.2f/hr)" % offer, "desc": "They stay, at the new rate."},
+		{"label": "Let them go", "desc": "Good luck over there."}], {"s": s, "offer": offer, "rival": rival_name})
+
+
+func choose_poach(i: int, d: Dictionary) -> void:
+	var s = d["s"]
+	if not valid_staff(s):
+		return
+	if i == 0:
+		s.raises += d["offer"] - s.wage
+		s.wage = d["offer"]
+		s.add_stress(-10.0, "you matched the offer")
+		Crew.log_line("%s turned down %s. You matched their offer: $%.2f an hour." % [s.person_name, d["rival"], s.wage], "money", [s])
+		note("money", "#6cc3a0", "You kept %s from %s with a raise to $%.2f an hour." % [s.person_name, d["rival"], s.wage])
+	else:
+		Crew.quit(s, "%s left to work at %s across the street." % [s.person_name, d["rival"]])
+		if Crew.main != null:
+			Crew.main.lose_staff(s)
 
 
 func note(icon: String, color: String, text: String) -> void:

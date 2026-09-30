@@ -54,7 +54,7 @@ func reset() -> void:
 # ------------------------------------------------------------------ batches
 
 func unit_cost(ing: String) -> float:
-	return Data.INGREDIENTS[ing]["cost"] * Data.SUPPLIERS[GameState.supplier]["cost"]
+	return Data.INGREDIENTS[ing]["cost"] * Data.SUPPLIERS[GameState.supplier]["cost"] * Town.price_mult(ing) * Biz.cost_mult(ing)
 
 
 func total(ing: String) -> int:
@@ -258,6 +258,7 @@ func arrive() -> void:
 	if GameState.money < cost:
 		GameState.toast.emit("The delivery driver won't unload: the bill is $%d and you can't pay it." % int(ceil(cost)), "bad")
 		GameState.today["delivery_refused"] = true
+		Biz.after_delivery(false, pending.keys())
 		pending = {}
 		pending_cost = 0.0
 		return
@@ -265,7 +266,7 @@ func arrive() -> void:
 	GameState.today["delivery_cost"] = GameState.today.get("delivery_cost", 0.0) + cost
 	var short_ing := ""
 	if randf() < Data.DELIVERY_SHORT:
-		var options: Array = pending.keys().filter(func(i): return pending[i] >= 8)
+		var options: Array = pending.keys().filter(func(i): return pending[i] >= 8 and not Biz.never_short(i))
 		if not options.is_empty():
 			short_ing = options.pick_random()
 	for ing in pending:
@@ -280,6 +281,7 @@ func arrive() -> void:
 		var refund := missing * unit_cost(short_ing)
 		GameState.add_money(refund)
 		GameState.today["delivery_cost"] -= refund
+	Biz.after_delivery(true, pending.keys())
 	pending = {}
 	pending_cost = 0.0
 	van_until = GameState.minute + 8.0

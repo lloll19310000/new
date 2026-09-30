@@ -45,8 +45,18 @@ func _process(delta: float) -> void:
 	var e := evening()
 	if night != null:
 		var c := Color.WHITE.lerp(Color(0.62, 0.62, 0.8), e)
-		if Events.raining and GameState.phase != GameState.Phase.PLANNING:
-			c = c * Color(0.86, 0.88, 0.95)
+		match Town.weather:
+			"rain":
+				c = c * Color(0.86, 0.88, 0.95)
+			"storm":
+				c = c * Color(0.74, 0.76, 0.86)
+				# now and then the sky lights up
+				if fmod(t, 9.0) < 0.12 or fmod(t + 3.3, 13.0) < 0.08:
+					c = Color(1.25, 1.25, 1.35)
+			"snow":
+				c = c * Color(0.95, 0.97, 1.03)
+			"heat":
+				c = c * Color(1.06, 1.0, 0.9)
 		if not Events.powered():
 			c = c * Color(0.62, 0.62, 0.72)
 		night.color = c
@@ -165,11 +175,72 @@ func _draw() -> void:
 		var vx := float(lot.entry_door.x if lot.has_entry() else lot.W / 2)
 		Art.van(self, Vector2((vx + 3.5) * Data.TILE, (Data.SIDEWALK_Y + 1.5) * Data.TILE))
 	draw_staff_bubbles()
-	if Events.raining and (GameState.phase == GameState.Phase.SERVICE or GameState.phase == GameState.Phase.CLEANUP):
-		draw_rain()
+	if GameState.phase != GameState.Phase.REPORT:
+		match Town.weather:
+			"rain", "storm":
+				draw_puddles()
+				draw_rain()
+				if Town.weather == "storm":
+					draw_rain()
+			"snow":
+				draw_snow()
+			"heat":
+				draw_heat()
+	draw_rival()
 
 
 ## Rain streaks over the whole lot.
+## The rival diner's storefront across the street, with its neon.
+func draw_rival() -> void:
+	if not Town.rival_open():
+		return
+	var lot = main.lot
+	var x0 := float(lot.W - 16) * Data.TILE
+	var y0 := float(lot.H - 1) * Data.TILE + 10.0
+	Art.rbox(self, Rect2(Vector2(x0, y0), Vector2(12 * Data.TILE, Data.TILE)), Color("5a4a6a"), Color("3a2e46"), 3, 2)
+	var sign_r := Rect2(Vector2(x0 + 2 * Data.TILE, y0 + 4), Vector2(8 * Data.TILE, Data.TILE - 12))
+	Art.rbox(self, sign_r, Color("22202a"), Color("b58be0"), 4, 2)
+	var glow := 0.75 + 0.25 * sin(t * 3.0)
+	draw_string(Art.font(), sign_r.position + Vector2(0, sign_r.size.y * 0.72), Town.rival["name"].to_upper(), HORIZONTAL_ALIGNMENT_CENTER, sign_r.size.x, 14, Color(0.95, 0.55, 1.0, glow))
+
+
+## Snow drifting down, settled on the grass and the sidewalk.
+func draw_snow() -> void:
+	var lot = main.lot
+	var w := float(lot.W * Data.TILE)
+	var h := float(lot.H * Data.TILE)
+	for y in lot.H:
+		for x in lot.W:
+			var c := Vector2i(x, y)
+			if lot.floor_at(c) == Data.FLOOR_NONE and not lot.is_street(c):
+				draw_rect(Rect2(Vector2(c) * Data.TILE, Vector2(Data.TILE, Data.TILE)), Color(1, 1, 1, 0.55 if (x * 7 + y * 3) % 5 != 0 else 0.4))
+	for i in 140:
+		var x := fmod(i * 97.13 + sin(t * 0.8 + i) * 18.0 + t * 8.0, w)
+		var y := fmod(i * 53.71 + t * 38.0 + i * 13.0, h)
+		draw_circle(Vector2(x, y), 1.4 + (i % 3) * 0.5, Color(1, 1, 1, 0.85))
+
+
+## Puddles on the sidewalk and the street while it rains.
+func draw_puddles() -> void:
+	var lot = main.lot
+	for i in 14:
+		var x := float((i * 7 + 3) % lot.W) + 0.3
+		var y := float(Data.SIDEWALK_Y - 1 + (i % 3))
+		Art.ellipse(self, Vector2(x, y + 0.5) * Data.TILE, Vector2(18 + (i % 4) * 5, 6 + (i % 2) * 2), Color(0.55, 0.65, 0.8, 0.35))
+		var ring := fmod(t * 0.7 + i * 0.37, 1.0)
+		draw_arc(Vector2(x + 0.2, y + 0.45) * Data.TILE, 2.0 + ring * 8.0, 0, TAU, 12, Color(0.85, 0.9, 1.0, 0.5 * (1.0 - ring)), 1.0)
+
+
+## A heatwave: a faint shimmer over the street.
+func draw_heat() -> void:
+	var lot = main.lot
+	var y0 := float(Data.SIDEWALK_Y) * Data.TILE
+	for i in 30:
+		var x := fmod(i * 131.7 + t * 12.0, float(lot.W * Data.TILE))
+		var yy := y0 + fmod(i * 17.3, 2.5 * Data.TILE)
+		draw_line(Vector2(x, yy), Vector2(x + 14.0, yy + sin(t * 3.0 + i) * 2.0), Color(1, 0.95, 0.8, 0.18), 2.0)
+
+
 func draw_rain() -> void:
 	var w := float(main.lot.W * Data.TILE)
 	var h := float(main.lot.H * Data.TILE)

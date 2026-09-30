@@ -67,6 +67,7 @@ var restroom_in := -1.0    # minutes until one of them goes to the restroom, or 
 var saw_mouse := false
 var refill_in := -1.0      # minutes until they'd like a coffee top-up, or -1
 var table2 = null          # a second table pushed together for a big party
+var combo_saving := 0.0    # what their combos take off the bill
 var wait_spots: Array = [] # cells they're waiting on (a bench, a waiting chair, the line)
 var wait_seated := false   # someone in the group got a seat to wait on
 var wants_refill := false
@@ -445,19 +446,26 @@ func makeable(d: String) -> bool:
 func pick(options: Array) -> String:
 	var likes: Array = info()["likes"]
 	var breakfast := GameState.minute < 10.5 * 60.0
-	var bag: Array = []
+	var weights: Array = []
+	var total := 0.0
 	for d in options:
-		bag.append(d)
+		var w := 1.0
 		if d in likes:
-			bag.append(d)
-			bag.append(d)
+			w += 2.0
 		if breakfast and d in Data.BREAKFAST_LIKES:
-			bag.append(d)
-			bag.append(d)
+			w += 2.0
 		if d == GameState.special:
-			for i in Data.SPECIAL_PICKS - 1:
-				bag.append(d)
-	return bag.pick_random()
+			w += Data.SPECIAL_PICKS - 1
+		# the season, the holiday and the weather change what people fancy
+		w *= Town.dish_mult(d)
+		weights.append(w)
+		total += w
+	var r := randf() * total
+	for i in options.size():
+		r -= weights[i]
+		if r <= 0.0:
+			return options[i]
+	return options[-1]
 
 
 ## Called when a server finishes taking the order (server is null for app
@@ -504,9 +512,31 @@ func place_order(server = null) -> void:
 						continue
 					d = pick(alt)
 				mine.append(d)
+		# a combo: someone having the burger makes it the Classic
+		for cb in Data.COMBOS:
+			if not GameState.combos.get(cb["key"], false) or not cb["dishes"][0] in mine or randf() >= Data.COMBO_TAKE:
+				continue
+			if not cb["dishes"].all(func(d): return makeable(d) and safe.call(d)):
+				continue
+			var cost := 0.0
+			for d in cb["dishes"]:
+				cost += GameState.price(d)
+				if not d in mine:
+					mine.append(d)
+			combo_saving += cost * Data.COMBO_DISCOUNT
+			GameState.today["combos"] = GameState.today.get("combos", 0) + 1
+			break
 		if i == 0 and allergy != "":
 			allergic_items = mine.duplicate()
 		order.append_array(mine)
+	# a good server suggests a little something extra
+	if server != null and not app and randf() < server.upsell_chance():
+		var extra: Array = Data.UPSELL_DISHES.filter(func(d): return makeable(d) and not d in order)
+		if not extra.is_empty():
+			order.append(extra.pick_random())
+			GameState.today["upsells"] = GameState.today.get("upsells", 0) + 1
+			server.upsells_today += 1
+			review_bonus += 0.05
 	if sold_out_hits > 0:
 		extra_hits["their first choice was sold out"] = minf(0.5, Data.SOLD_OUT_REVIEW * sold_out_hits)
 	if order.is_empty():
@@ -758,14 +788,20 @@ func pay(on_table: bool = false) -> float:
 	var score: float = result[0]
 	if score >= 4.75:
 		Crew.teamwork(cooked_by, served_by)
-	var charged := 0.0 if comped else bill
-	var tip: float = bill * tip_rate(score) * info()["tip"] * (1.0 + Data.REFILL_TIP * refills)
+	var charged := 0.0 if comped else maxf(0.0, bill - combo_saving)
+	if regular != null and Town.loyalty_cards:
+		charged *= 1.0 - Data.LOYALTY_CARD_COST   # their loyalty card stamp
+	var tip: float = bill * tip_rate(score) * info()["tip"] * (1.0 + Data.REFILL_TIP * refills) * Town.tip_mult()
 	if regular != null and regular["loyalty"] >= Data.REGULAR_LOYAL:
 		tip *= 1.4
 	if comped:
 		GameState.today["comped"] += bill
 	GameState.today["served"] += members.size()
 	GameState.totals["served"] += members.size()
+	var bh: Dictionary = GameState.today.get("by_hour", {})
+	var hk := str(int(GameState.minute / 60.0))
+	bh[hk] = bh.get(hk, 0) + members.size()
+	GameState.today["by_hour"] = bh
 	if GameState.minute < 11.0 * 60.0:
 		GameState.totals["breakfast_served"] = int(GameState.totals.get("breakfast_served", 0)) + members.size()
 	var at: Vector2 = where()
