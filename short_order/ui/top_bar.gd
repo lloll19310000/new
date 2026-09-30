@@ -7,6 +7,7 @@ signal open_pressed
 signal speed_chosen(speed: int)
 signal help_pressed
 signal menu_pressed
+signal inbox_pressed
 
 const SPEEDS := [0, 1, 2, 4]
 const SOUND_ON := preload("res://ui/icons/sound_on.svg")
@@ -36,6 +37,8 @@ const GRADE_COLORS := {"A": Color("6cc3a0"), "B": Color("f2c14e"), "C": Color("e
 
 var _last_money := 0.0
 var today_label: Label
+var inbox_button: Button
+var unread_badge: Label
 var _clock_t := 0.0
 var _chip_style: StyleBoxFlat
 
@@ -67,6 +70,28 @@ func _ready() -> void:
 	menu_button.custom_minimum_size = help_button.custom_minimum_size
 	menu_button.pressed.connect(menu_pressed.emit)
 	help_button.get_parent().add_child(menu_button)
+	# the message inbox: everything the ticker said, with an unread count
+	inbox_button = Button.new()
+	inbox_button.name = "InboxButton"
+	inbox_button.theme_type_variation = help_button.theme_type_variation
+	inbox_button.icon = UiKit.icon("bell")
+	inbox_button.tooltip_text = "Messages: everything that happened lately"
+	inbox_button.custom_minimum_size = help_button.custom_minimum_size
+	inbox_button.pressed.connect(inbox_pressed.emit)
+	help_button.get_parent().add_child(inbox_button)
+	help_button.get_parent().move_child(inbox_button, help_button.get_index())
+	unread_badge = UiKit.label("", 10, Color("201915"), &"SmallLabel")
+	var bs := StyleBoxFlat.new()
+	bs.bg_color = UiKit.CHERRY
+	bs.set_corner_radius_all(7)
+	bs.content_margin_left = 4
+	bs.content_margin_right = 4
+	unread_badge.add_theme_stylebox_override("normal", bs)
+	unread_badge.add_theme_color_override("font_color", Color.WHITE)
+	unread_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	unread_badge.visible = false
+	inbox_button.add_child(unread_badge)
+	unread_badge.position = Vector2(18, -4)
 	Sfx.settings_changed.connect(func():
 		sound_button.set_pressed_no_signal(not Sfx.sound_on)
 		sound_button.icon = SOUND_OFF if not Sfx.sound_on else SOUND_ON)
@@ -75,7 +100,13 @@ func _ready() -> void:
 	today_label.tooltip_text = "Sales so far today (tips go to the staff)."
 	money.get_parent().add_child(today_label)
 	_last_money = GameState.money
+	get_viewport().size_changed.connect(refresh)
 	refresh()
+
+
+func show_unread(n: int) -> void:
+	unread_badge.visible = n > 0
+	unread_badge.text = str(mini(n, 99))
 
 
 func show_speed(v: int) -> void:
@@ -125,6 +156,7 @@ func refresh() -> void:
 	var lv: Dictionary = GameState.level_info()
 	var wide := get_viewport_rect().size.x >= 1400.0 or GameState.phase != GameState.Phase.PLANNING
 	level.text = lv["name"] if wide else "Level %d" % (GameState.rep_level + 1)
+	$Row/Logo.visible = get_viewport_rect().size.x >= 1400.0
 	var tip := "Reputation: %s (level %d of %d). Customers: +%d%%." % [lv["name"], GameState.rep_level + 1, Data.REP_LEVELS.size(), int(round((lv["mult"] - 1.0) * 100))]
 	if GameState.rep_level + 1 < Data.REP_LEVELS.size():
 		var nxt: Dictionary = Data.REP_LEVELS[GameState.rep_level + 1]

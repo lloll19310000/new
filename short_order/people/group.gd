@@ -259,6 +259,14 @@ func waiting_for() -> Array:
 	return left
 
 
+## Who they were, for the day report: a regular's name, or "A trucker".
+func moment_who() -> String:
+	if regular != null:
+		return regular["name"]
+	var n: String = Data.CUSTOMERS[kind]["name"]
+	return "Some locals" if kind == "regular" else n
+
+
 ## "Table 3", "Takeout", "App order", for tickets and the log.
 func label() -> String:
 	if app:
@@ -1023,6 +1031,8 @@ func leave(score: float, complaint: String, paid: bool) -> void:
 		GameState.add_review(score, complaint, weight)
 		var p: Vector2 = members[0].position if not members.is_empty() else Vector2.ZERO
 		lot.fx.stars(p, score)
+		var dishes: Array = received.map(func(d): return Data.DISHES[d]["name"].to_lower())
+		GameState.note_moment(score, moment_who(), complaint if score < 3.5 and complaint != "" else Crew.and_list(dishes.slice(0, 3)))
 		if kind == "celebrity":
 			Events.celebrity_review(score)
 		if kind == "critic":
@@ -1043,6 +1053,8 @@ func leave(score: float, complaint: String, paid: bool) -> void:
 		Front.after_visit(regular, 1.5, served_by)
 	if not paid:
 		GameState.today["left"] += members.size()
+		if kind != "inspector":
+			GameState.note_moment(0.0, moment_who(), complaint if complaint != "" else "waiting too long", true)
 	if booking != null:
 		Front.release(booking)
 	if table != null:

@@ -65,17 +65,16 @@ layout_mode = 1
 [node name="Toasts" type="VBoxContainer" parent="Root"]
 unique_name_in_owner = true
 layout_mode = 1
-anchors_preset = 2
-anchor_top = 1.0
-anchor_bottom = 1.0
-offset_left = 10.0
-offset_top = -86.0
-offset_right = 350.0
-offset_bottom = -76.0
-grow_vertical = 0
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -190.0
+offset_top = 64.0
+offset_right = 190.0
+offset_bottom = 74.0
+grow_horizontal = 2
 mouse_filter = 2
-theme_override_constants/separation = 6
-alignment = 2
+theme_override_constants/separation = 4
 script = ExtResource("8_toasts")
 
 [node name="Report" parent="Root" instance=ExtResource("9_report")]

@@ -1,6 +1,7 @@
 extends Control
 ## The main menu: continue your latest diner, start a new one (and name it),
-## load any saved diner, change the settings, or quit.
+## load any saved diner, change the settings, or quit. The front page looks
+## like a laminated diner menu, with your saved diners as today's specials.
 
 signal continue_pressed
 signal resume_pressed
@@ -19,6 +20,13 @@ var load_button: Button
 var settings_button: Button
 var start_button: Button
 var resume_button: Button
+var specials: VBoxContainer
+var _dark_style: StyleBox
+var _paper_style: StyleBoxFlat
+
+const PAPER := Color("f4ecd8")
+const MENU_INK := Color("3a2e26")
+const MENU_RED := Color("c8372d")
 
 @onready var logo: Label = %Logo
 @onready var card: PanelContainer = $Center/Box/Card
@@ -46,6 +54,7 @@ func _ready() -> void:
 	buttons.add_child(resume_button)
 	buttons.move_child(resume_button, continue_button.get_index())
 	pages["menu"] = buttons
+	_dress_menu()
 	pages["new"] = _new_page()
 	pages["load"] = _load_page()
 	pages["settings"] = _settings_page()
@@ -65,6 +74,128 @@ func _ready() -> void:
 		show_page("settings"))
 	quit_button.pressed.connect(Sfx.quit_game)
 	show_page("menu")
+
+
+## The front page as a printed menu: cream paper, a red rim, a checked
+## strip top and bottom, a laminate shine, and the buttons as menu items.
+func _dress_menu() -> void:
+	_dark_style = card.get_theme_stylebox("panel")
+	_paper_style = StyleBoxFlat.new()
+	_paper_style.bg_color = PAPER
+	_paper_style.border_color = MENU_RED
+	_paper_style.set_border_width_all(5)
+	_paper_style.set_corner_radius_all(16)
+	_paper_style.content_margin_left = 30
+	_paper_style.content_margin_right = 30
+	_paper_style.content_margin_top = 34
+	_paper_style.content_margin_bottom = 30
+	_paper_style.shadow_color = Color(0, 0, 0, 0.5)
+	_paper_style.shadow_size = 14
+	_paper_style.shadow_offset = Vector2(0, 6)
+	card.draw.connect(_draw_paper)
+	buttons.add_theme_constant_override("separation", 2)
+	$Center/Box/Footer.visible = false
+	intro.add_theme_color_override("font_color", MENU_INK.lightened(0.15))
+	var head := UiKit.label("~ Menu ~", 20, MENU_RED, &"HeaderLabel")
+	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	buttons.add_child(head)
+	buttons.move_child(head, 0)
+	for b in [resume_button, continue_button, new_button, load_button, settings_button, quit_button]:
+		_menu_item(b)
+	# saved diners, as the specials board
+	specials = VBoxContainer.new()
+	specials.add_theme_constant_override("separation", 2)
+	buttons.add_child(specials)
+	buttons.move_child(specials, quit_button.get_index())
+
+
+func _draw_paper() -> void:
+	if card.get_theme_stylebox("panel") != _paper_style:
+		return
+	var w := card.size.x
+	var h := card.size.y
+	# checked strips
+	var sq := 9.0
+	for row in [[12.0], [h - 12.0 - sq * 2.0]]:
+		var y: float = row[0]
+		var n := int((w - 40.0) / sq)
+		var x0 := (w - n * sq) / 2.0
+		for i in n:
+			for j in 2:
+				if (i + j) % 2 == 0:
+					card.draw_rect(Rect2(x0 + i * sq, y + j * sq, sq, sq), MENU_RED.lerp(PAPER, 0.15))
+	# a laminate shine across the corner
+	var pts := PackedVector2Array([Vector2(w * 0.55, 5), Vector2(w * 0.78, 5), Vector2(w * 0.35, h - 5), Vector2(w * 0.12, h - 5)])
+	card.draw_colored_polygon(pts, Color(1, 1, 1, 0.12))
+
+
+## A menu line: dark ink, dotted leader to a "price" on the right.
+func _menu_item(b: Button, price: String = "") -> void:
+	b.theme_type_variation = &"FlatButton"
+	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	b.add_theme_font_size_override("font_size", 17)
+	for k in ["font_color", "icon_normal_color"]:
+		b.add_theme_color_override(k, MENU_INK)
+	for k in ["font_hover_color", "font_pressed_color", "font_focus_color", "icon_hover_color", "icon_pressed_color", "icon_focus_color"]:
+		b.add_theme_color_override(k, MENU_RED)
+	b.add_theme_color_override("font_disabled_color", Color(MENU_INK, 0.35))
+	b.add_theme_color_override("icon_disabled_color", Color(MENU_INK, 0.35))
+	var hover := StyleBoxFlat.new()
+	hover.bg_color = Color(MENU_RED, 0.08)
+	hover.set_corner_radius_all(6)
+	hover.content_margin_left = 8
+	hover.content_margin_right = 8
+	hover.content_margin_top = 4
+	hover.content_margin_bottom = 4
+	var plain := hover.duplicate()
+	plain.bg_color = Color(0, 0, 0, 0)
+	b.add_theme_stylebox_override("normal", plain)
+	b.add_theme_stylebox_override("hover", hover)
+	b.add_theme_stylebox_override("pressed", hover)
+	b.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	b.add_theme_stylebox_override("disabled", plain)
+	b.set_meta("price", price)
+	if not b.draw.is_connected(_draw_leader.bind(b)):
+		b.draw.connect(_draw_leader.bind(b))
+
+
+func _draw_leader(b: Button) -> void:
+	var price: String = b.get_meta("price", "")
+	if price == "":
+		return
+	var font := b.get_theme_font("font")
+	var fs := 15
+	var tw := font.get_string_size(b.text, HORIZONTAL_ALIGNMENT_LEFT, -1, b.get_theme_font_size("font_size")).x
+	var pw := font.get_string_size(price, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+	var y := b.size.y / 2.0
+	var x0 := 8.0 + (26.0 if b.icon != null else 0.0) + tw + 8.0
+	var x1 := b.size.x - 8.0 - pw - 6.0
+	var x := x0
+	while x < x1:
+		b.draw_circle(Vector2(x, y + 5.0), 1.2, Color(MENU_INK, 0.45))
+		x += 6.0
+	b.draw_string(font, Vector2(b.size.x - 8.0 - pw, y + 6.0), price, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, MENU_RED if not b.disabled else Color(MENU_INK, 0.35))
+
+
+func _fill_specials() -> void:
+	for c in specials.get_children():
+		c.queue_free()
+	if saves.is_empty():
+		return
+	var head := UiKit.label("Today's specials: your diners", 13, MENU_RED, &"StatLabel")
+	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	specials.add_child(head)
+	for sv in saves.slice(0, 3 if get_viewport_rect().size.y >= 820.0 else 2):
+		var b := Button.new()
+		b.text = str(sv["name"])
+		b.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		b.custom_minimum_size = Vector2(360, 0)
+		b.tooltip_text = "Day %d · $%s · %d staff. Click to open it." % [sv["day"], UiKit.thousands(int(sv["money"])), sv["staff"]]
+		_menu_item(b, "Day %d  %s" % [sv["day"], "★".repeat(clampi(int(round(sv["rating"])), 1, 5))])
+		b.add_theme_font_size_override("font_size", 15)
+		var sl: String = sv["slot"]
+		b.pressed.connect(func(): load_requested.emit(sl))
+		specials.add_child(b)
 
 
 func _button(text: String, icon_name: String) -> Button:
@@ -148,6 +279,9 @@ func _settings_page() -> VBoxContainer:
 func show_page(key: String) -> void:
 	for k in pages:
 		pages[k].visible = k == key
+	if _paper_style != null:
+		card.add_theme_stylebox_override("panel", _paper_style if key == "menu" else _dark_style)
+		card.queue_redraw()
 
 
 ## Shows the menu. saves: from main.list_saves(), newest first. playing: the
@@ -161,10 +295,12 @@ func open(saves_: Array, playing: String = "") -> void:
 	resume_button.text = "Back to %s" % playing
 	continue_button.visible = has_save and playing == ""
 	if has_save:
-		continue_button.text = "Continue: %s, day %d" % [saves[0]["name"], saves[0]["day"]]
+		continue_button.text = "Continue %s" % saves[0]["name"]
+		continue_button.set_meta("price", "Day %d" % saves[0]["day"])
 	load_button.disabled = not has_save
-	new_button.theme_type_variation = &"Button" if has_save else &"PrimaryButton"
 	save_list.fill(saves, "load")
+	_fill_specials()
+	resume_button.set_meta("price", "Day %d" % GameState.day)
 	show_page("menu")
 	visible = true
 	var tw := create_tween()

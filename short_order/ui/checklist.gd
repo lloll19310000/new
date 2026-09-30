@@ -1,9 +1,11 @@
 extends PanelContainer
 ## "Before you open": what's still missing before you can open the doors.
-## Shown in the morning only. Click the arrow to fold it away.
+## Shown in the morning only. After the first day it starts folded into a
+## small pill ("6 of 8 ready"); click it to open the full list.
 
 var main
 var collapsed := false
+var _last_day := -1
 
 @onready var count: Label = %Count
 @onready var bar: ProgressBar = %Bar
@@ -13,15 +15,27 @@ var collapsed := false
 
 
 func _ready() -> void:
-	fold.pressed.connect(func():
-		collapsed = not collapsed
-		refresh())
+	fold.pressed.connect(toggle)
+	mouse_filter = Control.MOUSE_FILTER_STOP
+	gui_input.connect(func(e: InputEvent):
+		if collapsed and e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
+			toggle()
+			accept_event())
+
+
+func toggle() -> void:
+	collapsed = not collapsed
+	refresh()
 
 
 func refresh() -> void:
 	if main == null:
 		return
 	visible = GameState.phase == GameState.Phase.PLANNING
+	if GameState.day != _last_day:
+		# a new morning: the full list on day one, a pill after that
+		_last_day = GameState.day
+		collapsed = GameState.day > 1
 	var list: Array = main.lot.checklist()
 	var done := 0
 	var needed := 0
@@ -34,6 +48,15 @@ func refresh() -> void:
 	count.text = "%d of %d" % [done, needed]
 	bar.value = 100.0 * done / needed
 	fold.icon = UiKit.icon("chevron_right" if collapsed else "chevron_left")
+	var title: Label = $Box/Header/Title
+	title.text = ("Ready to open" if done == needed else "Before you open") if not collapsed else ("All %d ready" % needed if done == needed else "%d of %d ready" % [done, needed])
+	title.theme_type_variation = &"StatLabel" if collapsed else &"HeaderLabel"
+	count.visible = not collapsed
+	custom_minimum_size.x = 170.0 if collapsed else 300.0
+	size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	tooltip_text = "Click to see what's left to do before you open." if collapsed else ""
+	fold.tooltip_text = "Show the list" if collapsed else "Fold the list into a pill"
+	($Box/Header/Icon as TextureRect).self_modulate = UiKit.MINT if done == needed else UiKit.GOLD
 	for c in items.get_children():
 		c.queue_free()
 	items.visible = not collapsed

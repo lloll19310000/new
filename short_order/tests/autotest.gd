@@ -2171,6 +2171,18 @@ static func run_ui(main, args: PackedStringArray) -> void:
 	hud.report.next_button.pressed.emit()
 	await tree.process_frame
 	check(GameState.day == 2 and FileAccess.file_exists(main.SAVE_PATH), "next day starts and the game saved")
+	check(hud.checklist.collapsed and hud.checklist.size.x < 200.0, "on day 2 the checklist starts as a small pill (%s)" % hud.checklist.size)
+	hud.checklist.toggle()
+	await tree.process_frame
+	check(not hud.checklist.collapsed and hud.checklist.items.visible, "clicking the pill opens the list")
+	hud.checklist.toggle()
+	check(hud.toasts.history.size() > 3 and hud.top_bar.unread_badge.visible, "messages are kept, with an unread count on the bell (%d)" % hud.toasts.history.size())
+	hud.top_bar.inbox_button.pressed.emit()
+	await tree.process_frame
+	check(hud.inbox.visible and hud.inbox.list.get_child_count() > 3 and not hud.top_bar.unread_badge.visible, "the bell opens the message inbox and marks it read")
+	await snap(main, "inbox", prefix)
+	await key(main, KEY_ESCAPE)
+	check(not hud.inbox.visible and not hud.game_menu.visible, "Esc closes the inbox")
 	# let someone go (two clicks), then load from the start screen
 	var n_staff := GameState.staff.size()
 	var fire_btn: Button = staff_page.cards.values()[0].fire_button

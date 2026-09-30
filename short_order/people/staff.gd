@@ -89,6 +89,7 @@ var _training := false          # training someone right now (slows them a littl
 var tips_today := 0.0           # tips they take home tonight
 var tips_earned := 0.0          # tips from tables they served (before any sharing)
 var worked_today := false
+var jobs_today := 0              # jobs finished today, for the day's MVP
 var meal_left := 0.0            # minutes of staff meal left
 var meal_seat = null            # the dining chair they eat at, or null
 var ate_today := false
@@ -778,6 +779,7 @@ func run_steps(minutes: float) -> void:
 					return
 	if job != null and steps.is_empty():
 		JobBoard.finish(job)
+		jobs_today += 1
 		job = null
 		reserved = {}
 		status = "Idle"

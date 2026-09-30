@@ -98,7 +98,7 @@ func reset_today() -> void:
 		"staff_meal": 0.0, "sold_out": [], "used": {},
 		"regulars": 0, "bookings": 0, "no_shows": 0, "app_orders": 0, "app_done": 0, "app_fees": 0.0, "app_cancelled": 0, "app_missed": 0,
 		"comped": 0.0, "complaints_raised": 0, "dashes": 0, "dash_lost": 0.0, "paid_at_till": 0,
-		"wrong_orders": 0, "allergies": 0, "cold_plates": 0, "no_plates": 0.0,
+		"wrong_orders": 0, "allergies": 0, "cold_plates": 0, "no_plates": 0.0, "best": {}, "worst": {},
 		"restroom_uses": 0, "dirty_restroom": 0, "trash_runs": 0, "handwash_skipped": 0, "mice": 0, "mice_caught": 0, "mouse_seen": 0}
 
 
@@ -364,6 +364,18 @@ func add_review(score: float, complaint: String, weight: int = 1) -> void:
 	if complaint != "":
 		today["complaints"][complaint] = today["complaints"].get(complaint, 0) + 1
 	rating_changed.emit(rating)
+
+
+## The day report's snapshots: the happiest and the unhappiest table today.
+## who: "A trucker", "Priya"; what: the dishes or the complaint.
+func note_moment(score: float, who: String, what: String, left: bool = false) -> void:
+	var b: Dictionary = today.get("best", {})
+	if not left and (b.is_empty() or score > b["score"]):
+		today["best"] = {"score": score, "who": who, "what": what, "at": clock_text()}
+	var w: Dictionary = today.get("worst", {})
+	var ws := 0.5 if left else score
+	if (left or score < 3.5) and (w.is_empty() or ws < w["score"]):
+		today["worst"] = {"score": ws, "who": who, "what": what, "at": clock_text(), "left": left}
 
 
 ## How many groups arrive per hour right now: rating, rush hour and health grade.

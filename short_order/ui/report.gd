@@ -46,12 +46,20 @@ const ADVICE := {
 @onready var next_button: Button = %NextButton
 var numbers_row: HBoxContainer
 var number_labels := {}
+var receipt: PanelContainer
+var polaroids: Array = []
+var tip_box: PanelContainer
+var tip_label: Label
+
+const RECEIPT_INK := Color("3a2e26")
+const RECEIPT_COLORS := {"mint": Color("2f7d55"), "cherry": Color("b23a2e"), "gold": Color("8a6410")}
 
 
 func _ready() -> void:
 	next_button.pressed.connect(func():
 		visible = false
 		next_pressed.emit())
+	_build_receipt()
 	# the three numbers owners watch, under the columns
 	numbers_row = HBoxContainer.new()
 	numbers_row.add_theme_constant_override("separation", 10)
@@ -79,18 +87,126 @@ func _ready() -> void:
 		number_labels[k] = [big, small, chip]
 
 
+## The customers and money columns become one paper receipt on the left;
+## the right side holds the day's snapshots and one tip for tomorrow.
+func _build_receipt() -> void:
+	var left: VBoxContainer = customers.get_parent()
+	var right: VBoxContainer = money.get_parent()
+	receipt = PanelContainer.new()
+	var st := StyleBoxFlat.new()
+	st.bg_color = Color("f4ecd8")
+	st.set_corner_radius_all(2)
+	st.content_margin_left = 14
+	st.content_margin_right = 14
+	st.content_margin_top = 10
+	st.content_margin_bottom = 12
+	st.shadow_color = Color(0, 0, 0, 0.35)
+	st.shadow_size = 4
+	st.shadow_offset = Vector2(2, 3)
+	receipt.add_theme_stylebox_override("panel", st)
+	receipt.custom_minimum_size = Vector2(300, 0)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 2)
+	receipt.add_child(box)
+	var head := UiKit.label(GameState.diner_name.to_upper() if GameState.diner_name != "" else "YOUR DINER", 13, RECEIPT_INK, &"StatLabel")
+	head.name = "ReceiptHead"
+	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(head)
+	for c in left.get_children():
+		if c != customers:
+			c.visible = false
+	for c in right.get_children():
+		if c != money:
+			c.visible = false
+	customers.reparent(box)
+	box.add_child(_dashes())
+	money.reparent(box)
+	for g in [customers, money]:
+		g.add_theme_constant_override("v_separation", 0)
+		g.add_theme_constant_override("h_separation", 16)
+	left.add_child(receipt)
+	left.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	# the snapshots
+	var snaps := HBoxContainer.new()
+	snaps.add_theme_constant_override("separation", 4)
+	right.add_child(snaps)
+	for k in ["best", "worst", "mvp"]:
+		var p := Polaroid.new()
+		p.name = "Polaroid_" + k
+		snaps.add_child(p)
+		polaroids.append(p)
+	tip_box = PanelContainer.new()
+	tip_box.theme_type_variation = &"Well"
+	var th := HBoxContainer.new()
+	th.add_theme_constant_override("separation", 8)
+	tip_box.add_child(th)
+	var ic := UiKit.icon_rect("sparkle", 20, UiKit.GOLD)
+	ic.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	th.add_child(ic)
+	tip_label = UiKit.label("", 13, UiKit.INK, &"BodyLabel")
+	tip_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	tip_label.custom_minimum_size = Vector2(340, 0)
+	tip_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	th.add_child(tip_label)
+	right.add_child(tip_box)
+
+
+func _dashes() -> Control:
+	var l := UiKit.label("- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -", 11, Color("a89b88"), &"SmallLabel")
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.clip_text = true
+	l.custom_minimum_size = Vector2(10, 0)
+	return l
+
+
 func row(grid: GridContainer, what: String, value: String, color: Color = UiKit.INK, bold: bool = false) -> void:
 	var a := Label.new()
 	a.text = what
 	a.theme_type_variation = &"BodyLabel" if not bold else &"StatLabel"
 	a.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	a.add_theme_color_override("font_color", RECEIPT_INK)
+	a.add_theme_font_size_override("font_size", 13)
 	grid.add_child(a)
 	var b := Label.new()
 	b.text = value
 	b.theme_type_variation = &"StatLabel"
 	b.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	b.add_theme_color_override("font_color", color)
+	var ink := RECEIPT_INK
+	if color == UiKit.MINT:
+		ink = RECEIPT_COLORS["mint"]
+	elif color == UiKit.CHERRY:
+		ink = RECEIPT_COLORS["cherry"]
+	elif color == UiKit.GOLD:
+		ink = RECEIPT_COLORS["gold"]
+	b.add_theme_color_override("font_color", ink)
+	b.add_theme_font_size_override("font_size", 13)
 	grid.add_child(b)
+
+
+## One clear thing to try tomorrow: the day's biggest problem, or a nudge.
+static func tomorrow_tip(r: Dictionary) -> String:
+	var c: String = r.get("complaint", "")
+	if c != "" and ADVICE.has(c):
+		return "Customers mostly minded %s. %s" % [c[0].to_lower() + c.substr(1), ADVICE[c]]
+	var outs: Array = r.get("sold_out", [])
+	if not outs.is_empty():
+		return "You sold out of %s. Order more of what it needs in Supplies." % Data.DISHES[outs[0]]["name"].to_lower()
+	var kt: Dictionary = r.get("kitchen", {})
+	if kt.get("no_plates", 0) >= 5:
+		return "The kitchen waited on clean plates. Put someone on Wash, or buy more plates."
+	if kt.get("cold_plates", 0) >= 3:
+		return "Food sat on the pass and went cold. More people on Serve would get it out hot."
+	if r.get("left", 0) > 0 and r.get("served", 0) > 0 and float(r["left"]) / r["served"] > 0.2:
+		return "Lots of people walked out. More tables, or more hands on Serve and Host, keeps the line moving."
+	var nums: Dictionary = r.get("numbers", {})
+	if not nums.is_empty() and r.get("revenue", 0.0) > 0.0:
+		if nums["staff"] > Data.TARGET_STAFF_COST + 0.15:
+			return "Wages were %d%% of sales. Fewer people on quiet shifts, or more tables to sell more, would help." % int(nums["staff"] * 100)
+		if nums["food"] > Data.TARGET_FOOD_COST + 0.08:
+			return "Food cost %d%% of sales. Nudge prices up a little or cut dishes that barely make money." % int(nums["food"] * 100)
+	if r.get("rating", 0.0) >= 4.3:
+		return "A great day. Try a daily special, or a new dish, to keep people curious."
+	return "Decor near tables, a greeter at the door and fast food all lift the stars."
 
 
 func show_report(r: Dictionary) -> void:
@@ -98,6 +214,11 @@ func show_report(r: Dictionary) -> void:
 		for c in g.get_children():
 			c.queue_free()
 	title.text = "Day %d is over" % r["day"]
+	(receipt.get_child(0).get_node("ReceiptHead") as Label).text = ("%s · DAY %d" % [GameState.diner_name.to_upper(), r["day"]]) if GameState.diner_name != "" else "DAY %d" % r["day"]
+	var snaps := [["best", r.get("best", {}), -0.06], ["worst", r.get("worst", {}), 0.045], ["mvp", r.get("mvp", {}), -0.02]]
+	for i in snaps.size():
+		polaroids[i].show_moment(snaps[i][0], snaps[i][1], snaps[i][2])
+	tip_label.text = "Tip for tomorrow: " + tomorrow_tip(r)
 	row(customers, "Groups that came in", str(r["groups"]))
 	row(customers, "Customers served", str(r["served"]), UiKit.MINT)
 	row(customers, "Walked out unhappy", str(r["left"]), UiKit.CHERRY if r["left"] > 0 else UiKit.INK)
@@ -117,6 +238,8 @@ func show_report(r: Dictionary) -> void:
 	if r.get("staff_meal", 0.0) > 0.0:
 		row(money, "Staff meal", "-$%d" % int(r["staff_meal"]), UiKit.CHERRY)
 	var net: float = r["net"]
+	money.add_child(_dashes())
+	money.add_child(Control.new())
 	row(money, "Today", ("+$%d" if net >= 0 else "-$%d") % int(absf(net)), UiKit.MINT if net >= 0 else UiKit.CHERRY, true)
 	row(money, "Cash now", UiKit.money(r["money"]), UiKit.GOLD, true)
 	var nums: Dictionary = r.get("numbers", {})
@@ -247,9 +370,7 @@ func build_notes(r: Dictionary) -> String:
 		t += line("critic", "#b58be0", "A food critic gave you [b]%.1f stars[/b]." % c)
 	if r.get("breakdowns", 0) > 0:
 		t += line("fix", "#e75a4e", "%d breakdown%s in the kitchen." % [r["breakdowns"], "" if r["breakdowns"] == 1 else "s"])
-	if r["complaint"] != "":
-		var advice: String = ADVICE.get(r["complaint"], "")
-		t += line("alert", "#f2c14e", "Most common complaint: [b]%s[/b]. %s" % [r["complaint"], advice])
+	# (the biggest complaint is the tip for tomorrow, up top)
 	if r.get("delivery_refused", false):
 		t += line("supplies", "#e75a4e", "The delivery driver wouldn't unload this morning: you couldn't pay the bill.")
 	if r.get("prepped", 0) > 0:

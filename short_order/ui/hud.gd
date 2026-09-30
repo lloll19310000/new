@@ -18,6 +18,7 @@ var main
 @onready var start = %Start
 @onready var event_card = %EventCard
 var tickets_card
+var inbox
 var game_menu
 var _speed_before_event := 1
 
@@ -54,7 +55,6 @@ func _ready() -> void:
 	top_bar.speed_chosen.connect(set_speed)
 	top_bar.help_pressed.connect(help.toggle)
 	build_menu.tool_chosen.connect(func(t: String): main.build.set_tool(t))
-	build_menu.resized.connect(place_toasts)
 	side_panel.hire_requested.connect(main.hire)
 	side_panel.fire_requested.connect(main.fire)
 	report.next_pressed.connect(main.start_next_day)
@@ -79,8 +79,21 @@ func _ready() -> void:
 		set_speed(maxi(_speed_before_event, 1)))
 	GameState.staff_changed.connect(refresh_checklist)
 	GameState.phase_changed.connect(func(_p): refresh_checklist())
+	# the message inbox, under the bell in the top bar
+	inbox = preload("res://ui/inbox.gd").new()
+	inbox.name = "Inbox"
+	inbox.toasts = toasts
+	toasts.get_parent().add_child(inbox)
+	toasts.get_parent().move_child(inbox, toasts.get_index() + 1)
+	inbox.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	inbox.offset_top = 64.0
+	inbox.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	top_bar.inbox_pressed.connect(inbox.toggle)
+	toasts.history_changed.connect(func():
+		top_bar.show_unread(toasts.unread)
+		if inbox.visible:
+			inbox.refresh())
 	refresh_all()
-	place_toasts.call_deferred()
 
 
 # ------------------------------------------------------------------ called by the game
@@ -144,12 +157,6 @@ func set_speed(v: int) -> void:
 	top_bar.show_speed(v)
 
 
-func place_toasts() -> void:
-	# toasts sit just above the build menu, which grows when a tray opens
-	toasts.offset_bottom = -(build_menu.size.y + 18.0)
-	toasts.offset_top = toasts.offset_bottom - 10.0
-
-
 func _unhandled_key_input(event: InputEvent) -> void:
 	var k := event as InputEventKey
 	if k == null or not k.pressed or k.echo:
@@ -160,6 +167,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			return
 		if game_menu.visible:
 			game_menu.close()
+		elif inbox.visible:
+			inbox.visible = false
 		elif main.build.tool != "select":
 			main.build.set_tool("select")
 		elif main.build.selection != null:

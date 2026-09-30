@@ -549,11 +549,27 @@ func end_day() -> void:
 		"overtime": Shifts.today["overtime"],
 		"level_up": GameState.level_info()["name"] if level_up else "",
 		"breakdowns": t["breakdowns"], "types": t["types"].duplicate(),
+		"best": t["best"].duplicate(), "worst": t["worst"].duplicate(), "mvp": mvp(),
 	}
 	var bills_paid: float = bills.get("rent", 0.0) + bills.get("utilities", 0.0) + bills.get("loan", 0.0)
 	last_report["net"] = t["revenue"] - wages - bills_paid - last_report["supplies"] - t["staff_meal"]
 	GameState.set_phase(GameState.Phase.REPORT)
 	hud.show_report(last_report)
+
+
+## Who did the most today (jobs finished, with a nudge for good cooking and
+## tips): {name, role, jobs, look...} for the day report, or {}.
+func mvp() -> Dictionary:
+	var best = null
+	var best_v := 0.0
+	for s in GameState.staff:
+		var v: float = s.jobs_today + s.tips_today * 0.05
+		if v > best_v:
+			best_v = v
+			best = s
+	if best == null:
+		return {}
+	return {"name": best.person_name, "role": best.role, "jobs": best.jobs_today, "skin": best.skin, "hair": best.hair, "shirt": best.shirt, "look": best.look}
 
 
 func start_next_day() -> void:
@@ -563,6 +579,7 @@ func start_next_day() -> void:
 	Crew.reset_today()
 	for s in GameState.staff:
 		s.energy = 100.0
+		s.jobs_today = 0
 	GameState.roll_candidates()
 	GameState.set_phase(GameState.Phase.PLANNING)
 	GameState.staff_changed.emit()
