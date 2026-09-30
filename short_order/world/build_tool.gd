@@ -5,7 +5,8 @@ extends Node2D
 
 const Art = preload("res://world/art.gd")
 const Furniture = preload("res://world/furniture.gd")
-const DRAG_TOOLS := ["floor_diner", "floor_kitchen", "floor_staff", "floor_restroom", "wall", "remove"]
+const DRAG_TOOLS := ["floor_diner", "floor_kitchen", "floor_staff", "floor_restroom", "wall", "remove", "copy"]
+const UNDO_MAX := 30
 
 signal selected(thing)
 signal tool_changed(tool: String)
@@ -19,6 +20,8 @@ var drag_from := Vector2i(-1, -1)
 var dragging := false
 var mouse_world := Vector2.ZERO
 var selection = null
+var undo_stack: Array = []   # lot snapshots from before each build, this morning
+var blueprint: Dictionary = {}
 
 
 func set_tool(t: String) -> void:
@@ -74,6 +77,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		var k := (event as InputEventKey).keycode
 		if k == KEY_R:
 			rotate_pressed()
+		elif k == KEY_Z and (event as InputEventKey).ctrl_pressed:
+			undo()
+			get_viewport().set_input_as_handled()
 
 
 func rotate_pressed() -> void:
@@ -113,8 +119,29 @@ func rect_between(a: Vector2i, b: Vector2i) -> Rect2i:
 	return Rect2i(p, q - p + Vector2i.ONE)
 
 
+## Remembers the lot before a change, so Ctrl+Z can put it back.
+func remember() -> void:
+	undo_stack.append(lot.snapshot())
+	if undo_stack.size() > UNDO_MAX:
+		undo_stack.pop_front()
+
+
+func undo() -> bool:
+	if undo_stack.is_empty() or not GameState.is_building_allowed():
+		return false
+	lot.restore(undo_stack.pop_back())
+	GameState.toast.emit("Undone.", "")
+	Sfx.play("remove", -6.0)
+	return true
+
+
 func apply_rect(r: Rect2i) -> void:
 	var ok := false
+	if tool == "copy":
+		blueprint = lot.copy_area(r)
+		GameState.toast.emit("Copied a %d by %d area (about $%d to build). Choose Paste and click where it goes." % [r.size.x, r.size.y, lot.blueprint_cost(blueprint)], "good")
+		return
+	remember()
 	match tool:
 		"floor_diner", "floor_kitchen", "floor_staff", "floor_restroom":
 			ok = lot.place_floor(r, Data.BUILD[tool]["floor"])
@@ -140,6 +167,20 @@ func apply_click(c: Vector2i) -> void:
 			lot.queue_redraw()
 		return
 	var ok := false
+	if tool == "paste":
+		if blueprint.is_empty():
+			GameState.toast.emit("Copy an area first: choose Copy and drag a box over it.", "")
+			return
+		remember()
+		var why: String = lot.paste_area(blueprint, c)
+		if why != "":
+			undo_stack.pop_back()
+			GameState.toast.emit(why, "bad")
+			Sfx.play("error", -8.0)
+		else:
+			Sfx.play("place", -4.0)
+		return
+	remember()
 	if tool == "door":
 		if not lot.can_place_door(c):
 			GameState.toast.emit("A door needs an empty tile or a wall.", "bad")
@@ -180,6 +221,13 @@ func cost_preview() -> Array:
 				return ["$%d" % c3, GameState.can_afford(c3)]
 			"remove":
 				return ["Remove", true]
+			"copy":
+				return ["Copy %d by %d" % [r.size.x, r.size.y], true]
+	if tool == "paste":
+		if blueprint.is_empty():
+			return ["Copy an area first", false]
+		var bc: int = lot.blueprint_cost(blueprint)
+		return ["Paste: $%d" % bc, GameState.can_afford(bc)]
 	if tool == "land":
 		var p := GameState.plot_at(hover)
 		if p.is_empty():
@@ -215,6 +263,15 @@ func _draw() -> void:
 				draw_rect(Rect2(Vector2(c) * t, Vector2(t, t)), Color(0.36, 0.3, 0.26, 0.75))
 		draw_rect(Rect2(Vector2(r.position) * t, Vector2(r.size) * t), tint)
 		draw_rect(Rect2(Vector2(r.position) * t, Vector2(r.size) * t), tint.lightened(0.4), false, 2.0)
+	elif tool == "paste" and not blueprint.is_empty():
+		var bs := Vector2(blueprint["size"][0], blueprint["size"][1])
+		draw_rect(Rect2(Vector2(hover) * t, bs * t), tint)
+		for cd in blueprint["cells"]:
+			if cd[3] == 1:
+				draw_rect(Rect2((Vector2(hover) + Vector2(cd[0], cd[1])) * t, Vector2(t, t)), Color(0.36, 0.3, 0.26, 0.6))
+		for fd in blueprint["furn"]:
+			draw_rect(Rect2((Vector2(hover) + Vector2(fd[1], fd[2])) * t, Vector2(t, t)).grow(-4), Color(1, 1, 1, 0.35))
+		draw_rect(Rect2(Vector2(hover) * t, bs * t), tint.lightened(0.4), false, 2.0)
 	elif tool == "land":
 		var p := GameState.plot_at(hover)
 		if not p.is_empty():

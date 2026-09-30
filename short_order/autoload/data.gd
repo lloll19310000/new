@@ -215,6 +215,8 @@ const BUILD := {
 	"wall":          {"name": "Walls",            "cost": 15,  "desc": "Drag a box to wall in a room."},
 	"door":          {"name": "Door",             "cost": 120, "desc": "Click a wall to put a door in it."},
 	"land":          {"name": "Buy land",         "cost": 0,   "desc": "Click a plot marked For sale to buy it. Then you can build there."},
+	"copy":          {"name": "Copy area",        "cost": 0,   "desc": "Drag a box over a room to copy it as a blueprint: floors, walls, doors and furniture. Ctrl+Z undoes your last change this morning."},
+	"paste":         {"name": "Paste",            "cost": 0,   "desc": "Click to build the copied blueprint on empty land you own. It costs what building it piece by piece would."},
 }
 
 ## The land. You start with one plot and can buy the others to grow.
@@ -268,6 +270,8 @@ const FURNITURE := {
 	"chair":    {"name": "Chair",          "size": [1, 1], "cost": 45,  "solid": false, "cat": "dining",  "floor": "diner",   "seat": true, "desc": "Place beside a table. It turns to face the table; press R to turn it yourself."},
 	"booth":    {"name": "Booth seat",     "size": [1, 1], "cost": 110, "solid": false, "cat": "dining",  "floor": "diner",   "seat": true, "desc": "A padded bench with a high back. Put booth seats on both sides of a table for a proper booth: couples and families love one, and like their visit a little more."},
 	"counter":  {"name": "Counter",        "size": [1, 1], "cost": 120, "solid": true,  "cat": "dining",  "floor": "diner",   "seats": 1, "counter": true, "desc": "A stretch of diner counter; line several up and they join. Put a stool beside each: truckers and regulars on their own like sitting at the counter."},
+	"highchair": {"name": "High chair",   "size": [1, 1], "cost": 70,  "solid": false, "cat": "dining",  "floor": "diner",   "desc": "Families with little ones like a high chair nearby: they enjoy their visit more."},
+	"stall":    {"name": "Drive-in stall", "size": [2, 2], "cost": 900, "solid": false, "cat": "structure", "floor": "outside", "min_level": 2, "desc": "A parking bay with a menu board, outside on your lot. Cars pull in and a server skates out to take the order and bring it back (servers skate faster outside). Unlocks at Town favourite."},
 	"bench":    {"name": "Waiting bench",  "size": [2, 1], "cost": 160, "solid": false, "cat": "dining",  "floor": "front",   "wait_seat": true, "desc": "Somewhere to sit while waiting for a table: inside by the door, or out on the sidewalk. People waiting on a seat stay much longer before giving up, and a free seat means fewer walk past."},
 	"wait_chair": {"name": "Waiting chair", "size": [1, 1], "cost": 55, "solid": false, "cat": "dining", "floor": "front", "wait_seat": true, "desc": "A chair by the door for someone waiting for a table."},
 	"stool":    {"name": "Stool",          "size": [1, 1], "cost": 40,  "solid": false, "cat": "dining",  "floor": "diner",   "seat": true, "desc": "A chrome counter stool. Place one beside a counter."},
@@ -291,6 +295,7 @@ const FURNITURE := {
 	"records":  {"name": "Record wall",    "size": [1, 1], "cost": 200, "solid": true,  "cat": "decor",   "floor": "wall",    "beauty": 2, "radius": 5, "desc": "Old vinyl records hung on the wall."},
 	"tin_sign": {"name": "Tin sign",       "size": [1, 1], "cost": 60,  "solid": true,  "cat": "decor",   "floor": "wall",    "beauty": 1, "radius": 4, "desc": "A vintage \"HOT COFFEE\" sign."},
 	"gumball":  {"name": "Gumball machine", "size": [1, 1], "cost": 120, "solid": true, "cat": "decor",   "floor": "diner",   "beauty": 1, "radius": 3, "kids": true, "desc": "Kids love it. So do their parents' quarters."},
+	"radio":    {"name": "Kitchen radio",  "size": [1, 1], "cost": 80,  "solid": true,  "cat": "kitchen", "floor": "kitchen", "desc": "Something on in the background while the cooks work. Click it to pick the station: hits, sports or the news."},
 	"trophy":   {"name": "Trophy shelf",   "size": [1, 1], "cost": 150, "solid": true,  "cat": "decor",   "floor": "wall",    "beauty": 2, "radius": 5, "locked": true, "desc": "Your diner's trophies, on the wall. Customers love it. A reward from the Goals board."},
 	"aquarium": {"name": "Fish tank",      "size": [2, 1], "cost": 600, "solid": true,  "cat": "decor",   "floor": "diner",   "beauty": 3, "radius": 6, "locked": true, "desc": "A bubbling tank of goldfish. Very calming. A reward from the Goals board."},
 	"clock":    {"name": "Chrome clock",   "size": [1, 1], "cost": 120, "solid": true,  "cat": "decor",   "floor": "wall",    "beauty": 2, "radius": 5, "locked": true, "desc": "A classic chrome diner clock. A reward from the Goals board."},
@@ -355,6 +360,44 @@ const FILING_INSPECTION := 0.05
 
 ## Staying on: at the end of a shift, someone stays (up to this many minutes)
 ## if nobody else in their role is here yet, or this many customer jobs wait.
+## Kids: a family with little ones wants crayons soon after sitting down,
+## or a kid gets bored and cries (and the tables nearby hear it).
+const CRAYON_WAIT := 7.0
+const CRYING_HIT := 0.12
+const KIDS_MENU_REVIEW := 0.15
+const KIDS_MENU_PRICE := 0.6        # a kid's portion, of the usual price
+const HIGHCHAIR_REVIEW := 0.1
+## Carhops: cars at drive-in stalls.
+const CARHOP_SHARE := 0.2
+const SKATE_SPEED := 1.3
+## The review wall: some customers write a review; your replies matter.
+const REVIEW_WRITE := 0.45
+const REPLY_FREE_PIE := 7.0
+const REVIEW_TEXTS := {
+	"great": ["Best {dish} in the county, no contest. Staff made us feel like family.", "Five stars. The {dish} was perfect and our server remembered my name.",
+		"Stopped in on a whim and wow. Get the {dish}. Thank me later.", "This is what a diner should be. Warm, quick, and that {dish}!", "Came for the {dish}, stayed for the pie. We'll be back."],
+	"good": ["Solid {dish}, friendly crew. A little busy but worth it.", "Good food, fair prices. The {dish} hit the spot.", "Nice spot. Would come again for the {dish}.",
+		"Pretty good! {complaint_cap} could be better, but the {dish} made up for it."],
+	"meh": ["It was fine. {complaint_cap} let it down.", "The {dish} was okay. Not sure what the fuss is about.", "Mixed feelings. {complaint_cap}, but the staff tried.",
+		"Average diner, average {dish}. {complaint_cap}."],
+	"bad": ["Disappointed. {complaint_cap}. Won't be rushing back.", "One star. {complaint_cap}. The {dish} wasn't worth the wait.", "What happened? {complaint_cap}, and nobody seemed to care.",
+		"Avoid. {complaint_cap}."],
+}
+
+## The jukebox's playlist: who likes it, who doesn't (stars, near the jukebox).
+const PLAYLISTS := {
+	"oldies": {"name": "Oldies", "likes": {"regular": 0.2, "family": 0.1, "celebrity": 0.1, "nightowl": 0.1}, "pitch": 1.0},
+	"rock": {"name": "Rock and roll", "likes": {"student": 0.25, "barcrowd": 0.25, "trucker": 0.1, "family": -0.1}, "pitch": 1.12},
+	"country": {"name": "Country", "likes": {"trucker": 0.3, "regular": 0.1, "student": -0.1, "critic": -0.1}, "pitch": 0.92},
+	"jazz": {"name": "Jazz", "likes": {"critic": 0.25, "nightowl": 0.2, "tourist": 0.1, "trucker": -0.1}, "pitch": 0.84},
+}
+## The kitchen radio's stations: stress a minute for cooks in the kitchen, and a speed nudge.
+const RADIO := {
+	"hits": {"name": "Hits", "stress": -0.12, "speed": 1.0, "desc": "Everyone hums along: a little less stress."},
+	"sports": {"name": "Sports", "stress": -0.05, "grumpy": -0.3, "speed": 1.0, "desc": "The game's on. Grumpy cooks cheer up; the rest don't mind."},
+	"news": {"name": "The news", "stress": 0.03, "speed": 1.04, "desc": "Heads down: cooks work a touch faster, and a touch more wound up."},
+}
+
 ## Waiting for a table: people take a waiting seat if there's one, otherwise
 ## they line up along the sidewalk outside. Seated they wait longer.
 const WAIT_SEAT_PATIENCE := 1.5
@@ -443,10 +486,49 @@ const CATERING_PICKUP := 12 * 60
 const CATERING_CLIENTS := ["the Henderson wedding", "the high school football banquet", "the Rotary Club lunch", "a baby shower at the church hall",
 	"the fire station's open day", "a funeral lunch for old Mr. Pruitt", "the county clerk's retirement party", "the Little League team"]
 const HISTORY_DAYS := 120          # nights kept for the Books
+const SCRAPBOOK_MAX := 80
 ## A sister diner.
 const SECOND_AT_LEVEL := 3          # Destination diner
 const SECOND_COST := 100000.0       # what you move across to get it started
 const SISTER_SHARE := 0.6           # of this diner's weekly profit, as a guess at the other's
+
+## Careers (see Career): each role's ladder, [skill, shifts worked] for each
+## step, and the perks you pick when someone moves up.
+const CAREER_STEPS := [[0, 0], [5, 10], [7, 30], [9, 60]]
+const CAREER_TITLES := {
+	"cook": ["Trainee cook", "Line cook", "Senior line cook", "Sous chef"],
+	"server": ["Trainee server", "Server", "Head server", "Floor captain"],
+	"host": ["Trainee host", "Host", "Senior host", "Front-of-house lead"],
+	"busser": ["Trainee busser", "Busser", "Senior busser", "Floor lead"],
+	"dishwasher": ["Dishwasher", "Dish lead", "Kitchen porter", "Prep cook"],
+	"porter": ["Porter", "Senior porter", "Maintenance lead", "Facilities boss"],
+	"manager": ["Shift manager", "Manager", "General manager", "Owner's right hand"],
+}
+const PROMOTION_RAISE := 1.0
+const PERKS := {
+	"flip_master": {"name": "Flip master", "desc": "Cooks 20% faster.", "roles": ["cook", "dishwasher"]},
+	"batch_prep": {"name": "Batch prep", "desc": "Preps 35% faster in the morning.", "roles": ["cook", "dishwasher"]},
+	"calm_hands": {"name": "Calm hands", "desc": "Half as many mistakes when it's busy or they're stressed.", "roles": ["cook", "server", "busser"]},
+	"upseller": {"name": "Upseller", "desc": "Much likelier to talk a table into a pie or a shake.", "roles": ["server", "host", "manager"]},
+	"memory": {"name": "Memory like a steel trap", "desc": "Hardly ever writes an order down wrong.", "roles": ["server", "host"]},
+	"charmer": {"name": "Charmer", "desc": "10% bigger tips on their tables.", "roles": ["server", "host"]},
+	"quick_feet": {"name": "Quick feet", "desc": "Walks 12% faster.", "roles": ["server", "busser", "porter", "host"]},
+	"sparkle": {"name": "Sparkle", "desc": "Cleans and washes 30% faster.", "roles": ["dishwasher", "busser", "porter"]},
+	"mentor": {"name": "Mentor", "desc": "Trainees learn half as fast again with them.", "roles": ["cook", "server", "manager"]},
+	"peacemaker": {"name": "Peacemaker", "desc": "Talks and check-ins work 30% better.", "roles": ["manager", "host"]},
+}
+## Time off and availability.
+const TIMEOFF_CHANCE := 0.03
+const TIMEOFF_REASONS := ["it's finals week and there's an exam", "their kid's school recital", "a shift at their second job", "their sister's wedding",
+	"a doctor's appointment they can't move", "moving apartments", "their grandmother's 90th birthday", "a band gig out of town", "jury duty"]
+const AVAIL_CHANCE := 0.25          # of new hires who can't work mornings, or nights
+## Benefits (see Career): per person a week, or a share of the weekly payroll.
+const BENEFITS := {
+	"meals": {"name": "Free shift meals", "per_person": 20.0, "desc": "Staff eat free on their meal break: less stress, and applicants like it."},
+	"health": {"name": "Health insurance", "per_person": 45.0, "desc": "Colds pass in half the time, and it takes an extra bad night before someone burns out and quits. Better people apply."},
+	"pto": {"name": "Paid time off", "payroll": 0.03, "desc": "Half as many no-shows, and everyone sleeps a little easier (less stress each night)."},
+	"retire": {"name": "Retirement match", "payroll": 0.03, "desc": "People stay: it takes an extra refused raise or bad night before they quit, and the schedule's fairer on them."},
+}
 
 ## Crew moments (see Moments).
 const YEAR_DAYS := 365
@@ -485,9 +567,9 @@ const MAX_BEAUTY := 4           # beauty above this doesn't help any more
 
 ## The build menu, one list per category, left to right.
 const BUILD_MENU := [
-	{"key": "structure", "name": "Structure", "icon": "structure", "items": ["land", "floor_diner", "floor_kitchen", "wall", "door", "takeout", "dumpster"]},
-	{"key": "dining",    "name": "Dining",    "icon": "dining",    "items": ["table", "table_small", "chair", "booth", "counter", "stool", "bench", "wait_chair", "host", "till"]},
-	{"key": "kitchen",   "name": "Kitchen",   "icon": "kitchen",   "items": ["grill", "fryer", "griddle", "drinks", "oven", "ice", "pass", "prep", "fridge", "freezer", "sink", "bin", "trap"]},
+	{"key": "structure", "name": "Structure", "icon": "structure", "items": ["land", "floor_diner", "floor_kitchen", "wall", "door", "takeout", "stall", "dumpster", "copy", "paste"]},
+	{"key": "dining",    "name": "Dining",    "icon": "dining",    "items": ["table", "table_small", "chair", "booth", "counter", "stool", "bench", "wait_chair", "highchair", "host", "till"]},
+	{"key": "kitchen",   "name": "Kitchen",   "icon": "kitchen",   "items": ["grill", "fryer", "griddle", "drinks", "oven", "ice", "pass", "prep", "fridge", "freezer", "sink", "bin", "trap", "radio"]},
 	{"key": "restroom",  "name": "Restroom",  "icon": "restroom",  "items": ["floor_restroom", "toilet", "handsink"]},
 	{"key": "decor",     "name": "Decor",     "icon": "decor",     "items": ["plant", "flowers", "palm", "lamp", "rug", "wall_art", "tin_sign", "records", "eotm", "neon", "jukebox", "gumball", "clock", "trophy", "aquarium"]},
 	{"key": "staff",     "name": "Staff & office", "icon": "staff_room", "items": ["floor_staff", "sofa", "staff_table", "coffee_maker", "vending", "tv", "lockers", "desk", "filing", "whiteboard"]},
@@ -504,6 +586,7 @@ const CUSTOMERS := {
 	"trucker": {"name": "A trucker",   "weight": 12.0, "size": [1, 1], "hours": [6, 22], "patience": 0.75, "price": 0.6, "tip": 1.6, "likes": ["burger", "meatloaf", "fries", "coffee"], "look": "cap", "order": [1.0, 0.8, 0.8, 0.45]},
 	"barcrowd": {"name": "The bar crowd", "weight": 16.0, "size": [2, 4], "hours": [22, 26], "patience": 0.8, "price": 1.3, "tip": 1.1, "likes": ["fries", "burger", "double", "chili"], "look": "", "order": [1.0, 0.8, 0.5, 0.3]},
 	"nightowl": {"name": "Night owls", "weight": 10.0, "size": [1, 2], "hours": [22, 26], "patience": 1.2, "price": 1.0, "tip": 1.2, "likes": ["coffee", "pie", "pancakes"], "look": "", "order": [0.6, 0.3, 1.0, 0.7]},
+	"carhop":  {"name": "A car at the drive-in", "weight": 0.0, "size": [1, 3], "hours": [11, 22], "patience": 1.0, "price": 1.0, "tip": 1.2, "likes": ["burger", "fries", "milkshake"], "look": "", "order": [1.0, 0.8, 0.9, 0.3]},
 	"party":   {"name": "A big party", "weight": 2.0, "size": [5, 8], "hours": [11, 21], "patience": 1.3, "price": 1.1, "tip": 1.2, "likes": ["burger", "pie", "milkshake"], "look": "", "order": [0.95, 0.6, 0.8, 0.5], "min_seats": 5},
 	"tourist": {"name": "Tourists",    "weight": 10.0, "size": [2, 4], "hours": [9, 20], "patience": 0.9,  "price": 0.7, "tip": 1.3, "likes": ["pancakes", "meatloaf", "pie", "milkshake"], "look": "camera", "order": [0.9, 0.5, 0.8, 0.5], "min_level": 2},
 	"critic":  {"name": "A food critic", "weight": 0.0, "size": [1, 1], "hours": [11, 20], "patience": 0.9, "price": 1.5, "tip": 1.0, "likes": [], "look": "beret", "order": [1.0, 0.5, 1.0, 0.8], "review_weight": 5, "picky": 2.0},

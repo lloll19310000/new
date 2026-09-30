@@ -177,6 +177,28 @@ func plan_schedule(day: int, keep_offs: bool = false) -> void:
 						break
 			targets.erase(pick)
 			s.shift = pick
+	# people who can't work mornings or nights (school, a second job, kids):
+	# swap with someone in the same role who can, or change their shift if
+	# the role's still covered without them
+	if two:
+		for s in team:
+			if s.shift_locked or works_off(s, day) or s.avail == "":
+				continue
+			var bad: Array = ["open", "double"] if s.avail == "no_mornings" else ["close", "double"]
+			if not s.shift in bad:
+				continue
+			var want := "close" if s.avail == "no_mornings" else "open"
+			var mates: Array = team.filter(func(o): return o != s and o.role == s.role and not works_off(o, day))
+			var swap = null
+			for o in mates:
+				if o.shift == want and not o.shift_locked and not o.shift in (["open", "double"] if o.avail == "no_mornings" else (["close", "double"] if o.avail == "no_nights" else [])):
+					swap = o
+					break
+			if swap != null:
+				swap.shift = s.shift
+				s.shift = want
+			elif not s.role in ESSENTIAL or mates.any(func(o): return o.shift in bad):
+				s.shift = want
 	if boss != null and two:
 		_manager_touches(team, day)
 	plan_note = schedule_text(day, boss)
@@ -201,7 +223,7 @@ func off_need(s, managed: bool) -> float:
 
 ## Off on `day`: a scheduled or asked-for day off, or sick.
 func works_off(s, day: int) -> bool:
-	return s.sched_off == day or s.away_day == day or s.sick_days > 0
+	return s.sched_off == day or s.away_day == day or s.sick_days > 0 or s.requested_off.has(day)
 
 
 ## Can the rest of their role cover if they're off? Cooks and servers need
@@ -325,7 +347,7 @@ func morning() -> void:
 		var skip := false
 		var late := 0.0
 		if not no_surprises and GameState.day >= 2:
-			var p_no: float = Data.NO_SHOW_CHANCE + (0.02 if s.mood == "fed_up" else 0.0) + (0.04 if s.burnout_warned else 0.0) + 0.01 * s.warnings
+			var p_no: float = Data.NO_SHOW_CHANCE * (0.5 if Career.has_benefit("pto") else 1.0) + (0.02 if s.mood == "fed_up" else 0.0) + (0.04 if s.burnout_warned else 0.0) + 0.01 * s.warnings
 			skip = randf() < p_no
 			var p_late: float = Data.LATE_CHANCE + (0.06 if s.mood == "fed_up" else 0.0) + (0.05 if s.energy < Data.CLOSED_LATE_ENERGY else 0.0) + (0.03 if s.has_trait("slow") else 0.0)
 			if main != null and main.lot.has_type("whiteboard"):
@@ -665,6 +687,8 @@ func night() -> void:
 			p += minf(0.3, s.exposure / 60.0 * Data.SICK_SPREAD)
 			if randf() < p:
 				s.sick_days = randi_range(Data.SICK_DAYS.x, Data.SICK_DAYS.y)
+				if Career.has_benefit("health"):
+					s.sick_days = maxi(1, s.sick_days / 2)
 		# the day off from a sick call is over
 		if s.sick_at_work:
 			s.sick_at_work = false

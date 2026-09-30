@@ -66,7 +66,8 @@ func nightly_bills() -> Dictionary:
 	GameState.add_money(-(out["rent"] + out["utilities"] + out["loan"]))
 	out["contracts"] = Biz.weekly()
 	out["sister"] = Biz.sister_week()
-	out["benefits"] = Books.benefits_week() if has_method("benefits_week") else 0.0
+	out["benefits"] = Career.benefits_week()
+	GameState.add_money(-out["benefits"])
 	if not loan.is_empty():
 		loan["owed"] -= out["loan"]
 		if loan["owed"] <= 0.5:

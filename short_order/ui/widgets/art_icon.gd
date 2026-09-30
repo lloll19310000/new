@@ -64,6 +64,9 @@ func _draw() -> void:
 					Art.wall_rect(self, rr, false, false, i > 0, i < 2)
 		"dish":
 			Art.dish(self, key, size / 2.0, minf(size.x, size.y) / 16.0)
+		"icon":
+			var d := minf(size.x, size.y) * 0.6
+			draw_texture_rect(UiKit.icon(key), Rect2((size - Vector2(d, d)) / 2.0, Vector2(d, d)), false, UiKit.INK)
 		"land":
 			var c3 := minf(size.x, size.y)
 			draw_rect(Rect2((size - Vector2(c3, c3)) / 2.0, Vector2(c3, c3)), Color("5f9a4a"))

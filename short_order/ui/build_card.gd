@@ -3,7 +3,8 @@ extends Button
 
 signal chosen(key: String)
 
-const ART_KEYS := {"floor_diner": "floor:1", "floor_kitchen": "floor:2", "floor_staff": "floor:3", "floor_restroom": "floor:4", "wall": "wall", "door": "door", "land": "land"}
+const ART_KEYS := {"floor_diner": "floor:1", "floor_kitchen": "floor:2", "floor_staff": "floor:3", "floor_restroom": "floor:4", "wall": "wall", "door": "door", "land": "land",
+	"copy": "icon:inspect", "paste": "icon:plus"}
 const PER_TILE := ["floor_diner", "floor_kitchen", "floor_staff", "floor_restroom", "wall"]
 
 var key := ""
@@ -34,6 +35,8 @@ func apply() -> void:
 	cost_label.text = "$%d%s" % [Data.item_cost(key), "/tile" if key in PER_TILE else ""]
 	if key == "land":
 		cost_label.text = "Plots"
+	elif key in ["copy", "paste"]:
+		cost_label.text = "Blueprint"
 	refresh()
 
 
@@ -43,6 +46,8 @@ func refresh() -> void:
 		disabled = true
 		modulate = Color(1, 1, 1, 0.45)
 		cost_label.text = "Locked"
+		if Data.FURNITURE.has(key) and GameState.rep_level < int(Data.FURNITURE[key].get("min_level", 0)):
+			tooltip_text += "\nLocked: unlocks when your diner is a %s." % Data.REP_LEVELS[int(Data.FURNITURE[key]["min_level"])]["name"]
 		for g in Data.GOALS:
 			if g["reward"].get("decor", "") == key:
 				tooltip_text += "\nLocked: reach the goal \"%s\" (%s) on the Goals board." % [g["name"], g["desc"].to_lower().trim_suffix(".")]

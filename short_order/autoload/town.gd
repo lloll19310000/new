@@ -172,6 +172,7 @@ func rival_nightly() -> void:
 		GameState.toast.emit("%s has closed. Their regulars are coming to you now." % rival["name"], "good")
 		Crew.log_line("%s across the street closed down. You won." % rival["name"], "star")
 		GameState.totals["rival_beaten"] = int(GameState.totals.get("rival_beaten", 0)) + 1
+		Moments.note_scrapbook("rival", "%s closed" % rival["name"], "The diner across the street gave up. You won.")
 		return
 	# now and then they make a move
 	if randf() < Data.RIVAL_MOVE_CHANCE:

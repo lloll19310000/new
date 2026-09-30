@@ -236,6 +236,7 @@ func add(a, b, ev: String, pts: float = INF, cap: float = 0.0) -> float:
 	if is_inf(pts):
 		pts = Data.REL_EVENTS[ev].get("points", 0.0)
 	if pts > 0.0:
+		pts *= Career.team_mult()
 		for t in Data.GOOD_TRAIT_GAIN:
 			if a.has_trait(t):
 				pts *= Data.GOOD_TRAIT_GAIN[t]
@@ -535,6 +536,10 @@ func update_stress(s, rush: float) -> void:
 			parts.append([Data.STRESS_FRIEND, "friends on shift"])
 		if s.is_idle():
 			parts.append([Data.STRESS_IDLE, "quiet moments"])
+	# the kitchen radio, for whoever's working in the kitchen
+	if not s.on_break and main != null and main.lot.has_type("radio") and main.lot.floor_at(s.current_cell()) == Data.FLOOR_KITCHEN:
+		var st: Dictionary = Data.RADIO[GameState.radio]
+		parts.append([st.get("grumpy", st["stress"]) if s.has_trait("grumpy") else st["stress"], "the kitchen radio"])
 	var total := 0.0
 	for p in parts:
 		total += p[0]
@@ -631,7 +636,7 @@ func ask_mediation(a, b) -> bool:
 
 ## The talk: how well it goes depends on the manager's people skills and mood.
 func mediate(m, a, b) -> void:
-	var q: float = clampf(0.5 + 0.05 * m.service, 0.5, 1.0) * (0.7 if m.mood == "okay" else 1.0) * desk_bonus()
+	var q: float = clampf(0.5 + 0.05 * m.service, 0.5, 1.0) * (0.7 if m.mood == "okay" else 1.0) * desk_bonus() * (1.3 if "peacemaker" in m.perks else 1.0)
 	both(a, b, "mediated", Data.MEDIATE_POINTS * q)
 	a.add_stress(-Data.MEDIATE_STRESS * q, "the manager talked it out")
 	b.add_stress(-Data.MEDIATE_STRESS * q, "the manager talked it out")
@@ -670,7 +675,7 @@ func desk_bonus() -> float:
 
 
 func check_in(m, s) -> void:
-	var q: float = clampf(0.5 + 0.05 * m.service, 0.5, 1.0) * desk_bonus()
+	var q: float = clampf(0.5 + 0.05 * m.service, 0.5, 1.0) * desk_bonus() * (1.3 if "peacemaker" in m.perks else 1.0)
 	s.add_stress(-Data.CHECKIN_STRESS * q, "the manager checked in")
 	if s.energy < 60.0 or s.stress >= Data.STRESS_FED_UP:
 		s.break_asked = true
@@ -851,11 +856,12 @@ func set_manager(s, on: bool) -> void:
 ## history fades a little, and daily limits reset.
 func nightly() -> void:
 	for s in team():
-		if s.raise_refused >= Data.RAISE_REFUSALS_QUIT:
+		var extra := 1 if Career.has_benefit("retire") else 0
+		if s.raise_refused >= Data.RAISE_REFUSALS_QUIT + extra:
 			quit(s, "%s left for a better-paying job across town." % s.person_name)
 		elif s.stress >= Data.STRESS_BURNOUT:
 			s.burnout_nights += 1
-			if s.burnout_nights >= Data.BURNOUT_QUIT_NIGHTS:
+			if s.burnout_nights >= Data.BURNOUT_QUIT_NIGHTS + (1 if Career.has_benefit("health") else 0) + extra:
 				quit(s, "%s burned out and quit." % s.person_name)
 				continue
 			s.burnout_warned = true
@@ -868,6 +874,8 @@ func nightly() -> void:
 	var calm: float = Data.MANAGER_NIGHT_CALM if team().any(func(s): return s.manager) else 0.0
 	if calm > 0.0 and main != null and main.lot.has_type("desk"):
 		calm *= Data.DESK_NIGHT_CALM
+	if Career.has_benefit("pto"):
+		calm += 2.0
 	for s in team():
 		s.add_stress(Data.STRESS_NIGHT - calm, "a night's rest")
 	var worked: Array = []

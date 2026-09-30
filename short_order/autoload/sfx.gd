@@ -78,6 +78,8 @@ func play(n: String, db: float = 0.0, pitch_spread: float = 0.06) -> void:
 ## Turns the looping sounds on or off; called by main.gd a few times a second.
 func set_loops(cooking: bool, jukebox: bool) -> void:
 	_set_loop(sizzle, cooking and sound_on)
+	if music != null:
+		music.pitch_scale = float(Data.PLAYLISTS.get(GameState.playlist, {"pitch": 1.0})["pitch"])
 	_set_loop(music, jukebox and sound_on)
 
 

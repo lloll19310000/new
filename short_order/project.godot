@@ -28,6 +28,7 @@ Moments="*res://autoload/moments.gd"
 Goals="*res://autoload/goals.gd"
 Town="*res://autoload/town.gd"
 Biz="*res://autoload/biz.gd"
+Career="*res://autoload/career.gd"
 
 [display]
 

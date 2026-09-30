@@ -103,6 +103,7 @@ func teach_dish(force = null) -> bool:
 		str(who.origin.get("city", "their hometown")), GameState.hometown_name()]
 	Crew.log_line(t, "cook", [who])
 	GameState.toast.emit(t, "crew")
+	note_scrapbook("dish", GameState.hometown_name(), t)
 	who.add_stress(-Data.MILESTONE_STRESS, "taught their hometown dish")
 	for o in GameState.staff:
 		if o != who and o.worked_today and o.role in ["cook", "manager"]:
@@ -131,6 +132,7 @@ func pick_eotm() -> void:
 	var t := "%s is employee of the month (%d jobs in four weeks): their photo goes on the wall, and $%.2f more an hour." % [best.person_name, best_v, Data.EOTM_RAISE]
 	GameState.toast.emit(t, "good")
 	Crew.log_line(t, "star", [best])
+	note_scrapbook("eotm", "Employee of the month: %s" % best.person_name, t)
 	today_lines.append(["star", "#f2c14e", t])
 	var jealous: Array = []
 	for o in GameState.staff:

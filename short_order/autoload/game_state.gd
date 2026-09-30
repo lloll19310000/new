@@ -31,7 +31,13 @@ var rating: float = 3.0
 var menu: Dictionary = {}          # dish -> {"on": bool, "price": float}
 var unlocked: Array = []           # recipes you've unlocked (see Data.RECIPES)
 var combos: Dictionary = {}        # combo key -> on (see Data.COMBOS)
+var kids_menu := false             # smaller, cheaper plates for kids
+var playlist := "oldies"           # the jukebox (see Data.PLAYLISTS)
+var radio := "hits"                # the kitchen radio (see Data.RADIO)
+var review_feed: Array = []        # written reviews, newest last: {"id", "day", "who", "score", "text", "dish", "reply"}
+var reply_mood := 0.0              # how your replies to reviews have gone down lately
 var history: Array = []            # one entry a night: the day's numbers, for the Books
+var scrapbook: Array = []          # pages: {"day", "kind", "title", "text", "img"}
 var hometown: Dictionary = {}      # {"cook", "dish"}: the hometown dish a cook taught you
 var stock: Dictionary = {}         # ingredient -> int
 var target: Dictionary = {}        # ingredient -> int, topped up every night
@@ -73,6 +79,12 @@ func reset() -> void:
 	rating = 3.0
 	menu = {}
 	history = []
+	scrapbook = []
+	kids_menu = false
+	playlist = "oldies"
+	radio = "hits"
+	review_feed = []
+	reply_mood = 0.0
 	combos = {"classic": true}
 	unlocked = []
 	hometown = {}
@@ -225,6 +237,17 @@ func dish_on(dish: String) -> bool:
 	return menu.has(dish) and menu[dish]["on"] and dish_known(dish)
 
 
+## A week's wages, from the last seven nights (or today's plan).
+func weekly_wages() -> float:
+	var last: Array = history.slice(maxi(0, history.size() - 7))
+	if last.is_empty():
+		return wages() * 7.0
+	var t := 0.0
+	for h in last:
+		t += float(h.get("wages", 0.0))
+	return t * 7.0 / last.size()
+
+
 ## About what this diner makes in a week, from the last seven nights.
 func weekly_profit() -> float:
 	var last: Array = history.slice(maxi(0, history.size() - 7))
@@ -234,6 +257,45 @@ func weekly_profit() -> float:
 	for h in last:
 		t += float(h.get("net", 0.0))
 	return t * 7.0 / last.size()
+
+
+## Someone writes a review on the review wall (see the Reviews tab).
+func write_review(who: String, score: float, complaint: String, dish: String) -> void:
+	var bucket := "great" if score >= 4.5 else ("good" if score >= 3.5 else ("meh" if score >= 2.5 else "bad"))
+	var t: String = Data.REVIEW_TEXTS[bucket].pick_random()
+	var c := complaint if complaint != "" else "the wait"
+	t = t.replace("{dish}", Data.DISHES[dish]["name"].to_lower() if Data.DISHES.has(dish) else "food").replace("{complaint_cap}", c[0].to_upper() + c.substr(1))
+	review_feed.append({"id": review_count, "day": day, "who": who, "score": snappedf(score, 0.1), "text": t, "dish": dish, "reply": ""})
+	if review_feed.size() > 60:
+		review_feed = review_feed.slice(review_feed.size() - 60)
+
+
+## Your reply to a review: "thank", "sorry" (and a free pie next time) or "argue".
+func reply_review(id: int, how: String) -> void:
+	for r in review_feed:
+		if int(r["id"]) != id or r["reply"] != "":
+			continue
+		var s: float = r["score"]
+		match how:
+			"thank":
+				reply_mood += 0.6 if s >= 3.5 else -0.4
+				r["reply"] = "Thank you so much! See you soon." if s >= 3.5 else "Thanks for stopping by!"
+			"sorry":
+				if s < 3.5:
+					add_money(-Data.REPLY_FREE_PIE)
+					reply_mood += 1.2
+					add_review(4.3, "")   # they came back for the pie, and liked it
+					r["reply"] = "We're so sorry. Come back and the pie's on us. (They did, and loved it.)"
+				else:
+					reply_mood += 0.2
+					r["reply"] = "Sorry it wasn't perfect! We'll do better."
+			"argue":
+				reply_mood -= 2.0
+				if s < 3.0:
+					add_review(1.5, "the owner argued online")   # someone piles on
+				r["reply"] = "Actually, you're wrong, and here's why..."
+		rating_changed.emit(rating)
+		return
 
 
 ## A combo's price: its dishes together, less the combo discount.
@@ -269,6 +331,8 @@ func unlock_decor(key: String) -> void:
 
 
 func item_unlocked(key: String) -> bool:
+	if Data.FURNITURE.has(key) and rep_level < int(Data.FURNITURE[key].get("min_level", 0)):
+		return false
 	return not (Data.FURNITURE.has(key) and Data.FURNITURE[key].get("locked", false)) or unlocked.has(key)
 
 
@@ -465,6 +529,7 @@ func groups_per_hour() -> float:
 	if day <= Data.NEW_DINER_RAMP.size():
 		base *= Data.NEW_DINER_RAMP[day - 1]
 	base *= level_info()["mult"] * price_demand() * Events.crowd_mult() * seat_demand() * Town.crowd_mult()
+	base *= clampf(1.0 + 0.01 * reply_mood, 0.92, 1.08)   # how you answer reviews online
 	return base * Data.GRADE_EFFECT.get(grade, 1.0)
 
 
@@ -537,6 +602,10 @@ func make_candidate(role: String) -> Dictionary:
 	var sk: Array = ROLE_SKILLS.get(role, ROLE_SKILLS["server"])
 	var cooking := randi_range(sk[0].x, sk[0].y)
 	var service := randi_range(sk[1].x, sk[1].y)
+	# good benefits attract better people
+	if Career.has_benefit("health") or Career.has_benefit("meals"):
+		cooking = mini(10, cooking + (1 if randf() < 0.5 else 0))
+		service = mini(10, service + (1 if randf() < 0.5 else 0))
 	var traits: Array = []
 	var r := randf()
 	var count := 0 if r < 0.35 else (1 if r < 0.85 else 2)

@@ -80,6 +80,10 @@ var meal_missed := false        # worked past the 5th hour without a meal break 
 var rest_breaks := 0            # rest breaks taken today
 var _snacked := false
 var upsells_today := 0
+var rank := 0                    # step on their role's career ladder (see Career)
+var perks: Array = []            # perk keys (see Data.PERKS)
+var requested_off: Array = []    # days off they asked for, and got
+var avail := ""                  # "", "no_mornings" or "no_nights"
 var clock_out := false          # their shift is over: finish up and go home
 var arrive_at := -1.0           # game minute they're due in today
 var came_at := -1.0             # when they actually got here
@@ -151,6 +155,15 @@ func setup(d: Dictionary, lot_ref) -> void:
 	shifts_worked = int(d.get("shifts_worked", 0))
 	jobs_month = int(d.get("jobs_month", 0))
 	eotm_count = int(d.get("eotm_count", 0))
+	rank = int(d.get("rank", 0))
+	perks = []
+	for p in d.get("perks", []):
+		if Data.PERKS.has(str(p)):
+			perks.append(str(p))
+	requested_off = []
+	for x in d.get("requested_off", []):
+		requested_off.append(int(x))
+	avail = str(d.get("avail", ""))
 	if birthday <= 0:
 		birthday = randi_range(1, Data.YEAR_DAYS)
 	caught_days = []
@@ -167,6 +180,8 @@ func setup(d: Dictionary, lot_ref) -> void:
 	is_staff = true
 	customer_nav = false
 	mess = 2.0 if has_trait("clumsy") else (0.5 if has_trait("tidy") else 1.0)
+	if avail == "" and not d.has("avail") and randf() < Data.AVAIL_CHANCE:
+		avail = "no_mornings" if randf() < 0.5 else "no_nights"
 	name = "Staff_" + person_name
 
 
@@ -247,9 +262,19 @@ func set_away(on: bool) -> void:
 
 func work_speed(for_cooking: bool) -> float:
 	var skill := cooking if for_cooking else service
-	var s := (0.75 + skill * 0.05) * energy_factor() * crew_speed * stress_factor()
+	var s := (0.75 + skill * 0.05) * energy_factor() * crew_speed * stress_factor() * Career.speed_bonus()
+	if for_cooking and lot.has_type("radio"):
+		s *= float(Data.RADIO[GameState.radio]["speed"])
 	if has_trait("slow"):
 		s *= 0.85
+	# perks
+	if job != null:
+		if for_cooking and job.kind == "cook" and "flip_master" in perks:
+			s *= 1.2
+		elif job.kind == "prep" and "batch_prep" in perks:
+			s *= 1.35
+		elif job.kind in ["wash", "sweep", "bus", "scrub"] and "sparkle" in perks:
+			s *= 1.3
 	if sick_at_work:
 		s *= Data.SICK_SPEED
 	if _training:
@@ -273,7 +298,10 @@ func tick(dt: float, minutes: float) -> void:
 	if clock_out and job == null:
 		go_home()
 		return
-	speed_mult = (0.85 + service * 0.035) * energy_factor() * crew_speed * stress_factor()
+	speed_mult = (0.85 + service * 0.035) * energy_factor() * crew_speed * stress_factor() * (1.12 if "quick_feet" in perks else 1.0)
+	# carhops skate outside
+	if lot.floor_at(current_cell()) == Data.FLOOR_NONE and lot.has_type("stall"):
+		speed_mult *= Data.SKATE_SPEED
 	if has_trait("speedy"):
 		speed_mult *= 1.2
 	if has_trait("slow"):
@@ -418,7 +446,7 @@ func practice(minutes: float) -> void:
 	# working beside a better trainer: twice the practice, and they get on
 	var tr = Shifts.trainer_near(self)
 	if tr != null and tr.get(skill) >= level + 2:
-		mult *= Data.TRAIN_XP
+		mult *= Data.TRAIN_XP * (1.5 if "mentor" in tr.perks else 1.0)
 		Crew.add(self, tr, "trained", 0.05 * minutes, 3.0)
 	xp[skill] += minutes * mult
 	var need := Data.xp_needed(level)
@@ -469,9 +497,11 @@ func start_break() -> void:
 
 ## How likely they are to talk a table into a pie or a shake.
 func upsell_chance() -> float:
-	var p: float = Data.UPSELL_BASE + Data.UPSELL_PER_SERVICE * service
+	var p: float = Data.UPSELL_BASE + Data.UPSELL_PER_SERVICE * service + Career.upsell_bonus()
 	if has_trait("chatty") or has_trait("friendly"):
 		p += 0.03
+	if "upseller" in perks:
+		p += 0.08
 	return p
 
 
@@ -573,6 +603,8 @@ func timed_break_tick(minutes: float) -> void:
 	if break_left <= 0.0:
 		if break_kind == "meal":
 			add_stress(Data.TABLE_MEAL_STRESS if has_meta("break_table") else Data.TABLE_MEAL_STRESS * 0.5, "a meal break")
+			if Career.has_benefit("meals"):
+				add_stress(-3.0, "a free shift meal")
 			ate_today = true
 		if has_meta("break_table"):
 			remove_meta("break_table")
@@ -782,6 +814,8 @@ func can_take(j) -> bool:
 				((j.furniture.dirty_plates > 0 and not lot.of_type("sink").is_empty()) or j.furniture.cash > 0.0)
 		"collect":
 			return j.furniture != null and lot.furniture.has(j.furniture) and j.furniture.cash > 0.0
+		"crayons":
+			return group_ok(j.group) and not j.group.crayons and j.group.table != null and j.group.state in ["seated", "ordered", "eating"]
 		"refill":
 			# only when the floor's calm: orders, food and checks come first
 			return group_ok(j.group) and j.group.state == "eating" and j.group.wants_refill and j.group.table != null \
@@ -884,6 +918,7 @@ func start_job(j) -> void:
 		"service": plan_service(j)
 		"collect": plan_collect(j)
 		"refill": plan_refill(j)
+		"crayons": plan_crayons(j)
 
 
 func go_step(cells: Array, label: String) -> Dictionary:
@@ -1545,6 +1580,19 @@ func plan_collect(j) -> void:
 		go_step(lot.access_cells(t), "Picking up a check"),
 		work_step(0.25, "Picking up a check", false, t.center_px()),
 		call_step(func(): return Books.collect_table(t, self)),
+	]
+
+
+## Crayons and a paper menu to colour in, for the kids.
+func plan_crayons(j) -> void:
+	var g = j.group
+	steps = [
+		go_step(lot.access_cells(g.table), "Bringing crayons"),
+		work_step(0.15, "Bringing crayons", false, g.table.center_px()),
+		call_step(func():
+			if group_ok(g):
+				g.got_crayons()
+			return true),
 	]
 
 

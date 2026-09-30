@@ -30,6 +30,41 @@ Saves from earlier versions still load: your old save becomes the first diner in
 
 Each diner has its own save and saves itself every morning. The main menu can continue your latest diner, start a new one or load any of them; in the game, **Esc** (or the menu button on the top bar) pauses and opens the menu to save, load, change the settings or go back to the main menu.
 
+### New in version 8: the town and the business
+
+| Feature | What it does |
+| --- | --- |
+| **A smaller interface** | Settings > Interface: Small, Medium (the default) or Large. The side panel is narrower. |
+| **Fixed icons** | The framed picture, neon sign, pass counter and takeout window icons no longer have a floor tile drawn over them. |
+| **Staff who don't vanish** | People off today or due later stay home in the morning instead of walking out when you start; at the end of a shift someone stays on if nobody else in their role is there yet. |
+| **8x speed** | A fifth speed (key 4). |
+| **Waiting benches and lines** | Benches and waiting chairs; when they're full, people line up along the sidewalk. |
+| **Pushed-together tables** | Big parties of 5 to 8 sit at two nearby tables. |
+| **Early birds** | A few customers come in during the prep hour. |
+| **Breaks** | California meal and rest breaks, staggered so a role is never left empty; a missed meal break costs an hour's pay. |
+| **Staff room and office** | Break table, staff coffee, vending machine, TV, lockers, manager's desk, filing cabinet, schedule board, and more decor. |
+| **Characters with personality** | Hairstyles, builds, beards, glasses, patterned clothes, accessories and their own expressions. |
+| **Seasons and holidays** | A calendar from the 1st of March; seasonal dishes and produce prices; New Year's to Christmas. |
+| **Weather** | Sun, rain, storms, snow and heatwaves, drawn on the map. |
+| **Around town** | The county fair, roadwork, the farmers' market, a marathon, concerts, Friday-night football. |
+| **A rival diner** | Opens across the street at Town favourite; fight back with loyalty cards and price matching. |
+| **Suppliers** | Relationships and weekly contracts. |
+| **Catering** | Accept a job, prep it in the morning, the van collects at noon. |
+| **Combos and upselling** | Combos on the menu; servers suggest a pie or a shake. |
+| **A second diner** | Open one once you're a Destination diner; each diner's weekly profit comes in with the other's bills. |
+| **Late nights** | Open to 02:00 for the bar crowd and night owls. |
+| **Careers and perks** | Each role has a ladder; every step brings a raise and a perk you choose. |
+| **Time off and availability** | Days off for their own lives; some can't work mornings or nights. |
+| **The morning huddle** | Speed, upselling, cleanliness or teamwork for the day. |
+| **Benefits** | Free shift meals, health insurance, paid time off, a retirement match. |
+| **Kids** | Crayons, a kids' menu, high chairs; bored kids cry. |
+| **The review wall** | Written reviews you can reply to. |
+| **Carhops** | Drive-in stalls with servers on skates. |
+| **The Books** | Profit, customers, busiest hours and best sellers, charted. |
+| **Undo and blueprints** | Ctrl+Z, and Copy area / Paste for whole rooms. |
+| **The scrapbook** | Big moments saved with a snapshot; P takes your own. |
+| **Jukebox playlists and the kitchen radio** | Each crowd has its music; the radio changes the kitchen's mood. |
+
 ### New in version 7: a diner with character
 
 | Feature | What it does |
@@ -142,6 +177,9 @@ Each diner has its own save and saves itself every morning. The main menu can co
 | The menu: save, load, settings | Esc (after stopping building and letting go of the selection), or the menu button on the top bar |
 | Show or hide the side panel | Tab |
 | Map overlays (dirt, traffic, waits, wear) | V, or the buttons above the build bar |
+| Fastest speed (8x) | 4 |
+| A photo for the scrapbook | P |
+| Undo the last build this morning | Ctrl+Z |
 
 ## Where things are
 
@@ -159,6 +197,9 @@ Each diner has its own save and saves itself every morning. The main menu can co
 | `autoload/health.gd` | Restrooms, trash, mice, hand-washing and what the inspector looks for |
 | `autoload/moments.gd` | Crew moments: birthdays, milestones, the hometown dish, the employee of the month |
 | `autoload/goals.gd` | The Goals board: progress and rewards |
+| `autoload/town.gd` | The calendar, seasons, holidays, weather, the events board and the rival |
+| `autoload/biz.gd` | Suppliers, catering and a sister diner |
+| `autoload/career.gd` | Careers and perks, time off, the morning huddle and benefits |
 | `autoload/shifts.gd` | Opening hours, **the schedule** (shifts and days off), California overtime, lateness, no-shows, sick days, training and closing duties |
 | `world/lot.gd` | The grid, building rules, pathfinding (one grid for staff, one for customers), dirt, decor, the inspection |
 | `world/build_tool.gd` | Mouse input for building and inspecting |
@@ -172,7 +213,7 @@ Each diner has its own save and saves itself every morning. The main menu can co
 | `main.gd` | Time, the day cycle, spawning customers, save slots, saving and loading |
 | `ui/` | The interface, one scene per piece (see below) |
 | `sounds/` | The sound effects (WAV files) |
-| `tests/autotest.gd`, `tests/v6_checks.gd`, `tests/v7_checks.gd` | Automatic tests |
+| `tests/autotest.gd`, `tests/v6_checks.gd` ... `tests/v9_checks.gd` | Automatic tests |
 | `tests/art_preview.gd` | Draws every piece of furniture in every direction, for checking the art |
 
 ## The interface
@@ -195,6 +236,7 @@ The interface is built from scenes you can open and edit in Godot, like any othe
 | `ui/start_screen.tscn`, `game_menu.gd`, `widgets/save_list.gd`, `widgets/settings_box.gd` | The main menu, the pause menu, the list of saves and the settings |
 | `ui/report.tscn` + `widgets/polaroid.gd` | The day report: the receipt, the snapshots and a tip for tomorrow |
 | `ui/goals_page.gd` | The Goals tab: the cork board of milestones |
+| `ui/reviews_page.gd`, `ui/books_page.gd` + `widgets/bar_chart.gd`, `ui/scrapbook_page.gd` | The Reviews, Books and Scrapbook tabs |
 | `ui/toasts.gd`, `ui/inbox.gd` | The message ticker and the inbox behind the bell |
 | `help.tscn`, `event_card.tscn` | Pop-ups (the event card asks you to choose) |
 
@@ -226,7 +268,5 @@ To look at the furniture art in every direction: `godot --path . -- --art` saves
 ## Ideas for what to add next
 
 - Your own sprites: replace a function in `world/art.gd` with `draw_texture`
-- Bigger tables for parties
 - A week-ahead view of the schedule
-- Seasonal menus and ingredient prices that change with the seasons
 - Cheaper potatoes from your Spudstead farm

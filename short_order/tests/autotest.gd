@@ -2,6 +2,7 @@ extends RefCounted
 const V6 = preload("res://tests/v6_checks.gd")
 const V7 = preload("res://tests/v7_checks.gd")
 const V8 = preload("res://tests/v8_checks.gd")
+const V9 = preload("res://tests/v9_checks.gd")
 ## Automatic tests. Run from a terminal in the project folder:
 ##   godot --headless --path . -- --autotest     plays two days as fast as possible
 ##   godot --path . -- --uitest                  clicks through the interface like a player
@@ -404,6 +405,7 @@ static func run(main, args: PackedStringArray) -> void:
 	await V6.run(main)
 	await V7.run(main)
 	await V8.run(main)
+	await V9.run(main)
 	await flavour_check(main)
 	print("AUTOTEST: done")
 	Sfx.quit_game()
@@ -2083,6 +2085,11 @@ static func run_ui(main, args: PackedStringArray) -> void:
 	check(hud.side_panel.pages["goals"].visible and hud.side_panel.pages["goals"].cards.size() == Data.GOALS.size(), "the Goals tab shows the board")
 	await snap(main, "goals", prefix)
 	check_fits(main, "with the Goals tab open")
+	for tab in ["reviews", "books", "scrapbook"]:
+		hud.side_panel.open(tab)
+		await tree.process_frame
+		check(hud.side_panel.pages[tab].visible, "the %s tab opens" % tab)
+		check_fits(main, "with the %s tab open" % tab)
 	office.scroll_vertical = 0
 	hud.side_panel.tabs["crew"].pressed.emit()
 	await tree.process_frame
@@ -2204,6 +2211,10 @@ static func run_ui(main, args: PackedStringArray) -> void:
 	hud.report.next_button.pressed.emit()
 	await tree.process_frame
 	check(GameState.day == 2 and FileAccess.file_exists(main.SAVE_PATH), "next day starts and the game saved")
+	for tab in ["books", "reviews", "scrapbook", "office"]:
+		hud.side_panel.open(tab)
+		await tree.create_timer(0.3).timeout
+		await snap(main, "tab_" + tab, prefix)
 	check(hud.checklist.collapsed and hud.checklist.size.x < 200.0, "on day 2 the checklist starts as a small pill (%s)" % hud.checklist.size)
 	hud.checklist.toggle()
 	await tree.process_frame

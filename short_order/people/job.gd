@@ -39,6 +39,7 @@ func describe() -> String:
 		"bus": return "Clear a table"
 		"collect": return "Pick up the money left on a table"
 		"refill": return "Top up a table's coffee"
+		"crayons": return "Bring crayons to a family"
 		"wash": return "Wash dishes"
 		"sweep": return "Sweep the floor"
 		"repair": return "Repair the %s" % Data.FURNITURE[furniture.type]["name"].to_lower()

@@ -608,6 +608,88 @@ func place_furniture(type: String, c: Vector2i, dir: int) -> bool:
 
 
 ## Puts furniture down without paying or checking (used when loading a save).
+## Everything built on the lot, as plain data (for undo and blueprints).
+func snapshot() -> Dictionary:
+	var furn: Array = []
+	for f in furniture:
+		furn.append([f.type, f.cell.x, f.cell.y, f.dir, f.tier, f.wear])
+	return {"floor": floor_type.duplicate(), "wall": wall.duplicate(), "furn": furn, "money": GameState.money}
+
+
+## Puts the lot back as it was in a snapshot (and the cash with it).
+func restore(snap: Dictionary) -> void:
+	for f in furniture.duplicate():
+		for cc in f.cells():
+			furn_at[idx(cc)] = null
+	furniture.clear()
+	floor_type = snap["floor"].duplicate()
+	wall = snap["wall"].duplicate()
+	for fd in snap["furn"]:
+		var f = add_furniture(fd[0], Vector2i(fd[1], fd[2]), fd[3])
+		f.tier = fd[4]
+		f.wear = fd[5]
+	GameState.money = snap["money"]
+	GameState.money_changed.emit(GameState.money)
+	refresh()
+	layout_changed.emit()
+
+
+## A piece of the lot as a blueprint: floors, walls and furniture inside r,
+## relative to its corner.
+func copy_area(r: Rect2i) -> Dictionary:
+	var cells: Array = []
+	for c in rect_cells(r):
+		if not in_lot(c):
+			continue
+		cells.append([c.x - r.position.x, c.y - r.position.y, floor_type[idx(c)], wall[idx(c)]])
+	var furn: Array = []
+	for f in furniture:
+		if r.has_point(f.cell) and r.encloses(Rect2i(f.cell, f.size)):
+			furn.append([f.type, f.cell.x - r.position.x, f.cell.y - r.position.y, f.dir])
+	return {"size": [r.size.x, r.size.y], "cells": cells, "furn": furn}
+
+
+## What a blueprint would cost to build at c.
+func blueprint_cost(bp: Dictionary) -> int:
+	var cost := 0
+	for cd in bp["cells"]:
+		if cd[2] != Data.FLOOR_NONE:
+			cost += Data.BUILD["floor_diner"]["cost"]
+		if cd[3] == 1:
+			cost += Data.BUILD["wall"]["cost"]
+		elif cd[3] == 2:
+			cost += Data.BUILD["door"]["cost"]
+	for fd in bp["furn"]:
+		cost += int(Data.FURNITURE[fd[0]]["cost"])
+	return cost
+
+
+## Builds a blueprint with its corner at c, on land you own that's empty.
+func paste_area(bp: Dictionary, c: Vector2i) -> String:
+	var size := Vector2i(bp["size"][0], bp["size"][1])
+	for cd in bp["cells"]:
+		var cc := c + Vector2i(cd[0], cd[1])
+		if not buildable(cc):
+			return "It doesn't fit on land you own there."
+		if (cd[2] != Data.FLOOR_NONE or cd[3] != 0) and (floor_type[idx(cc)] != Data.FLOOR_NONE or wall[idx(cc)] != 0 or furn_at[idx(cc)] != null):
+			return "Something's already built there. Paste it onto empty ground."
+	var cost := blueprint_cost(bp)
+	if not GameState.spend(cost):
+		return "That costs $%d." % cost
+	for cd in bp["cells"]:
+		var cc := c + Vector2i(cd[0], cd[1])
+		if cd[2] != Data.FLOOR_NONE:
+			floor_type[idx(cc)] = cd[2]
+		if cd[3] != 0:
+			wall[idx(cc)] = cd[3]
+	for fd in bp["furn"]:
+		if Data.FURNITURE.has(fd[0]) and GameState.item_unlocked(fd[0]):
+			add_furniture(fd[0], c + Vector2i(fd[1], fd[2]), fd[3])
+	refresh()
+	layout_changed.emit()
+	return ""
+
+
 func add_furniture(type: String, c: Vector2i, dir: int):
 	var f := Furniture.new()
 	f.id = GameState.new_id()

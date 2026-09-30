@@ -12,6 +12,7 @@ var prep_rows := {}          # dish -> {"spin": SpinBox, "info": Label}
 var paper: PanelContainer
 var paper_title: Label
 var combo_rows := {}
+var kids_switch: CheckButton
 var _t := 0.0
 
 @onready var rows_box: VBoxContainer = %Rows
@@ -90,6 +91,15 @@ func _ready() -> void:
 		r.add_child(pill)
 		col.add_child(r)
 		combo_rows[key] = {"price": pl, "switch": sw, "row": r, "combo": cb}
+	# a kids' menu
+	kids_switch = CheckButton.new()
+	kids_switch.text = "Kids' menu (%d%% of the price)" % int(Data.KIDS_MENU_PRICE * 100)
+	kids_switch.add_theme_color_override("font_color", Color("3a2e26"))
+	kids_switch.add_theme_color_override("font_pressed_color", Color("3a2e26"))
+	kids_switch.add_theme_color_override("font_hover_color", Color("b23a2e"))
+	kids_switch.tooltip_text = "Smaller plates for kids at a smaller price. Families like it: a better visit, and they come more."
+	kids_switch.toggled.connect(func(on: bool): GameState.kids_menu = on)
+	paper.get_child(0).add_child(kids_switch)
 	build_prep_list()
 	GameState.menu_changed.connect(refresh)
 	visibility_changed.connect(refresh)
@@ -149,6 +159,7 @@ func build_prep_list() -> void:
 
 func refresh() -> void:
 	paper_title.text = (GameState.diner_name if GameState.diner_name != "" else "Menu")
+	kids_switch.set_pressed_no_signal(GameState.kids_menu)
 	for k in combo_rows:
 		var cr: Dictionary = combo_rows[k]
 		var ok: bool = cr["combo"]["dishes"].all(func(d): return GameState.dish_known(d))

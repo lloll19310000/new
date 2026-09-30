@@ -13,6 +13,9 @@ const PAGES := {
 	"crew": {"title": "Crew", "icon": "crew"},
 	"office": {"title": "Office", "icon": "office"},
 	"goals": {"title": "Goals", "icon": "star"},
+	"reviews": {"title": "Reviews", "icon": "chat"},
+	"books": {"title": "Books", "icon": "money"},
+	"scrapbook": {"title": "Scrapbook", "icon": "camera"},
 }
 const SLIDE := 0.22
 const PANEL_W := 330.0
@@ -45,13 +48,16 @@ func _ready() -> void:
 	pages["office"].get_parent().add_child(gp)
 	pages["goals"] = gp
 	var office_tab: Button = tabs["office"]
-	var gt := office_tab.duplicate() as Button
+	var gt := office_tab.duplicate(Node.DUPLICATE_GROUPS | Node.DUPLICATE_SCRIPTS | Node.DUPLICATE_USE_INSTANTIATION) as Button
 	gt.name = "GoalsTab"
 	gt.icon = UiKit.icon("star")
 	gt.tooltip_text = "Goals: milestones for your diner, with rewards"
 	gt.set_pressed_no_signal(false)
 	office_tab.get_parent().add_child(gt)
 	tabs["goals"] = gt
+	_add_page("reviews", preload("res://ui/reviews_page.gd").new(), "chat", "Reviews: what people write about you, and your replies")
+	_add_page("books", preload("res://ui/books_page.gd").new(), "money", "Books: profit, customers, busiest hours and best sellers over time")
+	_add_page("scrapbook", preload("res://ui/scrapbook_page.gd").new(), "camera", "Scrapbook: your diner's story in snapshots (P takes a photo)")
 	Goals.changed.connect(func():
 		if not (is_open and current == "goals"):
 			gt.modulate = Color(1.4, 1.25, 0.8))
@@ -64,6 +70,22 @@ func _ready() -> void:
 		if not (is_open and current == "crew"):
 			crew_badge.visible = true)
 	show_page(current)
+
+
+## A page built in code, with its own button on the rail.
+func _add_page(key: String, page: Control, icon_name: String, tip: String) -> void:
+	page.name = key.capitalize() + "Page"
+	page.visible = false
+	pages["office"].get_parent().add_child(page)
+	pages[key] = page
+	var office_tab: Button = tabs["office"]
+	var t := office_tab.duplicate(Node.DUPLICATE_GROUPS | Node.DUPLICATE_SCRIPTS | Node.DUPLICATE_USE_INSTANTIATION) as Button
+	t.name = key.capitalize() + "Tab"
+	t.icon = UiKit.icon(icon_name)
+	t.tooltip_text = tip
+	t.set_pressed_no_signal(false)
+	office_tab.get_parent().add_child(t)
+	tabs[key] = t   # (connected with the others in _ready)
 
 
 func toggle(key: String) -> void:

@@ -81,6 +81,7 @@ func give(g: Dictionary, quiet: bool = false) -> void:
 	if quiet:
 		return
 	GameState.toast.emit("Goal reached: %s! You earned %s." % [g["name"], what], "good")
+	Moments.note_scrapbook("goal", "Goal: %s" % g["name"], "%s. Reward: %s." % [g["desc"].trim_suffix("."), what])
 	Crew.log_line("Goal reached: %s. Reward: %s." % [g["name"], what], "star")
 	Sfx.play("fanfare", -4.0)
 

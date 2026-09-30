@@ -25,6 +25,9 @@ var town_note: Label
 var loyalty_switch: CheckButton
 var match_switch: CheckButton
 var rival_box: VBoxContainer
+var huddle_buttons := {}
+var huddle_note: Label
+var benefit_switches := {}
 var catering_box: VBoxContainer
 var supplier_box: VBoxContainer
 var second_box: VBoxContainer
@@ -79,6 +82,26 @@ func _ready() -> void:
 	Town.changed.connect(refresh)
 	# ---- before opening
 	header("Before opening", "sun")
+	var hl := UiKit.label("Morning huddle: today's focus", 13, UiKit.INK, &"BodyLabel")
+	box.add_child(hl)
+	var hrow := GridContainer.new()
+	hrow.columns = 3
+	hrow.add_theme_constant_override("h_separation", 4)
+	hrow.add_theme_constant_override("v_separation", 4)
+	for h in [["", "None"], ["speed", "Speed"], ["upsell", "Upselling"], ["clean", "Clean"], ["team", "Teamwork"]]:
+		var hb := Button.new()
+		hb.text = h[1]
+		hb.toggle_mode = true
+		hb.theme_type_variation = &"SmallButton"
+		hb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var hk: String = h[0]
+		hb.pressed.connect(func():
+			Career.set_huddle(hk)
+			refresh())
+		hrow.add_child(hb)
+		huddle_buttons[hk] = hb
+	box.add_child(hrow)
+	huddle_note = note("")
 	meal_switch = toggle("Staff meal before opening",
 		"Everyone sits down and eats together for %d minutes: about $%d a person in food. They start the day calmer and like each other a little more." % [int(Data.STAFF_MEAL_MINUTES), int(Data.STAFF_MEAL_COST)],
 		func(on: bool): GameState.staff_meal = on)
@@ -147,6 +170,13 @@ func _ready() -> void:
 		"Orders come in over the apps and drivers pick them up at the takeout window. More orders, but the app keeps %d%% of each bill." % int(Data.APP_SHARE * 100),
 		func(on: bool): Front.apps_on = on)
 	apps_note = note("")
+	# ---- benefits
+	header("Staff benefits", "heart")
+	for k in Data.BENEFITS:
+		var b: Dictionary = Data.BENEFITS[k]
+		var cost := ("$%d a person a week" % int(b["per_person"])) if b.has("per_person") else ("%d%% of the weekly payroll" % int(b["payroll"] * 100))
+		var kk: String = k
+		benefit_switches[k] = toggle("%s (%s)" % [b["name"], cost], b["desc"], func(on: bool): Career.set_benefit(kk, on))
 	# ---- catering
 	header("Catering", "van")
 	note("Now and then someone asks you to cater a wedding, a banquet or a party. The cooks prep it that morning (you need a prep counter) and the van collects it at noon: you're paid for what's ready.")
@@ -234,6 +264,12 @@ func refresh() -> void:
 	if not is_node_ready():
 		return
 	refresh_biz()
+	for k in huddle_buttons:
+		huddle_buttons[k].set_pressed_no_signal(Career.huddle == k)
+	huddle_note.text = {"": "No huddle: everyone just gets on with it.", "speed": "Speed: everyone works 6% faster today.", "upsell": "Upselling: servers push the pie and shakes.",
+		"clean": "Clean: 30% less mess tracked around.", "team": "Teamwork: people warm to each other faster."}[Career.huddle] + (" A manager on shift makes it count half as much again." if Career.huddle != "" else "")
+	for k in benefit_switches:
+		benefit_switches[k].set_pressed_no_signal(Career.has_benefit(k))
 	var tl: Array = Town.today_lines()
 	tl.append("Tomorrow: %s." % Town.weather_name(Town.forecast).to_lower())
 	town_note.text = "\n".join(tl)

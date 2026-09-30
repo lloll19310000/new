@@ -68,6 +68,10 @@ var saw_mouse := false
 var refill_in := -1.0      # minutes until they'd like a coffee top-up, or -1
 var table2 = null          # a second table pushed together for a big party
 var combo_saving := 0.0    # what their combos take off the bill
+var kids := 0              # little ones in a family
+var crayons := false       # a server brought the crayons
+var crayon_wait := 0.0
+var crying := false
 var wait_spots: Array = [] # cells they're waiting on (a bench, a waiting chair, the line)
 var wait_seated := false   # someone in the group got a seat to wait on
 var wants_refill := false
@@ -82,7 +86,7 @@ func start(lot_ref, size: int, parent: Node, kind_: String = "regular", window =
 	lot = lot_ref
 	kind = kind_
 	app = kind == "driver"
-	takeout = kind == "takeout" or app
+	takeout = kind == "takeout" or kind == "carhop" or app
 	booking = extra.get("booking")
 	regular = extra.get("regular")
 	var spawns: Array = lot.spawn_cells()
@@ -102,6 +106,13 @@ func start(lot_ref, size: int, parent: Node, kind_: String = "regular", window =
 		members[0].queue_redraw()
 	if booking != null:
 		booking["group"] = self
+	if kind == "family" and members.size() > 2:
+		kids = members.size() - 2
+	if kind == "carhop":
+		# they stay in the car: park it and wait for a carhop
+		for m in members:
+			m.visible = false
+		lot.queue_redraw()
 	if Data.DASH_KIND.has(kind) or kind in ["takeout", "driver", "critic", "celebrity"]:
 		if randf() < Data.ALLERGY_CHANCE:
 			allergy = Data.ALLERGENS.keys().pick_random()
@@ -133,6 +144,8 @@ func start(lot_ref, size: int, parent: Node, kind_: String = "regular", window =
 
 func tick(minutes: float) -> void:
 	var patience: float = info()["patience"]
+	if state in ["seated", "ordered", "eating"]:
+		kid_tick(minutes)
 	match state:
 		"arriving":
 			if not anyone_moving():
@@ -428,6 +441,14 @@ func sit_down() -> void:
 		m.place_at(m.seat.cell)
 		m.face_toward(table.center_px())
 	state = "seated"
+	if kids > 0:
+		JobBoard.post("serve", "crayons", {"group": self})
+		if GameState.kids_menu:
+			review_bonus += Data.KIDS_MENU_REVIEW
+		for hc in lot.of_type("highchair"):
+			if lot.distance(hc.cell, table.cell) <= 3:
+				review_bonus += Data.HIGHCHAIR_REVIEW
+				break
 	var j = JobBoard.post("serve", "take_order", {"group": self})
 	# a regular's favourite server gets first go at their table
 	if regular != null:
@@ -583,10 +604,16 @@ func place_order(server = null) -> void:
 ## How likely this server is to write a dish down wrong.
 static func wrong_chance(s) -> float:
 	var p: float = Data.WRONG_BASE + (10 - s.service) * Data.WRONG_PER_SKILL
+	var trouble := 0.0
 	if s.stress >= Data.STRESS_FED_UP:
-		p += Data.WRONG_STRESSED
+		trouble += Data.WRONG_STRESSED
 	if s.energy < Data.BREAK_AT:
-		p += Data.WRONG_TIRED
+		trouble += Data.WRONG_TIRED
+	if "calm_hands" in s.perks:
+		trouble *= 0.5
+	p += trouble
+	if "memory" in s.perks:
+		p *= 0.3
 	return p
 
 
@@ -720,6 +747,29 @@ func check_all_served() -> void:
 			refill_in = randf_range(Data.REFILL_AFTER.x, Data.REFILL_AFTER.y)
 
 
+## A bored kid starts crying if the crayons don't come; the tables nearby hear it.
+func kid_tick(minutes: float) -> void:
+	if kids <= 0 or crayons:
+		return
+	crayon_wait += minutes
+	if not crying and crayon_wait >= Data.CRAYON_WAIT:
+		crying = true
+		extra_hits["a bored, crying kid"] = Data.CRYING_HIT
+		for g in Crew.groups_near(where(), 4.0):
+			if g != self:
+				g.note_trouble("a crying kid nearby", Data.CRYING_HIT)
+		lot.fx.add(where() + Vector2(0, -16), "Waaah!", Color("ff8f7a"))
+
+
+func got_crayons() -> void:
+	crayons = true
+	if crying:
+		crying = false
+		extra_hits.erase("a bored, crying kid")
+	else:
+		review_bonus += 0.08
+
+
 ## Coffee drinkers hold their cup up for a top-up a few minutes in.
 func refill_tick(minutes: float) -> void:
 	if refill_in < 0.0 or wants_refill or refills >= Data.REFILL_MAX:
@@ -791,9 +841,13 @@ func pay(on_table: bool = false) -> float:
 	var charged := 0.0 if comped else maxf(0.0, bill - combo_saving)
 	if regular != null and Town.loyalty_cards:
 		charged *= 1.0 - Data.LOYALTY_CARD_COST   # their loyalty card stamp
+	if kids > 0 and GameState.kids_menu:
+		charged *= 1.0 - (1.0 - Data.KIDS_MENU_PRICE) * kids / float(members.size())
 	var tip: float = bill * tip_rate(score) * info()["tip"] * (1.0 + Data.REFILL_TIP * refills) * Town.tip_mult()
 	if regular != null and regular["loyalty"] >= Data.REGULAR_LOYAL:
 		tip *= 1.4
+	if main_server() != null and "charmer" in main_server().perks:
+		tip *= 1.1
 	if comped:
 		GameState.today["comped"] += bill
 	GameState.today["served"] += members.size()
@@ -1095,7 +1149,7 @@ func review(final: bool = true) -> Array:
 			hits["a plain, bare room"] = 0.2
 		s += beauty * 0.1
 		if lot.music_near(spot) and GameState.is_open():
-			s += 0.15
+			s += 0.15 + float(Data.PLAYLISTS[GameState.playlist]["likes"].get(kind, 0.0))
 	for k in hits:
 		s -= hits[k]
 	s += (q - 0.5) * 0.6
@@ -1203,7 +1257,13 @@ func leave(score: float, complaint: String, paid: bool) -> void:
 		GameState.add_review(score, complaint, weight)
 		var p: Vector2 = members[0].position if not members.is_empty() else Vector2.ZERO
 		lot.fx.stars(p, score)
-		var dishes: Array = received.map(func(d): return Data.DISHES[d]["name"].to_lower())
+		var dishes: Array = []
+		for d in received:
+			var dn: String = Data.DISHES[d]["name"].to_lower()
+			if not dn in dishes:
+				dishes.append(dn)
+		if kind != "inspector" and (randf() < Data.REVIEW_WRITE or score >= 4.8 or score <= 1.8):
+			GameState.write_review(moment_who(), score, complaint, received[0] if not received.is_empty() else "")
 		GameState.note_moment(score, moment_who(), complaint if score < 3.5 and complaint != "" else Crew.and_list(dishes.slice(0, 2)))
 		if kind == "celebrity":
 			Events.celebrity_review(score)
@@ -1214,6 +1274,9 @@ func leave(score: float, complaint: String, paid: bool) -> void:
 				if not cd.has(d):
 					cd.append(d)
 			GameState.totals["critic_dishes"] = cd
+			if int(GameState.totals.get("critics_seen", 0)) == 0:
+				Moments.note_scrapbook("critic", "The first critic", "A food critic gave us %.1f stars." % score)
+			GameState.totals["critics_seen"] = int(GameState.totals.get("critics_seen", 0)) + 1
 			if score >= 4.0:
 				GameState.totals["critic"] = GameState.totals.get("critic", 0) + 1
 				GameState.toast.emit("The food critic loved it: %.1f stars! That review counts five times." % score, "good")

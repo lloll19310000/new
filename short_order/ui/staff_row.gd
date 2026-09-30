@@ -319,7 +319,7 @@ func refresh() -> void:
 	portrait.ring = Crew.MOOD_COLORS.get(who.mood, UiKit.MUTED) if who.mood != "okay" else Color(0, 0, 0, 0)
 	portrait.queue_redraw()
 	name_label.text = who.person_name + ("  ★" if who.manager else "")
-	status_label.text = "%s · %s" % [Data.ROLES[who.role]["name"], status_text()]
+	status_label.text = "%s · %s" % [Career.title(who), status_text()]
 	status_label.add_theme_color_override("font_color", rc.lerp(UiKit.MUTED, 0.35))
 	var ic: String = Data.ROLES[who.role]["icon"]
 	if who.on_phone:
@@ -344,7 +344,7 @@ func refresh() -> void:
 		return
 	origin_label.text = "%s. %s Signature dish: %s." % [Data.hometown(who.origin), who.bio, who.origin.get("dish", "?")]
 	info_box.tooltip_text = origin_label.text
-	var tk := str(who.traits) + str(who.role) + str(who.warnings) + str(who.sick_days) + str(who.trainer_id) + str(who.burnout_warned)
+	var tk: String = str(who.traits) + str(who.role) + str(who.warnings) + str(who.sick_days) + str(who.trainer_id) + str(who.burnout_warned) + str(who.perks) + who.avail + str(who.rank)
 	if tk != _traits_key:
 		_traits_key = tk
 		UiKit.fill_traits(traits_box, who.traits)
@@ -358,6 +358,16 @@ func refresh() -> void:
 		var tr = Crew.by_id(who.trainer_id) if who.trainer_id > 0 else null
 		if tr != null:
 			traits_box.add_child(UiKit.tag_chip("Training with %s" % tr.person_name, "school", UiKit.MINT, "They learn twice as fast working beside %s." % tr.person_name))
+		for p in who.perks:
+			traits_box.add_child(UiKit.tag_chip(Data.PERKS[p]["name"], "star", UiKit.GOLD, Data.PERKS[p]["desc"]))
+		if who.avail != "":
+			traits_box.add_child(UiKit.tag_chip("No mornings" if who.avail == "no_mornings" else "No nights", "calendar", UiKit.SKY,
+				"They can't work %s (school, kids or a second job): the schedule works around it." % ("mornings" if who.avail == "no_mornings" else "nights")))
+		var nxt: int = who.rank + 1
+		var titles: Array = Data.CAREER_TITLES.get(who.role, [])
+		if nxt < titles.size() and nxt < Data.CAREER_STEPS.size():
+			var st: Array = Data.CAREER_STEPS[nxt]
+			traits_box.add_child(UiKit.tag_chip(Career.title(who), "school", UiKit.MUTED, "Next: %s at skill %d and %d shifts (now %d and %d)." % [titles[nxt].to_lower(), st[0], st[1], Career.role_skill(who), who.shifts_worked]))
 	_bar("cooking", who.cooking, str(who.cooking), "Cooking %d of 10: cooks faster and better food. %d%% of the way to the next level." % [who.cooking, int(100.0 * who.xp["cooking"] / Data.xp_needed(who.cooking))])
 	_bar("service", who.service, str(who.service), "Service %d of 10: walks and serves faster. %d%% of the way to the next level." % [who.service, int(100.0 * who.xp["service"] / Data.xp_needed(who.service))])
 	_bar("energy", who.energy, "%d%%" % int(who.energy), "Energy. Tired staff work slower; below %d%% they take a break (faster on a sofa)." % int(Data.BREAK_AT))

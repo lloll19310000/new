@@ -302,6 +302,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			set_speed(4)
 		KEY_4:
 			set_speed(8)
+		KEY_P:
+			main.take_photo()
 		KEY_V:
 			main.heatmap.cycle()
 			show_overlay(main.heatmap.mode)

@@ -182,6 +182,31 @@ func choose_poach(i: int, d: Dictionary) -> void:
 			Crew.main.lose_staff(s)
 
 
+## Someone moved up: which perk do they pick up?
+func choose_perk(i: int, d: Dictionary) -> void:
+	var s = d["s"]
+	if not valid_staff(s):
+		return
+	var k: String = d["options"][i]
+	if not k in s.perks:
+		s.perks.append(k)
+	Crew.log_line("%s: %s. %s" % [s.person_name, Data.PERKS[k]["name"], Data.PERKS[k]["desc"]], "star", [s])
+
+
+## A day off for their own life.
+func choose_timeoff(i: int, d: Dictionary) -> void:
+	var s = d["s"]
+	if not valid_staff(s):
+		return
+	if i == 0:
+		s.requested_off.append(int(d["day"]))
+		s.add_stress(-4.0, "you gave them a day off")
+		Crew.log_line("%s has %s off: %s." % [s.person_name, Town.date_text(int(d["day"])), d["why"]], "calendar", [s])
+	else:
+		s.add_stress(10.0, "a day off refused")
+		Crew.log_line("%s asked for %s off (%s). You said no." % [s.person_name, Town.date_text(int(d["day"])), d["why"]], "storm", [s])
+
+
 func note(icon: String, color: String, text: String) -> void:
 	today.append([icon, color, text])
 

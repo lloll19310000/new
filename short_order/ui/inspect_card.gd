@@ -6,6 +6,7 @@ var main
 var thing = null
 var _t := 0.0
 var upgrade_button: Button
+var choice_row: HFlowContainer
 var buy_button: Button
 
 @onready var portrait: Portrait = %Portrait
@@ -43,6 +44,12 @@ func _ready() -> void:
 			Sfx.play("repair", -4.0)
 			main.lot.queue_redraw()
 			refresh())
+	# the jukebox's playlist, or the kitchen radio's station
+	choice_row = HFlowContainer.new()
+	choice_row.add_theme_constant_override("h_separation", 4)
+	choice_row.add_theme_constant_override("v_separation", 4)
+	choice_row.visible = false
+	rotate_button.get_parent().get_parent().add_child(choice_row)
 	# clicking a plot that's for sale: buy it right here
 	buy_button = Button.new()
 	buy_button.theme_type_variation = &"PrimaryButton"
@@ -61,6 +68,37 @@ func _ready() -> void:
 		if thing != null and main.lot.rotate_furniture(thing):
 			Sfx.play("place", -8.0)
 			refresh())
+
+
+## Buttons to pick the jukebox's playlist or the radio's station.
+func _fill_choices(kind: String) -> void:
+	for c in choice_row.get_children():
+		c.queue_free()
+	choice_row.visible = true
+	var opts: Dictionary = Data.PLAYLISTS if kind == "jukebox" else Data.RADIO
+	var cur: String = GameState.playlist if kind == "jukebox" else GameState.radio
+	for k in opts:
+		var b := Button.new()
+		b.text = opts[k]["name"]
+		b.toggle_mode = true
+		b.button_pressed = k == cur
+		b.theme_type_variation = &"SmallButton"
+		var likes: Array = []
+		if kind == "jukebox":
+			for who in opts[k]["likes"]:
+				likes.append("%s %s" % [Data.CUSTOMERS[who]["name"].to_lower() if Data.CUSTOMERS.has(who) else who, "love it" if opts[k]["likes"][who] > 0 else "don't"])
+			b.tooltip_text = ", ".join(likes).capitalize() + "."
+		else:
+			b.tooltip_text = opts[k]["desc"]
+		var kk: String = k
+		b.pressed.connect(func():
+			if kind == "jukebox":
+				GameState.playlist = kk
+			else:
+				GameState.radio = kk
+			GameState.toast.emit("%s: %s." % ["The jukebox is playing" if kind == "jukebox" else "The kitchen radio is on", opts[kk]["name"].to_lower()], "")
+			_fill_choices(kind))
+		choice_row.add_child(b)
 
 
 func show_thing(t) -> void:
@@ -97,6 +135,7 @@ func refresh() -> void:
 	rotate_button.visible = false
 	upgrade_button.visible = false
 	buy_button.visible = false
+	choice_row.visible = false
 	var sub := ""
 	var text := ""
 	if t is Vector2i:
@@ -159,6 +198,8 @@ func refresh() -> void:
 			upgrade_button.tooltip_text = "Pro stations cook 25% faster and wear out half as fast. Mornings only."
 		if t.is_station() and t.tier > 0:
 			title.text = "Pro " + title.text.to_lower()
+		if t.type == "jukebox" or t.type == "radio":
+			_fill_choices(t.type)
 	elif t.get("person_name") != null:
 		portrait.visible = true
 		portrait.show_person(t)

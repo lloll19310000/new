@@ -230,6 +230,7 @@ func check_story(r: Dictionary, server) -> void:
 		GameState.add_review(5.0, "")
 	Crew.log_line(text, "heart", [server] if server != null else [])
 	GameState.toast.emit(text, "crew")
+	Moments.note_scrapbook("regular", r["name"], text)
 	if server != null:
 		server.add_stress(-4.0, "a regular's story")
 

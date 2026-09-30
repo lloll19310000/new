@@ -993,6 +993,33 @@ static func furniture_in(ci: CanvasItem, type: String, r: Rect2, dir: int, f = n
 			rbox(ci, top.grow(-9 * s), Color("2b1d17"), Color("2b1d17"), 3, 0)
 			for i in 3:
 				ci.draw_line(Vector2(inner.position.x + 6 * s, inner.position.y + (4 + i * 3) * s), Vector2(inner.end.x - 6 * s, inner.position.y + (4 + i * 3) * s), Color("d8d0c2"), 1.0)
+		"radio":
+			var rc2 := r.get_center()
+			rbox(ci, Rect2(rc2 - Vector2(9, 6) * s, Vector2(18, 12) * s), Color("c8403a"), Color("8a2a24"), 3, 1)
+			ci.draw_circle(rc2 + Vector2(-3.5, 0) * s, 3.6 * s, Color("3a2e26"))
+			for k in 3:
+				ci.draw_arc(rc2 + Vector2(-3.5, 0) * s, (1.0 + k) * s, 0, TAU, 8, Color("6a5a4c"), 0.6 * s)
+			ci.draw_rect(Rect2(rc2 + Vector2(2, -3) * s, Vector2(5, 3) * s), Color("fff4c2"))
+			ci.draw_line(rc2 + Vector2(6, -6) * s, rc2 + Vector2(10, -12) * s, Color("c9ced6"), 1.0 * s)
+		"highchair":
+			var hc := r.get_center()
+			ci.draw_circle(hc + Vector2(1, 1.5) * s, 8 * s, Color(0, 0, 0, 0.18))
+			rbox(ci, Rect2(hc - Vector2(8, 8) * s, Vector2(16, 16) * s), Color("d9a14a"), Color("a8732e"), 4, 1)
+			rbox(ci, Rect2(hc - Vector2(8, 8) * s, Vector2(16, 6) * s), Color("f2c14e"), Color("a8732e"), 3, 1)
+			ci.draw_circle(hc + Vector2(0, 2) * s, 3 * s, Color("e75a4e"))
+		"stall":
+			# a parking bay: asphalt, white lines and a lit menu board on a post
+			ci.draw_rect(r.grow(-1 * s), Color("4a4a50"))
+			var wide2 := r.size.x >= r.size.y
+			for xx in [r.position.x + 3 * s, r.end.x - 3 * s]:
+				ci.draw_line(Vector2(xx, r.position.y + 3 * s), Vector2(xx, r.end.y - 3 * s), Color("f4f4f0"), 2 * s)
+			var board := Rect2(r.position + Vector2(r.size.x - 16 * s, 3 * s), Vector2(12, 16) * s)
+			ci.draw_rect(Rect2(board.get_center() + Vector2(-1, 6) * s, Vector2(2, 8) * s), Color("8d949b"))
+			rbox(ci, board, Color("c8403a"), Color("8a2a24"), 2, 1)
+			for k in 3:
+				ci.draw_line(board.position + Vector2(2.5, 4 + k * 3.5) * s, board.position + Vector2(9.5, 4 + k * 3.5) * s, Color("fff4c2"), 0.9 * s)
+			if f != null and f.group != null and is_instance_valid(f.group):
+				car(ci, r.get_center() + Vector2(-2, 2) * s, 1 if wide2 else 0, [Color("6aa6d9"), Color("e75a4e"), Color("f2c14e"), Color("6cc3a0")][f.group.get_instance_id() % 4])
 		"bench", "wait_chair":
 			# a wooden bench (or a single chair) with a red seat cushion and a back rail
 			var wide := inner.size.x >= inner.size.y

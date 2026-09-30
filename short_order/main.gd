@@ -307,6 +307,10 @@ func spawn_tick(minutes: float) -> void:
 	if window != null and randf() < Data.TAKEOUT_SHARE * Events.takeout_mult():
 		spawn_group("takeout", 1, window)
 		return
+	var stall = free_stall()
+	if stall != null and randf() < Data.CARHOP_SHARE:
+		spawn_group("carhop", randi_range(1, 3), stall)
+		return
 	if lot.tables().is_empty():
 		return
 	var queued := 0
@@ -319,6 +323,13 @@ func spawn_tick(minutes: float) -> void:
 	if queued >= (Data.QUEUE_LIMIT_HOST if Front.host_working() else Data.QUEUE_LIMIT) + maxi(0, free_seats / 2):
 		return   # they see the line at the door and keep walking
 	spawn_group(pick_kind(), -1)
+
+
+func free_stall():
+	for f in lot.of_type("stall"):
+		if f.group == null and lot.window_outside(f).x >= 0:
+			return f
+	return null
 
 
 func free_takeout_window():
@@ -379,6 +390,9 @@ func open_diner() -> void:
 		GameState.toast.emit("Not ready yet: " + item[0].to_lower() + ".", "bad")
 		Sfx.play("error")
 		return
+	build.undo_stack.clear()
+	if GameState.day == 1 and GameState.scrapbook.is_empty():
+		scrapbook_add("opening", "Opening day", "%s opens its doors for the very first time." % GameState.diner_name)
 	# a new day's list of what stressed people (last night's is kept until now)
 	for s in GameState.staff:
 		s.stress_log = {}
@@ -533,6 +547,8 @@ func end_day() -> void:
 	Moments.nightly()
 	Town.nightly()
 	Biz.nightly()
+	GameState.reply_mood *= 0.9
+	Career.nightly()
 	Goals.check()
 	lot.fade_scuffs()
 	# tomorrow's schedule: days off and who works days or nights
@@ -542,6 +558,7 @@ func end_day() -> void:
 	if level_up:
 		var lv: Dictionary = GameState.level_info()
 		GameState.toast.emit("Your diner is now a %s! More customers are coming%s." % [lv["name"], ", including tourists" if GameState.rep_level == 2 else ""], "good")
+		scrapbook_add("level", "Now a %s" % lv["name"], "%s is moving up in the world." % GameState.diner_name)
 		Crew.log_line("The diner is now a %s!" % lv["name"], "star")
 		Sfx.play("fanfare", -2.0)
 	var scores: Array = t["scores"]
@@ -770,7 +787,8 @@ func save_game(to: String = "") -> bool:
 			"warnings": s.warnings, "caught_days": s.caught_days, "stress": s.stress, "burnout_warned": s.burnout_warned,
 			"raise_refused": s.raise_refused, "start_skill": s.start_skill, "last_raise_day": s.last_raise_day, "away_day": s.away_day,
 			"shift": s.shift, "shift_locked": s.shift_locked, "sched_off": s.sched_off, "streak": s.streak, "burnout_nights": s.burnout_nights, "sick_days": s.sick_days, "closed_late": s.closed_late, "trainer_id": s.trainer_id, "training_days": s.training_days,
-			"birthday": s.birthday, "hired_day": s.hired_day, "shifts_worked": s.shifts_worked, "jobs_month": s.jobs_month, "eotm_count": s.eotm_count})
+			"birthday": s.birthday, "hired_day": s.hired_day, "shifts_worked": s.shifts_worked, "jobs_month": s.jobs_month, "eotm_count": s.eotm_count,
+			"rank": s.rank, "perks": s.perks, "requested_off": s.requested_off, "avail": s.avail})
 	var plates := GameState.plates_clean
 	for f in lot.furniture:
 		plates += f.dirty_plates + f.dirty
@@ -778,7 +796,7 @@ func save_game(to: String = "") -> bool:
 		"version": SAVE_VERSION, "name": GameState.diner_name, "saved_at": Time.get_datetime_string_from_system(false, true), "day": GameState.day, "money": GameState.money, "reviews": GameState.reviews,
 		"review_count": GameState.review_count,
 		"menu": GameState.menu, "stock": GameState.stock, "target": GameState.target,
-		"unlocked": GameState.unlocked, "hometown": GameState.hometown, "combos": GameState.combos, "moments": Moments.save_data(), "goals": Goals.save_data(), "town": Town.save_data(), "biz": Biz.save_data(), "history": GameState.history,
+		"unlocked": GameState.unlocked, "hometown": GameState.hometown, "combos": GameState.combos, "kids_menu": GameState.kids_menu, "playlist": GameState.playlist, "radio": GameState.radio, "review_feed": GameState.review_feed, "reply_mood": GameState.reply_mood, "moments": Moments.save_data(), "goals": Goals.save_data(), "town": Town.save_data(), "biz": Biz.save_data(), "history": GameState.history, "scrapbook": GameState.scrapbook, "career": Career.save_data(),
 		"plates_total": GameState.plates_total, "plates": plates, "totals": GameState.totals,
 		"grade": GameState.grade, "crew": Crew.save_data(),
 		"supplier": GameState.supplier, "special": GameState.special, "owned": GameState.owned, "rep_level": GameState.rep_level,
@@ -829,6 +847,11 @@ func load_game(from: String = "") -> bool:
 		for r in GameState.reviews:
 			sum += r
 		GameState.rating = sum / GameState.reviews.size()
+	GameState.kids_menu = bool(data.get("kids_menu", false))
+	GameState.playlist = str(data.get("playlist", "oldies")) if Data.PLAYLISTS.has(str(data.get("playlist", ""))) else "oldies"
+	GameState.radio = str(data.get("radio", "hits")) if Data.RADIO.has(str(data.get("radio", ""))) else "hits"
+	GameState.review_feed = data.get("review_feed", [])
+	GameState.reply_mood = float(data.get("reply_mood", 0.0))
 	for k in data.get("combos", {}):
 		GameState.combos[str(k)] = bool(data["combos"][k])
 	for d in data.get("unlocked", []):
@@ -849,7 +872,9 @@ func load_game(from: String = "") -> bool:
 	Moments.load_data(data.get("moments", {}))
 	Town.load_data(data.get("town", {}))
 	Biz.load_data(data.get("biz", {}))
+	Career.load_data(data.get("career", {}))
 	GameState.history = data.get("history", [])
+	GameState.scrapbook = data.get("scrapbook", [])
 	# very old saves kept a list of tutorial goals under "goals": ignore that
 	var gd = data.get("goals", {})
 	Goals.load_data(gd if gd is Dictionary else {})
@@ -955,6 +980,38 @@ func load_game(from: String = "") -> bool:
 ## Opens a second diner: $100,000 goes across to get it started; this diner
 ## keeps running under its crew, and its weekly profit comes in with the other
 ## one's bills (and the other way round).
+## A page in the scrapbook, with a snapshot of the diner right now (when
+## there's a screen to take it from).
+func scrapbook_add(kind: String, title: String, text: String) -> void:
+	var page := {"day": GameState.day, "kind": kind, "title": title, "text": text, "img": ""}
+	GameState.scrapbook.append(page)
+	if GameState.scrapbook.size() > Data.SCRAPBOOK_MAX:
+		GameState.scrapbook = GameState.scrapbook.slice(GameState.scrapbook.size() - Data.SCRAPBOOK_MAX)
+	if DisplayServer.get_name() == "headless" or not is_inside_tree():
+		return
+	# a clean picture: the interface steps out of the way for a moment
+	var was: bool = hud.visible
+	hud.visible = false
+	await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	var img := get_viewport().get_texture().get_image()
+	hud.visible = was
+	if img == null or img.is_empty():
+		return
+	img.resize(320, int(320.0 * img.get_height() / maxf(1.0, img.get_width())), Image.INTERPOLATE_BILINEAR)
+	DirAccess.make_dir_recursive_absolute(save_dir + "/scrapbook")
+	var path := "%s/scrapbook/%s_%d_%d.png" % [save_dir, slot if slot != "" else "new", GameState.day, Time.get_ticks_msec()]
+	if img.save_png(path) == OK:
+		page["img"] = path
+
+
+## Photo mode: P takes a picture for the scrapbook.
+func take_photo() -> void:
+	scrapbook_add("photo", "A snapshot", "%s, %s." % [Town.date_text(), GameState.clock_text()])
+	Sfx.play("pop")
+	GameState.toast.emit("Snap! It's in the scrapbook.", "good")
+
+
 func open_second_location(new_name: String) -> bool:
 	if not Biz.can_open_second():
 		return false
@@ -1022,5 +1079,6 @@ func clear_world() -> void:
 	Goals.reset()
 	Town.reset()
 	Biz.reset()
+	Career.reset()
 	JobBoard.clear()
 	lot.init_grid()

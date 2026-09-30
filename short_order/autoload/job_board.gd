@@ -113,6 +113,8 @@ func still_needed(j, lot) -> bool:
 			return j.furniture != null and lot.furniture.has(j.furniture) and j.furniture.cash > 0.0
 		"refill":
 			return g_ok and g.state == "eating" and g.wants_refill
+		"crayons":
+			return g_ok and not g.crayons and g.state in ["seated", "ordered", "eating"]
 		"wash":
 			return j.furniture != null and lot.furniture.has(j.furniture) and j.furniture.dirty > 0
 		"sweep":
