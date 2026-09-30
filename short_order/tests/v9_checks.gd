@@ -27,6 +27,7 @@ static func run(main) -> void:
 	career_checks(main)
 	customer_checks(main)
 	tool_checks(main)
+	await carhop_check(main)
 	await save_checks(main)
 
 
@@ -177,6 +178,34 @@ static func tool_checks(main) -> void:
 	check(Data.RADIO.has("hits") and Data.FURNITURE.has("radio"), "a kitchen radio")
 	GameState.history = [{"day": 1, "net": 100.0, "wages": 500.0}, {"day": 2, "net": 300.0, "wages": 500.0}]
 	check(is_equal_approx(GameState.weekly_profit(), 1400.0), "the Books know a week's profit ($%d)" % int(GameState.weekly_profit()))
+
+
+## A car pulls into a drive-in stall, a server skates out, and they're served.
+static func carhop_check(main) -> void:
+	var lot = main.lot
+	GameState.rep_level = 2
+	GameState.phase = GameState.Phase.PLANNING
+	var ok: bool = lot.place_furniture("stall", Vector2i(22, 19), 0)
+	check(ok, "a drive-in stall goes outside once you're a Town favourite")
+	for s in GameState.staff:
+		s.set_at_work(true)
+	Events.auto_choice = 0
+	main.open_diner()
+	while GameState.phase == GameState.Phase.PREP:
+		main.simulate(0.1)
+	var stall = main.free_stall()
+	check(stall != null, "the stall is free for a car")
+	if stall == null:
+		return
+	var served_before: int = GameState.today["served"]
+	main.spawn_group("carhop", 2, stall)
+	var g = main.groups[-1]
+	var guard := 0
+	while is_instance_valid(g) and g.state not in ["leaving", "gone"] and guard < 4000:
+		guard += 1
+		main.simulate(0.1)
+	check(GameState.today["served"] >= served_before + 2, "a car at the drive-in gets its order and pays (%d served)" % (GameState.today["served"] - served_before))
+	GameState.rep_level = 0
 
 
 static func save_checks(main) -> void:
