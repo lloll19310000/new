@@ -381,6 +381,8 @@ func is_sold_out(dish: String) -> bool:
 ## Checked every so often while open: tells you when something runs out.
 func check_sold_out() -> void:
 	for d in Data.DISH_ORDER:
+		if not GameState.dish_known(d):
+			continue
 		var out := is_sold_out(d)
 		if out and not sold_out.has(d):
 			sold_out[d] = true

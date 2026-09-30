@@ -232,7 +232,29 @@ static func bag(ci: CanvasItem, p: Vector2, s: float = 1.0) -> void:
 	ci.draw_circle(p + Vector2(0, -2.5) * s, 1.6 * s, Color("c8403a"))
 
 
-static func dish(ci: CanvasItem, d: String, p: Vector2, s: float = 1.0, on_plate: bool = true) -> void:
+## q: how well it was cooked (0..1), or -1 to leave presentation out. A
+## sloppy plate has a smear and crumbs; a beautiful one a garnish and a drizzle.
+static func dish(ci: CanvasItem, d: String, p: Vector2, s: float = 1.0, on_plate: bool = true, q: float = -1.0) -> void:
+	if q >= 0.0 and on_plate and Data.DISHES.has(d) and Data.DISHES[d]["plate"] and q < 0.4:
+		plate(ci, p, s)
+		ellipse(ci, p + Vector2(4.2, 3.2) * s, Vector2(3.0, 1.5) * s, Color(0.45, 0.25, 0.12, 0.55), 0.5)
+		p += Vector2(-1.6, 1.2) * s   # slid off-centre
+		_dish(ci, d, p, s, false)
+	else:
+		_dish(ci, d, p, s, on_plate)
+	if q < 0.0 or not on_plate or not Data.DISHES.has(d) or not Data.DISHES[d]["plate"]:
+		return
+	if q < 0.4:
+		for o in [Vector2(5.2, -2.5), Vector2(-5.4, 3.6), Vector2(3.4, 5.4)]:
+			ci.draw_circle(p + o * s, 0.55 * s, Color("b8793a"))
+	elif q >= 0.8:
+		# a parsley sprig on the rim and a neat drizzle
+		ellipse(ci, p + Vector2(-5.6, -3.6) * s, Vector2(1.6, 0.9) * s, Color("4f9a45"), -0.6)
+		ellipse(ci, p + Vector2(-4.4, -4.8) * s, Vector2(1.3, 0.8) * s, Color("6cbf55"), 0.4)
+		ci.draw_arc(p + Vector2(0, 0.5) * s, 6.2 * s, 0.3, 1.3, 6, Color(0.78, 0.25, 0.2, 0.8), 0.8 * s)
+
+
+static func _dish(ci: CanvasItem, d: String, p: Vector2, s: float = 1.0, on_plate: bool = true) -> void:
 	match d:
 		"burger":
 			if on_plate: plate(ci, p, s)
@@ -277,6 +299,49 @@ static func dish(ci: CanvasItem, d: String, p: Vector2, s: float = 1.0, on_plate
 			ci.draw_circle(p, 4.2 * s, Color("f4f4f4"))
 			ci.draw_circle(p, 3.1 * s, Color("6b4226"))
 			ci.draw_arc(p + Vector2(4.5, 0) * s, 1.6 * s, -PI / 2, PI / 2, 8, Color("f4f4f4"), 1.2 * s)
+		"double":
+			if on_plate: plate(ci, p, s)
+			ci.draw_circle(p, 5.6 * s, Color("6b3a1f"))
+			ci.draw_colored_polygon(PackedVector2Array([p + Vector2(-5.5, -1) * s, p + Vector2(5.5, -2) * s, p + Vector2(4, 3) * s, p + Vector2(-4.5, 3.5) * s]), Color("f2b632"))
+			ci.draw_circle(p + Vector2(0, -0.6) * s, 4.5 * s, Color("d9a45b"))
+			for o in [Vector2(-1.8, -1.6), Vector2(1.5, -2.4), Vector2(0.6, 0.8), Vector2(-0.8, 1.4), Vector2(2.2, 0.4)]:
+				ci.draw_circle(p + o * s, 0.5 * s, Color("f7ecd0"))
+		"club":
+			if on_plate: plate(ci, p, s)
+			for side in [-1.0, 1.0]:
+				var q := p + Vector2(side * 2.4, 0) * s
+				var tri := PackedVector2Array([q + Vector2(-side * 2.6, -4.2) * s, q + Vector2(side * 2.6, 3.6) * s, q + Vector2(-side * 2.6, 3.6) * s])
+				ci.draw_colored_polygon(tri, Color("e9c98a"))
+				ci.draw_polyline(PackedVector2Array([tri[0], tri[1], tri[2], tri[0]]), Color("b8793a"), 0.8 * s)
+				ci.draw_line(tri[0] + Vector2(0, 1.5) * s, tri[2] + Vector2(side * 1.2, -0.6) * s, Color("5fa84a"), 0.9 * s)
+				ci.draw_line(q + Vector2(-side * 1.2, -1.8) * s, q + Vector2(-side * 1.2, -4.5) * s, Color("c8403a"), 0.6 * s)
+		"waffles":
+			if on_plate: plate(ci, p, s)
+			rbox(ci, Rect2(p - Vector2(4.6, 4.6) * s, Vector2(9.2, 9.2) * s), Color("d9a14a"), Color("a8732e"), 2, 1)
+			for i in 3:
+				var o := (-2.3 + i * 2.3) * s
+				ci.draw_line(p + Vector2(o, -4.2 * s), p + Vector2(o, 4.2 * s), Color("b8803a"), 0.8 * s)
+				ci.draw_line(p + Vector2(-4.2 * s, o), p + Vector2(4.2 * s, o), Color("b8803a"), 0.8 * s)
+			ci.draw_rect(Rect2(p - Vector2(1.2, 1.2) * s, Vector2(2.4, 2.4) * s), Color("f7e27a"))
+		"chili", "soup":
+			ci.draw_circle(p, 5.2 * s, Color("f4f4f4"))
+			ci.draw_circle(p, 4.2 * s, Color("8a2f1c") if d == "chili" else Color("e0a040"))
+			if d == "chili":
+				for o in [Vector2(-1.5, -1), Vector2(1.6, 0.4), Vector2(-0.2, 1.8), Vector2(1.2, -2)]:
+					ellipse(ci, p + o * s, Vector2(0.9, 0.6) * s, Color("5a1c10"))
+				ci.draw_circle(p + Vector2(-1.8, 1.4) * s, 0.9 * s, Color("f2e7c6"))
+			else:
+				for o in [Vector2(-1.5, -1), Vector2(1.6, 0.4), Vector2(-0.2, 1.8)]:
+					ci.draw_circle(p + o * s, 0.6 * s, Color("5fa84a"))
+				ci.draw_circle(p + Vector2(1.4, -1.8) * s, 0.7 * s, Color("d23b30"))
+			ci.draw_line(p + Vector2(3, 2) * s, p + Vector2(6.5, 5) * s, Color("c9c9d1"), 1.1 * s)
+		"hometown":
+			if on_plate: plate(ci, p, s)
+			ci.draw_circle(p, 4.8 * s, Color("e8c170"))
+			ci.draw_arc(p, 3.4 * s, 0, TAU * 0.8, 12, Color("c8603a"), 1.4 * s)
+			ci.draw_arc(p, 1.8 * s, 1.0, TAU * 0.9, 10, Color("c8603a"), 1.2 * s)
+			ci.draw_circle(p + Vector2(2.4, -2.4) * s, 0.9 * s, Color("4f9a45"))
+			ci.draw_circle(p + Vector2(-2.6, 1.8) * s, 0.8 * s, Color("4f9a45"))
 		"soda", "icedtea":
 			# a tall glass seen from above, with ice cubes and a straw
 			ci.draw_circle(p, 4.4 * s, Color("dfeef6"))
@@ -607,7 +672,7 @@ static func furniture_in(ci: CanvasItem, type: String, r: Rect2, dir: int, f = n
 					if it.get("takeout", false):
 						bag(ci, p, 0.7)
 					else:
-						dish(ci, it["dish"], p, 0.75)
+						dish(ci, it["dish"], p, 0.75, true, float(it.get("q", -1.0)))
 		"oven":
 			# a range from above: the door handle and knobs along the front, two
 			# burners, and the back riser against the wall
@@ -956,7 +1021,7 @@ static func table_food(ci: CanvasItem, f) -> void:
 			if extra > 0:
 				p = p.lerp(c, 0.45) + Vector2(extra * 5.0 - 2.5, 0)
 			p = Vector2(clampf(p.x, top.position.x, top.end.x), clampf(p.y, top.position.y, top.end.y))
-			dish(ci, foods[i], p, 0.66)
+			dish(ci, foods[i], p, 0.66, true, f.food_q[i] if i < f.food_q.size() else -1.0)
 	if f.cash > 0.0:
 		# the check folder with the money tucked in, on the side away from the chairs
 		var away := Vector2.ZERO

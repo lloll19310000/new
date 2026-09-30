@@ -95,8 +95,16 @@ const NEW_DINER_RAMP := [0.7, 0.85, 0.95]
 
 ## kind: what part of a meal it is (main, side, drink, dessert).
 ## prep: can be prepped in the morning (chopped, portioned, mixed) to cook faster later.
-const DISHES := {
+## A var, not a const: the hometown dish takes the name of the cook who taught it.
+var DISHES := {
 	"burger":    {"name": "Burger",    "station": "grill",   "minutes": 5.0, "needs": {"meat": 1, "bread": 1, "veg": 1}, "price": 16.0, "plate": true,  "kind": "main", "prep": true},
+	## recipes you unlock (see RECIPES): off the menu until then
+	"double":    {"name": "Double cheeseburger", "station": "grill", "minutes": 6.0, "needs": {"meat": 2, "bread": 1, "dairy": 1}, "price": 21.0, "plate": true, "kind": "main", "prep": true, "locked": true},
+	"club":      {"name": "Club sandwich", "station": "griddle", "minutes": 4.0, "needs": {"meat": 1, "bread": 1, "veg": 1}, "price": 15.0, "plate": true, "kind": "main", "prep": true, "locked": true},
+	"waffles":   {"name": "Waffles",   "station": "griddle", "minutes": 4.0, "needs": {"eggs": 1, "dairy": 1, "bread": 1}, "price": 13.0, "plate": true, "kind": "main", "prep": true, "locked": true},
+	"chili":     {"name": "Chili",     "station": "oven",    "minutes": 6.0, "needs": {"meat": 1, "veg": 1}, "price": 14.0, "plate": true, "kind": "main", "prep": true, "locked": true},
+	"hometown":  {"name": "Hometown special", "station": "oven", "minutes": 6.0, "needs": {"meat": 1, "veg": 1, "bread": 1}, "price": 19.0, "plate": true, "kind": "main", "prep": true, "locked": true},
+	"soup":      {"name": "Soup of the day", "station": "oven", "minutes": 3.0, "needs": {"veg": 1, "bread": 1}, "price": 7.0, "plate": true, "kind": "side", "prep": true, "locked": true},
 	"pancakes":  {"name": "Pancakes",  "station": "griddle", "minutes": 4.0, "needs": {"dairy": 1, "bread": 1}, "price": 12.0,  "plate": true,  "kind": "main", "prep": true},
 	"omelette":  {"name": "Omelette",  "station": "griddle", "minutes": 4.0, "needs": {"eggs": 1, "dairy": 1},  "price": 13.0,  "plate": true,  "kind": "main", "prep": true},
 	"meatloaf":  {"name": "Meatloaf",  "station": "oven",    "minutes": 7.0, "needs": {"meat": 1, "bread": 1},  "price": 18.0, "plate": true,  "kind": "main", "prep": true},
@@ -108,7 +116,19 @@ const DISHES := {
 	"soda":      {"name": "Soda",      "station": "drinks",  "minutes": 0.8, "needs": {},                       "price": 3.5,  "plate": false, "kind": "drink", "prep": false, "ice": true},
 	"icedtea":   {"name": "Iced tea",  "station": "drinks",  "minutes": 0.8, "needs": {},                       "price": 3.5,  "plate": false, "kind": "drink", "prep": false, "ice": true},
 }
-const DISH_ORDER := ["burger", "pancakes", "omelette", "meatloaf", "fries", "pie", "milkshake", "coffee", "soda", "icedtea"]
+const DISH_ORDER := ["burger", "double", "club", "pancakes", "waffles", "omelette", "meatloaf", "chili", "hometown", "fries", "soup", "pie", "milkshake", "coffee", "soda", "icedtea"]
+## How each locked dish is unlocked: "rep" a reputation level, "goal" a goal
+## on the Goals board, "teach" a cook teaching you their hometown dish.
+const RECIPES := {
+	"soup": {"rep": 1, "how": "Reach Local spot"},
+	"club": {"rep": 2, "how": "Reach Town favourite"},
+	"double": {"rep": 3, "how": "Reach Destination diner"},
+	"waffles": {"goal": "breakfast", "how": "Goal: serve 60 breakfasts"},
+	"chili": {"goal": "regular_heart", "how": "Goal: a regular's heart meter full"},
+	"hometown": {"teach": true, "how": "A cook may teach you their hometown dish"},
+}
+## Where menu sections start on the printed menu.
+const MENU_SECTIONS := {"main": "From the grill & griddle", "side": "On the side", "dessert": "Sweets", "drink": "At the fountain"}
 const SPECIAL_PICKS := 3          # customers pick today's special this many times as often
 const SPECIAL_REVIEW := 0.2       # and like getting it this much
 

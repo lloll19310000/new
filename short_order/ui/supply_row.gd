@@ -30,7 +30,7 @@ func _ready() -> void:
 	amount.focus_exited.connect(_typed)
 	var used: Array = []
 	for d in Data.DISH_ORDER:
-		if Data.DISHES[d]["needs"].has(ing):
+		if Data.DISHES[d]["needs"].has(ing) and GameState.dish_known(d):
 			used.append(Data.DISHES[d]["name"].to_lower())
 	var info: Dictionary = Data.INGREDIENTS[ing]
 	tooltip_text = "%s: $%.2f each. Used for %s.\nKept on the %s. Lasts %d day%s from delivery, then it's thrown out." % [info["name"], info["cost"], ", ".join(used),

@@ -45,7 +45,7 @@ static func run(main, _args: PackedStringArray) -> void:
 	# the pass in the kitchen wall, with food on it
 	var ps = lot.add_furniture("pass", Vector2i(12, 12), 0)
 	for i in 8:
-		ps.items.append({"dish": Data.DISH_ORDER[i % Data.DISH_ORDER.size()], "group": null, "q": 1.0, "plated": true, "t": 0.0})
+		ps.items.append({"dish": ["double", "club", "waffles", "chili", "hometown", "soup", "burger", "pancakes"][i], "group": null, "q": [0.9, 0.3, 0.9, 0.6, 0.9, 0.5, 0.2, 0.95][i], "plated": true, "t": 0.0})
 	var ps2 = lot.add_furniture("pass", Vector2i(21, 4), 1)
 	for i in 5:
 		ps2.items.append({"dish": Data.DISH_ORDER[i], "group": null, "q": 1.0, "plated": true, "t": 0.0})
@@ -69,6 +69,9 @@ static func run(main, _args: PackedStringArray) -> void:
 	tb.food_on_table = ["burger", "fries", "milkshake", "pancakes", "coffee", "pie", "soda", "icedtea"]
 	st.food_on_table = ["meatloaf", "icedtea"]
 	tb2.food_on_table = ["omelette", "coffee", "burger", "soda"]
+	tb.food_q = [0.95, 0.9, 0.9, 0.2, 0.8, 0.3, 0.8, 0.8]
+	st.food_q = [0.25, 0.8]
+	tb2.food_q = [0.9, 0.8, 0.3, 0.8]
 	tb2.cash = 42.0
 	st.cash = 18.0
 	lot.queue_redraw()

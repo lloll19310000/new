@@ -19,6 +19,9 @@ var main
 @onready var event_card = %EventCard
 var tickets_card
 var inbox
+var overlay_bar: HBoxContainer
+var overlay_buttons := {}
+var overlay_legend: Label
 var game_menu
 var _speed_before_event := 1
 
@@ -79,6 +82,12 @@ func _ready() -> void:
 		set_speed(maxi(_speed_before_event, 1)))
 	GameState.staff_changed.connect(refresh_checklist)
 	GameState.phase_changed.connect(func(_p): refresh_checklist())
+	# the map overlays: dirt, foot traffic, table waits, station wear
+	overlay_bar = _overlay_bar()
+	toasts.get_parent().add_child(overlay_bar)
+	toasts.get_parent().move_child(overlay_bar, build_menu.get_index() + 1)
+	build_menu.resized.connect(_place_overlay_bar)
+	_place_overlay_bar.call_deferred()
 	# the message inbox, under the bell in the top bar
 	inbox = preload("res://ui/inbox.gd").new()
 	inbox.name = "Inbox"
@@ -157,6 +166,59 @@ func set_speed(v: int) -> void:
 	top_bar.show_speed(v)
 
 
+func _overlay_bar() -> HBoxContainer:
+	var bar := HBoxContainer.new()
+	bar.name = "OverlayBar"
+	bar.add_theme_constant_override("separation", 4)
+	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var icons := {"dirt": "clean", "traffic": "people", "waits": "clock", "wear": "fix"}
+	for m in ["dirt", "traffic", "waits", "wear"]:
+		var b := Button.new()
+		b.toggle_mode = true
+		b.icon = UiKit.icon(icons[m])
+		b.theme_type_variation = &"SmallButton"
+		b.custom_minimum_size = Vector2(30, 28)
+		b.tooltip_text = "Show %s on the map (V cycles).\n%s" % [main.heatmap.NAMES[m].to_lower(), main.heatmap.LEGENDS[m]]
+		b.toggled.connect(func(on: bool):
+			if on:
+				show_overlay(m)
+			elif main.heatmap.mode == m:
+				show_overlay(""))
+		bar.add_child(b)
+		overlay_buttons[m] = b
+	overlay_legend = UiKit.label("", 12, UiKit.INK, &"SmallLabel")
+	var st := StyleBoxFlat.new()
+	st.bg_color = Color(0.13, 0.1, 0.09, 0.9)
+	st.set_corner_radius_all(6)
+	st.content_margin_left = 8
+	st.content_margin_right = 8
+	st.content_margin_top = 3
+	st.content_margin_bottom = 3
+	overlay_legend.add_theme_stylebox_override("normal", st)
+	overlay_legend.visible = false
+	bar.add_child(overlay_legend)
+	return bar
+
+
+## Switches a map overlay on ("dirt", "traffic", "waits", "wear") or off ("").
+func show_overlay(m: String) -> void:
+	main.heatmap.set_mode(m)
+	for k in overlay_buttons:
+		overlay_buttons[k].set_pressed_no_signal(k == main.heatmap.mode)
+	var mode: String = main.heatmap.mode
+	overlay_legend.visible = mode != ""
+	if mode != "":
+		overlay_legend.text = "%s: %s" % [main.heatmap.NAMES[mode], main.heatmap.LEGENDS[mode]]
+
+
+func _place_overlay_bar() -> void:
+	overlay_bar.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+	overlay_bar.offset_left = 10.0
+	overlay_bar.offset_bottom = -(build_menu.size.y + 16.0)
+	overlay_bar.offset_top = overlay_bar.offset_bottom - 28.0
+	overlay_bar.grow_vertical = Control.GROW_DIRECTION_BEGIN
+
+
 func _unhandled_key_input(event: InputEvent) -> void:
 	var k := event as InputEventKey
 	if k == null or not k.pressed or k.echo:
@@ -190,6 +252,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			set_speed(2)
 		KEY_3:
 			set_speed(4)
+		KEY_V:
+			main.heatmap.cycle()
+			show_overlay(main.heatmap.mode)
 		KEY_TAB:
 			if side_panel.is_open:
 				side_panel.close()

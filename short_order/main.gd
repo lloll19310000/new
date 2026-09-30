@@ -38,6 +38,7 @@ var slow_timer := 0.0
 var critic_at := -1.0              # game minute a food critic arrives today, or -1
 var inspect_at := -1.0             # game minute the health inspector arrives today, or -1
 var rush_name := ""
+var heatmap
 
 
 func _ready() -> void:
@@ -55,6 +56,11 @@ func _ready() -> void:
 	var street := preload("res://world/street.gd").new()
 	street.name = "Street"
 	lot.add_child(street)
+	heatmap = preload("res://world/heatmap.gd").new()
+	heatmap.name = "Heatmap"
+	heatmap.lot = lot
+	heatmap.visible = false
+	lot.add_child(heatmap)
 	var fx := Fx.new()
 	fx.name = "Fx"
 	lot.add_child(fx)
@@ -512,6 +518,7 @@ func end_day() -> void:
 	# tomorrow's schedule: days off and who works days or nights
 	Shifts.plan_schedule(GameState.day + 1)
 	var level_up := GameState.check_level_up()
+	GameState.unlock_by_rep()
 	if level_up:
 		var lv: Dictionary = GameState.level_info()
 		GameState.toast.emit("Your diner is now a %s! More customers are coming%s." % [lv["name"], ", including tourists" if GameState.rep_level == 2 else ""], "good")
@@ -735,6 +742,7 @@ func save_game(to: String = "") -> bool:
 		"version": SAVE_VERSION, "name": GameState.diner_name, "saved_at": Time.get_datetime_string_from_system(false, true), "day": GameState.day, "money": GameState.money, "reviews": GameState.reviews,
 		"review_count": GameState.review_count,
 		"menu": GameState.menu, "stock": GameState.stock, "target": GameState.target,
+		"unlocked": GameState.unlocked, "hometown": GameState.hometown,
 		"plates_total": GameState.plates_total, "plates": plates, "totals": GameState.totals,
 		"grade": GameState.grade, "crew": Crew.save_data(),
 		"supplier": GameState.supplier, "special": GameState.special, "owned": GameState.owned, "rep_level": GameState.rep_level,
@@ -785,6 +793,12 @@ func load_game(from: String = "") -> bool:
 		for r in GameState.reviews:
 			sum += r
 		GameState.rating = sum / GameState.reviews.size()
+	for d in data.get("unlocked", []):
+		if Data.DISHES.has(str(d)):
+			GameState.unlocked.append(str(d))
+	var ht: Dictionary = data.get("hometown", {})
+	if not ht.is_empty():
+		GameState.set_hometown(str(ht.get("cook", "")), str(ht.get("dish", "")))
 	for d in data["menu"]:
 		if GameState.menu.has(d):
 			GameState.menu[d] = {"on": bool(data["menu"][d]["on"]), "price": float(data["menu"][d]["price"])}

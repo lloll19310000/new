@@ -29,6 +29,8 @@ var reviews: Array = []            # recent review scores (1.0 to 5.0)
 var review_count: int = 0          # every review ever
 var rating: float = 3.0
 var menu: Dictionary = {}          # dish -> {"on": bool, "price": float}
+var unlocked: Array = []           # recipes you've unlocked (see Data.RECIPES)
+var hometown: Dictionary = {}      # {"cook", "dish"}: the hometown dish a cook taught you
 var stock: Dictionary = {}         # ingredient -> int
 var target: Dictionary = {}        # ingredient -> int, topped up every night
 var plates_total: int = 0
@@ -68,8 +70,11 @@ func reset() -> void:
 	review_count = 0
 	rating = 3.0
 	menu = {}
+	unlocked = []
+	hometown = {}
+	Data.DISHES["hometown"]["name"] = "Hometown special"
 	for d in Data.DISH_ORDER:
-		menu[d] = {"on": true, "price": Data.DISHES[d]["price"]}
+		menu[d] = {"on": not Data.DISHES[d].get("locked", false), "price": Data.DISHES[d]["price"]}
 	stock = Data.START_STOCK.duplicate()
 	target = Data.START_STOCK.duplicate()
 	plates_total = Data.START_PLATES
@@ -213,7 +218,45 @@ func current_rush() -> Dictionary:
 # ---------------------------------------------------------------- menu and stock
 
 func dish_on(dish: String) -> bool:
-	return menu.has(dish) and menu[dish]["on"]
+	return menu.has(dish) and menu[dish]["on"] and dish_known(dish)
+
+
+## Locked recipes are off the menu until you unlock them.
+func dish_known(dish: String) -> bool:
+	return not Data.DISHES[dish].get("locked", false) or unlocked.has(dish)
+
+
+## Adds a recipe to the menu (switched on). why: "rep", "goal" or "teach".
+func unlock_dish(dish: String, why: String = "") -> bool:
+	if unlocked.has(dish) or not Data.DISHES.has(dish):
+		return false
+	unlocked.append(dish)
+	menu[dish]["on"] = true
+	var n: String = Data.DISHES[dish]["name"]
+	toast.emit("New recipe: %s is on the menu%s." % [n, {"rep": ", now the diner's better known", "goal": ", a reward from the Goals board", "teach": ""}.get(why, "")], "good")
+	menu_changed.emit()
+	return true
+
+
+## The recipes your reputation has earned so far.
+func unlock_by_rep() -> void:
+	for d in Data.RECIPES:
+		var r: Dictionary = Data.RECIPES[d]
+		if r.has("rep") and rep_level >= int(r["rep"]):
+			unlock_dish(d, "rep")
+
+
+## The hometown dish: {"cook": name, "dish": their dish} once taught.
+func set_hometown(cook: String, dish: String) -> void:
+	hometown = {"cook": cook, "dish": dish}
+	Data.DISHES["hometown"]["name"] = hometown_name()
+
+
+func hometown_name() -> String:
+	if hometown.is_empty():
+		return "Hometown special"
+	var d: String = hometown["dish"]
+	return "%s's %s" % [str(hometown["cook"]).split(" ")[0], d]
 
 
 func price(dish: String) -> float:
@@ -278,7 +321,7 @@ func price_level() -> float:
 	var sum := 0.0
 	var n := 0
 	for d in Data.DISH_ORDER:
-		if menu[d]["on"]:
+		if dish_on(d):
 			sum += menu[d]["price"] / Data.DISHES[d]["price"]
 			n += 1
 	return sum / n if n > 0 else 1.0

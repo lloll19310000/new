@@ -516,6 +516,7 @@ func receive(dishes: Array, qs: Array, server = null, cooks: Array = []) -> void
 		received.append(d)
 		if not takeout:
 			table.food_on_table.append(d)
+			table.food_q.append(qs[i] if i < qs.size() else 0.6)
 		bill += GameState.price(d)
 		if i < qs.size():
 			qualities.append(qs[i])
@@ -725,6 +726,7 @@ func leave_table() -> void:
 		if Data.DISHES[d]["plate"]:
 			plates += 1
 	table.food_on_table.clear()
+	table.food_q.clear()
 	table.dirty_plates += plates
 	if plates > 0 and not JobBoard.has_open("bus", "furniture", table):
 		JobBoard.post("clean", "bus", {"furniture": table})
@@ -1067,6 +1069,7 @@ func leave(score: float, complaint: String, paid: bool) -> void:
 				if Data.DISHES[d]["plate"]:
 					plated += 1
 			table.food_on_table.clear()
+			table.food_q.clear()
 			if plated > 0:
 				table.dirty_plates += plated
 				JobBoard.post("clean", "bus", {"furniture": table})

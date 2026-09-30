@@ -9,6 +9,8 @@ var rows := {}
 var price_note: Label
 var prep_note: Label
 var prep_rows := {}          # dish -> {"spin": SpinBox, "info": Label}
+var paper: PanelContainer
+var paper_title: Label
 var _t := 0.0
 
 @onready var rows_box: VBoxContainer = %Rows
@@ -20,10 +22,38 @@ func _ready() -> void:
 	price_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	price_note.custom_minimum_size = Vector2(100, 0)
 	rows_box.add_child(price_note)
+	# the dishes, printed on a menu card, section by section
+	paper = PanelContainer.new()
+	var st := StyleBoxFlat.new()
+	st.bg_color = Color("f4ecd8")
+	st.border_color = Color("c8372d")
+	st.set_border_width_all(3)
+	st.set_corner_radius_all(10)
+	st.content_margin_left = 10
+	st.content_margin_right = 8
+	st.content_margin_top = 10
+	st.content_margin_bottom = 10
+	paper.add_theme_stylebox_override("panel", st)
+	rows_box.add_child(paper)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 0)
+	paper.add_child(col)
+	paper_title = UiKit.label("", 18, Color("c8372d"), &"HeaderLabel")
+	paper_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	col.add_child(paper_title)
+	var kind := ""
 	for d in Data.DISH_ORDER:
+		var k: String = Data.DISHES[d]["kind"]
+		if k != kind:
+			kind = k
+			var h := UiKit.label("~ %s ~" % Data.MENU_SECTIONS.get(k, k.capitalize()), 13, Color("b23a2e"), &"StatLabel")
+			h.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			h.custom_minimum_size.y = 26
+			h.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+			col.add_child(h)
 		var row = DishRow.instantiate()
 		row.setup(d)
-		rows_box.add_child(row)
+		col.add_child(row)
 		rows[d] = row
 	build_prep_list()
 	GameState.menu_changed.connect(refresh)
@@ -83,6 +113,7 @@ func build_prep_list() -> void:
 
 
 func refresh() -> void:
+	paper_title.text = (GameState.diner_name if GameState.diner_name != "" else "Menu")
 	var lvl := GameState.price_level()
 	var pct := int(round((lvl - 1.0) * 100.0))
 	var effect := int(round((GameState.price_demand() - 1.0) * 100.0))

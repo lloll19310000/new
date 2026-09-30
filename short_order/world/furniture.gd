@@ -22,6 +22,7 @@ var items: Array = []                   # [{"dish": String, "group": Group, "q":
 var group = null                        # customer group sitting here (or waiting at the window)
 var dirty_plates: int = 0
 var food_on_table: Array = []           # dishes being eaten
+var food_q: Array = []                  # how well each was cooked (0..1), shown on the plate
 var chairs: Array = []                  # chairs next to this table
 var reserved = null                     # the booking this table is held for (a Dictionary), or null
 var join: int = 0                       # counters: which sides join another counter (bit per Data.DIRS)

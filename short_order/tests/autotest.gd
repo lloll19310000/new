@@ -2139,6 +2139,21 @@ static func run_ui(main, args: PackedStringArray) -> void:
 	Crew.say(sneak, "sorry", "phone")
 	await snap(main, "service", prefix)
 	check_fits(main, "while open")
+	for m in ["dirt", "traffic", "waits", "wear"]:
+		hud.overlay_buttons[m].button_pressed = true
+		await tree.process_frame
+		check(main.heatmap.mode == m and main.heatmap.visible and hud.overlay_legend.visible, "the %s overlay switches on" % m)
+		if m == "waits" or m == "traffic":
+			await snap(main, "overlay_" + m, prefix)
+	hud.overlay_buttons["wear"].button_pressed = false
+	check(main.heatmap.mode == "" and not main.heatmap.visible and not hud.overlay_legend.visible, "and off again")
+	# the printed menu: a price chip and what each plate makes
+	var mrow = menu_page.rows["burger"]
+	var before_price: float = GameState.price("burger")
+	mrow.plus_button.pressed.emit()
+	check(is_equal_approx(GameState.price("burger"), before_price + 0.5) and mrow.profit_label.text.begins_with("+$"), "the + chip raises the price; profit per plate shows (%s)" % mrow.profit_label.text)
+	mrow.minus_button.pressed.emit()
+	check(not menu_page.rows["waffles"].on_switch.get_parent().visible and menu_page.rows["waffles"].lock_label.visible, "locked recipes say how to unlock them")
 	print("UITEST: %s served=%d left=%d rating=%.2f" % [GameState.clock_text(), GameState.today["served"], GameState.today["left"], GameState.rating])
 	Events.auto_choice = 0   # answer anything else that comes up this afternoon
 	while GameState.minute < 20.5 * 60 and GameState.phase == GameState.Phase.SERVICE:
