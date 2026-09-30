@@ -82,12 +82,16 @@ func _ready() -> void:
 	loan_label.theme_type_variation = &"StatLabel"
 	box.add_child(loan_label)
 	loan_note = note("")
-	var loan_row := HBoxContainer.new()
-	loan_row.add_theme_constant_override("separation", 6)
-	for amount in Data.LOAN_OPTIONS:
+	var loan_row := GridContainer.new()
+	loan_row.columns = 3
+	loan_row.add_theme_constant_override("h_separation", 6)
+	loan_row.add_theme_constant_override("v_separation", 6)
+	for terms in Data.LOANS:
+		var amount: int = terms["amount"]
 		var b := Button.new()
-		b.text = "$%s" % UiKit.thousands(amount)
-		b.tooltip_text = "Borrow $%s now. You pay back $%d a week for %d weeks." % [UiKit.thousands(amount), int(ceil(amount * (1.0 + Data.LOAN_INTEREST) / Data.LOAN_WEEKS)), Data.LOAN_WEEKS]
+		b.text = "$%dk" % int(amount / 1000.0)
+		b.tooltip_text = "Borrow $%s now. You pay back $%s a week for %d weeks (%d%% on top in all)." % [UiKit.thousands(amount),
+			UiKit.thousands(int(ceil(amount * (1.0 + terms["interest"]) / terms["weeks"]))), terms["weeks"], int(round(terms["interest"] * 100))]
 		b.theme_type_variation = &"SmallButton"
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.pressed.connect(func():
@@ -204,7 +208,7 @@ func refresh() -> void:
 		payoff_button.text = "Pay it all back now ($%d, no more interest)" % int(ceil(Books.payoff_cost()))
 		payoff_button.disabled = GameState.money < Books.payoff_cost()
 	else:
-		loan_note.text = "Borrow now and pay it back over %d weeks with your bills, plus %d%% interest." % [Data.LOAN_WEEKS, int(Data.LOAN_INTEREST * 100)]
+		loan_note.text = "Borrow now and pay it back with your weekly bills: small loans over 10 weeks, the biggest over three years. Hover a button for its terms."
 	# front of house
 	var has_stand: bool = main != null and main.lot.has_type("host")
 	var has_window: bool = main != null and main.lot.has_type("takeout")

@@ -20,6 +20,7 @@ var furn_at: Array = []
 var furniture: Array = []
 var astar := AStarGrid2D.new()        # staff
 var astar_c := AStarGrid2D.new()      # customers
+var cleaner_on_shift := false         # someone whose job is cleaning is in (see update_cleaners)
 var entry_door := Vector2i(-1, -1)
 var entry_outside := Vector2i(-1, -1)
 var entry_inside := Vector2i(-1, -1)
@@ -224,6 +225,15 @@ func access_cells(f) -> Array:
 			return o == null or o.type != "chair")
 		if not no_chairs.is_empty():
 			return no_chairs
+	return out
+
+
+## Somewhere to stand by a person at c: their tile or one beside it.
+func access_cells_near(c: Vector2i) -> Array:
+	var out: Array = []
+	for d in [Vector2i.ZERO] + Data.DIRS:
+		if walkable(c + d):
+			out.append(c + d)
 	return out
 
 
@@ -611,13 +621,30 @@ func remove_rect(r: Rect2i) -> float:
 
 # ------------------------------------------------------------------ dirt
 
+## Is someone whose job is keeping the place clean in right now? Then spills
+## are swept as soon as they happen and small ones never show.
+func update_cleaners() -> void:
+	var was := cleaner_on_shift
+	cleaner_on_shift = false
+	for s in GameState.staff:
+		if is_instance_valid(s) and s.is_here() and (s.role in ["busser", "porter"] or s.priorities.get("clean", 0) == 1):
+			cleaner_on_shift = true
+			break
+	if was != cleaner_on_shift:
+		queue_redraw()
+
+
+func dirt_visible(c: Vector2i) -> bool:
+	return dirt[idx(c)] >= (Data.DIRT_SHOW_CLEANER if cleaner_on_shift else Data.DIRT_SHOW)
+
+
 func add_dirt(c: Vector2i, amount: float) -> void:
 	if not indoors(c) or wall[idx(c)] == 1:
 		return
 	var i := idx(c)
 	var before := dirt[i]
 	dirt[i] = minf(1.0, dirt[i] + amount)
-	if dirt[i] >= Data.DIRT_JOB:
+	if dirt[i] >= (Data.DIRT_SHOW if cleaner_on_shift else Data.DIRT_JOB):
 		post_sweep(c)
 	if int(before * 8) != int(dirt[i] * 8) or (before < Data.DIRT_SHOW and dirt[i] >= Data.DIRT_SHOW):
 		queue_redraw()
@@ -778,7 +805,7 @@ func _draw() -> void:
 			var c := Vector2i(x, y)
 			var i := idx(c)
 			Art.ground(self, c, floor_type[i], noise[i])
-			if dirt[i] > Data.DIRT_SHOW:
+			if dirt_visible(c):
 				var d := dirt[i]
 				var p := cell_center(c) + Vector2(noise[i] * 8 - 4, noise[(i + 7) % noise.size()] * 8 - 4)
 				Art.ellipse(self, p, Vector2(7, 5) * (0.6 + d * 0.6), Color(0.36, 0.26, 0.15, 0.2 + d * 0.45))

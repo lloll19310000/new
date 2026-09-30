@@ -39,6 +39,7 @@ var totals: Dictionary = {}
 var next_id: int = 1
 var grade: String = ""             # health grade: "", "A", "B" or "C"
 var last_inspection_day: int = 0
+var next_inspection_day: int = 5  # the inspector's next visit (they don't say exactly when)
 var supplier: String = "standard"  # see Data.SUPPLIERS
 var special: String = ""           # today's special dish, or ""
 var owned: Array = ["start"]       # plots of land you own (Data.PLOTS ids)
@@ -78,6 +79,7 @@ func reset() -> void:
 		"best_end_rating": 0.0, "best_busy_rating": 0.0}
 	grade = ""
 	last_inspection_day = 0
+	next_inspection_day = randi_range(Data.FIRST_INSPECTION.x, Data.FIRST_INSPECTION.y)
 	supplier = "standard"
 	special = ""
 	owned = ["start"]
@@ -378,52 +380,96 @@ func groups_per_hour() -> float:
 func set_grade(g: String) -> void:
 	grade = g
 	last_inspection_day = day
+	next_inspection_day = day + randi_range(Data.INSPECTION_DAYS.x, Data.INSPECTION_DAYS.y)
 	today["inspection"] = g
 	if g == "A":
 		totals["grade_a"] += 1
 	grade_changed.emit(g)
 
 
+## Someone reported a reaction to the food: the health department follows up soon.
+func report_allergy() -> void:
+	last_allergy_day = day
+	next_inspection_day = mini(next_inspection_day, day + randi_range(Data.FOLLOW_UP_INSPECTION.x, Data.FOLLOW_UP_INSPECTION.y))
+
+
 # ---------------------------------------------------------------- hiring
 
+## Skill ranges [cooking, service] for people looking for each kind of job.
+const ROLE_SKILLS := {
+	"cook": [Vector2i(3, 9), Vector2i(1, 6)], "server": [Vector2i(1, 5), Vector2i(3, 9)], "host": [Vector2i(1, 5), Vector2i(3, 9)],
+	"busser": [Vector2i(1, 5), Vector2i(2, 7)], "dishwasher": [Vector2i(1, 6), Vector2i(1, 6)], "porter": [Vector2i(2, 6), Vector2i(3, 7)],
+	"manager": [Vector2i(4, 9), Vector2i(5, 9)],
+}
+
+
+## New people looking for work this morning: a few of every kind, so you can
+## always fill a shift. Hire as many as you like.
 func roll_candidates() -> void:
 	candidates = []
+	var roles: Array = ["cook", "cook", "server", "server", "host", "busser", "dishwasher", ["manager", "porter", "cook", "server"].pick_random()]
+	for i in Data.CANDIDATES_PER_DAY - roles.size():
+		roles.append(Data.ROLE_ORDER.pick_random())
+	for r in roles.slice(0, Data.CANDIDATES_PER_DAY):
+		candidates.append(make_candidate(r))
+
+
+## A job ad for one role: a few more people for it come by today.
+func post_job_ad(role: String) -> bool:
+	if not Data.ROLES.has(role) or not spend(Data.JOB_AD_COST):
+		return false
+	for i in Data.JOB_AD_PEOPLE:
+		candidates.append(make_candidate(role))
+	toast.emit("Your ad for a %s is up: %d people came by." % [Data.ROLES[role]["name"].to_lower(), Data.JOB_AD_PEOPLE], "good")
+	staff_changed.emit()
+	return true
+
+
+func make_candidate(role: String) -> Dictionary:
 	var used := {}
 	for s in staff:
 		used[s.person_name] = true
-	for i in 3:
-		var origin: Dictionary = Data.random_origin(used)
-		var pname: String = origin["name"]
-		origin.erase("name")
-		used[pname] = true
-		var cooking := randi_range(2, 9)
-		var service := randi_range(2, 9)
-		var traits: Array = []
-		var r := randf()
-		var count := 0 if r < 0.35 else (1 if r < 0.85 else 2)
-		var keys: Array = Data.TRAITS.keys()
-		keys.shuffle()
-		for k in keys:
-			if traits.size() >= count:
-				break
-			if k == "slow" and traits.has("speedy") or k == "speedy" and traits.has("slow"):
-				continue
-			if k == "friendly" and traits.has("grumpy") or k == "grumpy" and traits.has("friendly"):
-				continue
-			traits.append(k)
-		# wages are per 8-hour shift
-		var wage := Data.WAGE_BASE + (cooking + service) * 2 + randi_range(-3, 3)
-		for t in traits:
-			wage += int(round(Data.TRAITS[t]["wage"] * Data.TRAIT_WAGE_SHARE))
-		candidates.append({"name": pname, "cooking": cooking, "service": service, "wage": maxi(wage, 20),
-			"skin": Data.SKIN.pick_random(), "hair": Data.HAIR.pick_random(), "traits": traits,
-			"origin": origin, "bio": Data.write_bio(origin, cooking, service, traits)})
+	for c in candidates:
+		used[c["name"]] = true
+	var origin: Dictionary = Data.random_origin(used)
+	var pname: String = origin["name"]
+	origin.erase("name")
+	var sk: Array = ROLE_SKILLS.get(role, ROLE_SKILLS["server"])
+	var cooking := randi_range(sk[0].x, sk[0].y)
+	var service := randi_range(sk[1].x, sk[1].y)
+	var traits: Array = []
+	var r := randf()
+	var count := 0 if r < 0.35 else (1 if r < 0.85 else 2)
+	var keys: Array = Data.TRAITS.keys()
+	keys.shuffle()
+	for k in keys:
+		if traits.size() >= count:
+			break
+		if k == "slow" and traits.has("speedy") or k == "speedy" and traits.has("slow"):
+			continue
+		if k == "friendly" and traits.has("grumpy") or k == "grumpy" and traits.has("friendly"):
+			continue
+		traits.append(k)
+	# hourly pay, as asked for this role (never under the minimum wage)
+	var wage: float = Data.role_pay(role, cooking, service, traits) + snappedf(randf_range(-0.5, 0.5), 0.25)
+	return {"name": pname, "role": role, "cooking": cooking, "service": service, "wage": maxf(Data.MIN_WAGE, wage),
+		"skin": Data.SKIN.pick_random(), "hair": Data.HAIR.pick_random(), "traits": traits,
+		"origin": origin, "bio": Data.write_bio(origin, cooking, service, traits)}
 
 
-## Starting priorities for a new hire: their best skill first, everything else after.
-func default_priorities(cooking: int, service: int) -> Dictionary:
-	return {"cook": 1 if cooking >= service else 2, "serve": 1 if service > cooking else 2,
-		"host": 3 if service > cooking else 4, "wash": 3, "clean": 3, "fix": 3}
+## Starting priorities for someone in this role (see Data.ROLES).
+func default_priorities(role: String) -> Dictionary:
+	return Data.ROLES.get(role, Data.ROLES["server"])["priorities"].duplicate()
+
+
+## The role that fits someone from an older save best, from their priorities.
+func guess_role(priorities: Dictionary, manager: bool) -> String:
+	if manager:
+		return "manager"
+	for pair in [["cook", "cook"], ["serve", "server"], ["host", "host"], ["wash", "dishwasher"], ["clean", "busser"], ["fix", "porter"]]:
+		if priorities.get(pair[0], 0) == 1:
+			return pair[1]
+	return "server"
 
 
 ## Tonight's pay: each person's hours today, with overtime past 8 (see Shifts).

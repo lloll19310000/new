@@ -10,7 +10,7 @@ extends Node
 
 var main                               # set by main.gd
 var tip_policy := "keep"               # "keep" or "share"
-var loan := {}                         # {"amount", "owed", "weekly"} or {} with no loan
+var loan := {}                         # {"amount", "owed", "weekly", "interest"} or {} with no loan
 var pool := 0.0                        # tips shared today, split at night
 
 
@@ -75,10 +75,11 @@ func nightly_bills() -> Dictionary:
 # ------------------------------------------------------------------ the loan
 
 func take_loan(amount: int) -> bool:
-	if not loan.is_empty() or not amount in Data.LOAN_OPTIONS:
+	var terms: Dictionary = Data.loan_terms(amount)
+	if not loan.is_empty() or terms.is_empty():
 		return false
-	var owed := amount * (1.0 + Data.LOAN_INTEREST)
-	loan = {"amount": float(amount), "owed": owed, "weekly": owed / Data.LOAN_WEEKS}
+	var owed: float = amount * (1.0 + terms["interest"])
+	loan = {"amount": float(amount), "owed": owed, "weekly": owed / terms["weeks"], "interest": terms["interest"]}
 	GameState.add_money(amount)
 	GameState.toast.emit("The bank lent you $%s. You'll pay back $%d with each week's bills." % [UiKit.thousands(amount), int(ceil(loan["weekly"]))], "good")
 	Crew.log_line("You took out a $%s loan." % UiKit.thousands(amount), "money")
@@ -89,7 +90,7 @@ func take_loan(amount: int) -> bool:
 func payoff_cost() -> float:
 	if loan.is_empty():
 		return 0.0
-	return loan["owed"] / (1.0 + Data.LOAN_INTEREST)
+	return loan["owed"] / (1.0 + loan.get("interest", 0.12))
 
 
 func pay_off() -> bool:
@@ -105,19 +106,55 @@ func pay_off() -> bool:
 
 # ------------------------------------------------------------------ tips
 
-## A table left a tip. With "keep", it goes to whoever brought the food;
-## with "share", into the pot that's split between everyone at night.
-func add_tip(amount: float, servers: Array) -> void:
+## A table left a tip. Their own server (who took the order) gets most of it,
+## and whoever ran food to the table splits the rest. With "keep", each person
+## takes home what they earned; with "share", it all goes in the pot that's
+## split between everyone at night.
+func add_tip(amount: float, servers: Array, main_server = null) -> void:
 	if amount <= 0.0:
 		return
-	var valid: Array = servers.filter(func(s): return s != null and is_instance_valid(s) and GameState.staff.has(s))
-	for s in valid:
-		s.tips_earned += amount / valid.size()
-	if tip_policy == "share" or valid.is_empty():
+	GameState.today["tips"] += amount
+	var ok := func(s): return s != null and is_instance_valid(s) and GameState.staff.has(s)
+	var runners: Array = servers.filter(ok)
+	var shares := {}
+	if ok.call(main_server):
+		shares[main_server] = amount * (Data.TIP_SERVER_SHARE if not runners.is_empty() else 1.0)
+		for s in runners:
+			shares[s] = shares.get(s, 0.0) + amount * (1.0 - Data.TIP_SERVER_SHARE) / runners.size()
+	else:
+		for s in runners:
+			shares[s] = shares.get(s, 0.0) + amount / runners.size()
+	if shares.is_empty():
 		pool += amount
 		return
-	for s in valid:
-		s.tips_today += amount / valid.size()
+	for s in shares:
+		s.tips_earned += shares[s]
+		if tip_policy == "keep":
+			s.tips_today += shares[s]
+	if tip_policy == "share":
+		pool += amount
+
+
+## Someone picked up the money a table left: the bill goes in the till and the
+## tip to the table's servers. Returns true if there was any.
+func collect_table(t, _by = null) -> bool:
+	if t == null or t.cash <= 0.0:
+		return false
+	var bill: float = t.cash - t.cash_tip
+	GameState.add_money(bill)
+	GameState.today["revenue"] += bill
+	GameState.totals["earned"] += bill
+	add_tip(t.cash_tip, t.cash_servers, t.cash_server)
+	if main != null:
+		main.lot.fx.add(t.center_px() + Vector2(0, -8), "+$%d" % int(round(bill)), Color("8ae596"))
+	Sfx.play("cash", -6.0)
+	t.cash = 0.0
+	t.cash_tip = 0.0
+	t.cash_server = null
+	t.cash_servers = []
+	if main != null:
+		main.lot.queue_redraw()
+	return true
 
 
 ## At night: the shared pot is split, and tips (or the lack of them) change moods.
@@ -139,22 +176,25 @@ func settle_tips() -> Array:
 		return out
 	# good tips make a day better
 	for s in worked:
-		s.add_stress(-minf(Data.TIP_STRESS_MAX, Data.TIP_STRESS * s.tips_today / maxf(1.0, s.wage)))
-	var top = worked[0]
-	for s in worked:
-		if s.tips_today > top.tips_today:
-			top = s
+		s.add_stress(-minf(Data.TIP_STRESS_MAX, Data.TIP_STRESS * s.tips_today / maxf(1.0, Shifts.pay_today(s))))
 	if tip_policy == "keep":
-		# the kitchen sees the servers walk off with the tips
+		# each server takes home what their tables left them
+		var earners: Array = worked.filter(func(s): return s.tips_today >= 1.0)
+		earners.sort_custom(func(a, b): return a.tips_today > b.tips_today)
+		var bits: Array = earners.map(func(s): return "%s $%d" % [s.person_name, int(round(s.tips_today))])
+		out.append(["money", "#6cc3a0", "Tips, each server keeps their own: [b]%s[/b]." % ", ".join(bits)])
+		# people who never serve a table (the kitchen, the dish pit) see the servers walk off with them
+		var top = earners[0] if not earners.is_empty() else null
 		var grumbles: Array = []
-		for s in worked:
-			if s != top and s.tips_today < 5.0 and top.tips_today >= 40.0:
-				Crew.add(s, top, "tips_keep")
-				s.add_stress(3.0)
-				grumbles.append(s.person_name)
+		if top != null and top.tips_today >= 40.0:
+			for s in worked:
+				if s.tips_earned < 1.0 and s.tips_today < 1.0:
+					Crew.add(s, top, "tips_keep")
+					s.add_stress(2.0)
+					grumbles.append(s.person_name)
 		if not grumbles.is_empty():
-			Crew.log_line("%s took home $%d in tips. %s got nothing and noticed." % [top.person_name, int(top.tips_today), Crew.and_list(grumbles)], "money", [top])
-			out.append(["money", "#f2c14e", "[b]%s[/b] kept $%d in tips; %s got none and grumbled about it." % [top.person_name, int(top.tips_today), Crew.and_list(grumbles)]])
+			Crew.log_line("%s got no tips today and noticed who did." % Crew.and_list(grumbles), "money", [top])
+			out.append(["money", "#f2c14e", "%s got no tips and grumbled a little. Sharing tips keeps the kitchen happier." % Crew.and_list(grumbles)])
 	else:
 		# sharing: the kitchen's grateful, big earners feel a little short-changed
 		var share: float = total / worked.size()
@@ -165,7 +205,7 @@ func settle_tips() -> Array:
 				for o in worked:
 					if o != s and o.tips_earned > share:
 						Crew.add(s, o, "tips_share")
-		out.append(["money", "#6cc3a0", "Tips were shared: [b]$%d[/b] each." % int(share)])
+		out.append(["money", "#6cc3a0", "Tips were shared: [b]$%d[/b] each for %d people." % [int(share), worked.size()]])
 	return out
 
 
@@ -201,4 +241,4 @@ func load_data(d: Dictionary) -> void:
 	tip_policy = d.get("tip_policy", "keep") if d.get("tip_policy", "keep") in ["keep", "share"] else "keep"
 	var l: Dictionary = d.get("loan", {})
 	if l.has("owed"):
-		loan = {"amount": float(l.get("amount", 0.0)), "owed": float(l["owed"]), "weekly": float(l.get("weekly", 0.0))}
+		loan = {"amount": float(l.get("amount", 0.0)), "owed": float(l["owed"]), "weekly": float(l.get("weekly", 0.0)), "interest": float(l.get("interest", 0.12))}

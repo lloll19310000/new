@@ -12,6 +12,8 @@ var station: String = ""     # which kind of station they need
 var cell: Vector2i = Vector2i.ZERO
 var claimed_by = null        # the staff member doing it
 var pref = null              # a staff member who gets first go (a regular's favourite server)
+var who = null               # manager jobs: the person to talk to...
+var who2 = null              # ...and the other one, when settling an argument
 var remake := false          # a dish being made again after the wrong one went out
 var done: bool = false
 var created: float = 0.0     # game minute it was posted, older jobs win ties
@@ -28,12 +30,16 @@ func describe() -> String:
 		"till": return "Ring up a bill at the till"
 		"check": return "Take payment at a table"
 		"complaint": return "Talk to an unhappy table"
+		"mediate": return "Settle an argument"
+		"checkin": return "Check on a stressed coworker"
 		"scrub": return "Clean the restroom"
 		"trash": return "Take out the trash"
 		"restroom": return "A trip to the restroom"
 		"restock": return "Restock the %s" % Data.FURNITURE[furniture.type]["name"].to_lower()
 		"bus": return "Clear a table"
+		"collect": return "Pick up the money left on a table"
 		"wash": return "Wash dishes"
 		"sweep": return "Sweep the floor"
 		"repair": return "Repair the %s" % Data.FURNITURE[furniture.type]["name"].to_lower()
+		"service": return "Service the %s" % Data.FURNITURE[furniture.type]["name"].to_lower()
 	return kind

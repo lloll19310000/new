@@ -38,6 +38,8 @@ var _snap_last := {}                   # id -> when they last snapped
 var _chat_min := {}                    # pair -> minutes chatted since their last exchange
 var _snack_done := {}                  # pair -> true once this break together has had its snack roll
 var _teamwork_day := -1                # the day a great order was last logged
+var _checked := {}                     # id -> when a manager last checked on them
+var _mediated := {}                    # pair -> true once a manager has sat them down today
 
 
 func _ready() -> void:
@@ -61,8 +63,10 @@ func reset() -> void:
 
 
 func reset_today() -> void:
-	today = {"bickers": 0, "breakups": 0, "caught": 0, "reprimands": 0, "phone_seen": 0,
+	today = {"bickers": 0, "breakups": 0, "caught": 0, "reprimands": 0, "phone_seen": 0, "mediations": 0, "checkins": 0,
 		"new_friends": [], "new_rivals": [], "work": {}, "quits": [], "burnout": []}
+	_checked = {}
+	_mediated = {}
 
 
 func now() -> float:
@@ -76,6 +80,19 @@ func team() -> Array:
 ## Everyone at work today (not on a day off).
 func present() -> Array:
 	return GameState.staff.filter(func(s): return is_instance_valid(s) and s.is_here())
+
+
+## Still on the team and in the building right now.
+func valid_here(s) -> bool:
+	return s != null and is_instance_valid(s) and GameState.staff.has(s) and s.is_here()
+
+
+## A manager on shift who's up to settling things (not fed up themselves), or null.
+func manager_on_shift(exclude: Array = []):
+	for m in present():
+		if m.manager and m.mood != "fed_up" and not m in exclude:
+			return m
+	return null
 
 
 func by_id(id: int):
@@ -456,6 +473,8 @@ func minute_step() -> void:
 			watch_phone(s, t)
 		elif s.mood == "cheerful" and s.is_working() and GameState.is_open() and lot.music_near(s.current_cell()) and randf() < 1.0 / 90.0:
 			say(s, "", "music")
+	if int(GameState.minute) % 10 == 0:
+		post_checkins(t)
 	refresh_labels(false)
 
 
@@ -590,6 +609,66 @@ func bicker(a, b) -> void:
 		g.note_trouble("staff arguing", Data.BICKER_REVIEW)
 	today["bickers"] += 1
 	log_line("%s and %s bickered%s." % [a.person_name, b.person_name, " in front of customers" if not seen.is_empty() else ""], "storm", [a, b])
+	ask_mediation(a, b)
+
+
+## Asks a manager on shift to sit two people down and talk it out (once a day per pair).
+func ask_mediation(a, b) -> bool:
+	var pk := pair_key(a, b)
+	if _mediated.has(pk) or manager_on_shift([a, b]) == null:
+		return false
+	for j in JobBoard.jobs:
+		if j.kind == "mediate" and not j.done and ((j.who == a and j.who2 == b) or (j.who == b and j.who2 == a)):
+			return true
+	_mediated[pk] = true
+	JobBoard.post("serve", "mediate", {"who": a, "who2": b})
+	return true
+
+
+## The talk: how well it goes depends on the manager's people skills and mood.
+func mediate(m, a, b) -> void:
+	var q: float = clampf(0.5 + 0.05 * m.service, 0.5, 1.0) * (0.7 if m.mood == "okay" else 1.0)
+	both(a, b, "mediated", Data.MEDIATE_POINTS * q)
+	a.add_stress(-Data.MEDIATE_STRESS * q)
+	b.add_stress(-Data.MEDIATE_STRESS * q)
+	a.pause_left = 0.0
+	b.pause_left = 0.0
+	Events.calm[pair_key(a, b)] = true
+	say(a, "", "heart")
+	today["mediations"] += 1
+	log_line("%s sat %s and %s down and they talked it out." % [m.person_name, a.person_name, b.person_name], "chat", [m, a, b])
+	refresh_labels(false)
+
+
+## Stressed people get a manager's check-in now and then.
+func post_checkins(t: Array) -> void:
+	if manager_on_shift() == null:
+		return
+	for j in JobBoard.jobs:
+		if j.kind == "checkin" and not j.done:
+			return
+	var worst = null
+	for s in t:
+		if s.manager or s.on_break or s.stress < Data.CHECKIN_AT:
+			continue
+		if now() - _checked.get(s.id, -9999.0) < Data.CHECKIN_EVERY:
+			continue
+		if worst == null or s.stress > worst.stress:
+			worst = s
+	if worst != null:
+		_checked[worst.id] = now()
+		JobBoard.post("serve", "checkin", {"who": worst})
+
+
+func check_in(m, s) -> void:
+	var q: float = clampf(0.5 + 0.05 * m.service, 0.5, 1.0)
+	s.add_stress(-Data.CHECKIN_STRESS * q)
+	if s.energy < 60.0 or s.stress >= Data.STRESS_FED_UP:
+		s.break_asked = true
+	say(m, "checkin", "heart")
+	today["checkins"] += 1
+	add(s, m, "chat", 1.0, Data.REL_CHAT_DAY_CAP)
+	log_line("%s checked on %s%s." % [m.person_name, s.person_name, " and sent them on a break" if s.break_asked else ""], "heart", [m, s])
 
 
 func snack(a, b) -> void:
@@ -728,18 +807,33 @@ func owner_caught(s) -> void:
 	GameState.staff_changed.emit()
 
 
-func set_manager(s, on: bool) -> void:
-	if s.manager == on:
+## Gives someone a new role: new job priorities, and the going rate for it
+## (plus any raises you've given them).
+func set_role(s, role: String) -> void:
+	if s.role == role or not Data.ROLES.has(role):
 		return
-	s.manager = on
-	s.wage += Data.MANAGER_WAGE if on else -Data.MANAGER_WAGE
+	var was: String = s.role
+	s.role = role
+	s.priorities = GameState.default_priorities(role)
+	s.wage = maxf(Data.MIN_WAGE, Data.role_pay(role, s.cooking, s.service, s.traits) + s.raises)
 	s.queue_redraw()
-	if on:
+	Shifts.replan()
+	var name_: String = Data.ROLES[role]["name"].to_lower()
+	if role == "manager":
 		log_line("%s is now a manager." % s.person_name, "star", [s])
-		GameState.toast.emit("%s is now a manager (+$%d a shift)." % [s.person_name, Data.MANAGER_WAGE], "good")
+		GameState.toast.emit("%s is now a manager ($%.2f an hour)." % [s.person_name, s.wage], "good")
 	else:
-		log_line("%s is no longer a manager." % s.person_name, "star", [s])
+		log_line("%s is now a %s%s." % [s.person_name, name_, " (was a manager)" if was == "manager" else ""], "staff", [s])
+		GameState.toast.emit("%s is now a %s ($%.2f an hour)." % [s.person_name, name_, s.wage], "")
 	GameState.staff_changed.emit()
+
+
+## Older code: makes someone a manager, or back to what fits them best.
+func set_manager(s, on: bool) -> void:
+	if on:
+		set_role(s, "manager")
+	elif s.manager:
+		set_role(s, "cook" if s.cooking > s.service else "server")
 
 
 # ------------------------------------------------------------------ nights, reports, saves
@@ -748,20 +842,23 @@ func set_manager(s, on: bool) -> void:
 ## history fades a little, and daily limits reset.
 func nightly() -> void:
 	for s in team():
-		if s.raise_refused >= 2:
+		if s.raise_refused >= Data.RAISE_REFUSALS_QUIT:
 			quit(s, "%s left for a better-paying job across town." % s.person_name)
 		elif s.stress >= Data.STRESS_BURNOUT:
-			if s.burnout_warned:
+			s.burnout_nights += 1
+			if s.burnout_nights >= Data.BURNOUT_QUIT_NIGHTS:
 				quit(s, "%s burned out and quit." % s.person_name)
 				continue
 			s.burnout_warned = true
 			today["burnout"].append(s.person_name)
 			log_line("%s is burning out. A day off, a sofa or friends nearby would help." % s.person_name, "alert", [s])
-			GameState.toast.emit("%s is burning out. Another day like this and they'll quit." % s.person_name, "bad")
+			GameState.toast.emit("%s is burning out (%d of %d bad nights). A day off would help." % [s.person_name, s.burnout_nights, Data.BURNOUT_QUIT_NIGHTS], "bad")
 		elif s.stress < Data.STRESS_FED_UP:
 			s.burnout_warned = false
+			s.burnout_nights = 0
+	var calm: float = Data.MANAGER_NIGHT_CALM if team().any(func(s): return s.manager) else 0.0
 	for s in team():
-		s.add_stress(Data.STRESS_NIGHT)
+		s.add_stress(Data.STRESS_NIGHT - calm)
 	var worked: Array = []
 	for pk in today["work"]:
 		if today["work"][pk] >= 180:
@@ -813,6 +910,13 @@ func report_lines() -> Array:
 		out.append(["heart", "#e27fa8", "[b]%s[/b] became friends." % n])
 	for n in today["new_rivals"]:
 		out.append(["storm", "#e75a4e", "[b]%s[/b] can't stand each other. Give them different jobs." % n])
+	if today["mediations"] > 0 or today["checkins"] > 0:
+		var bits2: Array = []
+		if today["mediations"] > 0:
+			bits2.append("settled %d argument%s" % [today["mediations"], "" if today["mediations"] == 1 else "s"])
+		if today["checkins"] > 0:
+			bits2.append("checked on stressed staff %d time%s" % [today["checkins"], "" if today["checkins"] == 1 else "s"])
+		out.append(["star", "#f2c14e", "Your managers " + " and ".join(bits2) + "."])
 	if today["bickers"] > 0:
 		out.append(["storm", "#f2c14e", "%d argument%s between staff%s." % [today["bickers"], "" if today["bickers"] == 1 else "s",
 			(", and %d broken up by a manager" % today["breakups"]) if today["breakups"] > 0 else ""]])

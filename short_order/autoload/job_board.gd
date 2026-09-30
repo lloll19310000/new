@@ -89,6 +89,10 @@ func still_needed(j, lot) -> bool:
 			return g_ok and g.state == "paying"
 		"complaint":
 			return g_ok and g.state == "complaining"
+		"mediate":
+			return Crew.valid_here(j.who) and Crew.valid_here(j.who2)
+		"checkin":
+			return Crew.valid_here(j.who) and j.who.stress >= Data.CHECKIN_AT - 15.0
 		"scrub":
 			return j.furniture != null and lot.furniture.has(j.furniture) and j.furniture.grime > 0.1
 		"trash":
@@ -105,12 +109,16 @@ func still_needed(j, lot) -> bool:
 			return false
 		"bus":
 			return j.furniture != null and lot.furniture.has(j.furniture) and j.furniture.dirty_plates > 0
+		"collect":
+			return j.furniture != null and lot.furniture.has(j.furniture) and j.furniture.cash > 0.0
 		"wash":
 			return j.furniture != null and lot.furniture.has(j.furniture) and j.furniture.dirty > 0
 		"sweep":
 			return lot.in_lot(j.cell) and lot.dirt[lot.idx(j.cell)] >= Data.DIRT_SHOW
 		"repair":
 			return j.furniture != null and lot.furniture.has(j.furniture) and j.furniture.broken
+		"service":
+			return j.furniture != null and lot.furniture.has(j.furniture) and not j.furniture.broken and j.furniture.wear >= Data.SERVICE_AT * 0.5
 	return true
 
 

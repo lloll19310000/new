@@ -22,6 +22,12 @@ func _ready() -> void:
 	reset_today()
 
 
+func reset() -> void:
+	auto = true
+	plan_note = ""
+	reset_today()
+
+
 func reset_today() -> void:
 	today = {"late": [], "no_show": [], "sick_home": [], "sick_in": [], "clopen": [], "overtime": 0.0, "trained": [], "trained_done": []}
 
@@ -53,6 +59,210 @@ func hours_text(s) -> String:
 	var a := DayTimeline.clock(shift_start(s))
 	var e := shift_end(s)
 	return "%s–%s" % [a, DayTimeline.clock(e)] if e >= 0.0 else "%s–close" % a
+
+
+# ------------------------------------------------------------------ the schedule
+
+var auto := true                       # the schedule writes itself every night
+var plan_note := ""                    # how tomorrow looks, for the report and the Staff page
+
+## Roles a shift can't run without.
+const ESSENTIAL := ["cook", "server"]
+
+
+## A long day needs a day crew and a night crew; a short one is a single shift.
+func two_shifts() -> bool:
+	return GameState.close_min() + Data.CLOSE_EXTRA - GameState.prep_min() > Data.SHIFT_HOURS * 60.0 + 30.0
+
+
+## The manager who writes the schedule (the most experienced), or null: then
+## you do it, and it only looks at who's worked too many days in a row.
+func scheduler():
+	var best = null
+	for s in GameState.staff:
+		if is_instance_valid(s) and s.manager and (best == null or s.cooking + s.service > best.cooking + best.service):
+			best = s
+	return best
+
+
+## Someone was hired, let go or given a new role in the morning: fit them into today's shifts.
+func replan() -> void:
+	if GameState.phase == GameState.Phase.PLANNING:
+		plan_schedule(GameState.day, true)
+
+
+## Writes the schedule for `day`: who has the day off, and who works the day
+## shift, the night shift or a double. Every role keeps someone on each shift
+## where it can, people who've worked five or six days in a row get a day
+## off, and a manager also looks after the stressed and burned-out, keeps
+## rivals apart and puts trainees on their trainer's shift.
+## keep_offs: leave the days off alone and only rebalance the shifts.
+func plan_schedule(day: int, keep_offs: bool = false) -> void:
+	var team: Array = GameState.staff.filter(func(s): return is_instance_valid(s))
+	if not auto or team.is_empty():
+		plan_note = ""
+		return
+	var boss = scheduler()
+	var two := two_shifts()
+	var by_role := {}
+	for s in team:
+		if not by_role.has(s.role):
+			by_role[s.role] = []
+		by_role[s.role].append(s)
+	# days off
+	if not keep_offs:
+		for s in team:
+			if s.sched_off == day:
+				s.sched_off = -1
+		var wants: Array = []
+		for s in team:
+			if s.away_day == day or s.sick_days > 0:
+				continue
+			var need := off_need(s, boss != null)
+			if need > 0.0:
+				wants.append([need, s])
+		wants.sort_custom(func(a, b): return a[0] > b[0])
+		var max_off := maxi(1, int(ceil(team.size() * 2.0 / 7.0)))
+		var off := 0
+		for w in wants:
+			if off >= max_off:
+				break
+			if can_spare(w[1], by_role[w[1].role], day, two):
+				w[1].sched_off = day
+				off += 1
+	# shifts for everyone who's in
+	for role in by_role:
+		var people: Array = by_role[role].filter(func(s): return not works_off(s, day))
+		var free: Array = people.filter(func(s): return not s.shift_locked)
+		if free.is_empty():
+			continue
+		if not two:
+			for s in free:
+				s.shift = "open"
+			continue
+		if people.size() == 1:
+			var lone = free[0]
+			if role in ESSENTIAL or role == "dishwasher":
+				lone.shift = "double"
+			elif role in ["busser", "host"]:
+				lone.shift = "close"
+			else:
+				lone.shift = "open"
+			continue
+		# split the role between the day and night shifts; whoever closed last
+		# night stays on nights (nobody likes closing then opening)
+		free.sort_custom(func(a, b): return int(a.closed_late) < int(b.closed_late) or (a.closed_late == b.closed_late and a.id < b.id))
+		var days := 0
+		var nights := 0
+		for s in people:
+			if s.shift_locked:
+				if s.shift != "close":
+					days += 1
+				if s.shift != "open":
+					nights += 1
+		var want_days := int(ceil(people.size() / 2.0))
+		for s in free:
+			if days < want_days and (days <= nights or not s.closed_late):
+				s.shift = "open"
+				days += 1
+			else:
+				s.shift = "close"
+				nights += 1
+	if boss != null and two:
+		_manager_touches(team, day)
+	plan_note = schedule_text(day, boss)
+	if not keep_offs:
+		Crew.log_line(plan_note, "clock", [boss] if boss != null else [])
+	GameState.staff_changed.emit()
+
+
+## How much someone needs a day off tomorrow (0 = they don't).
+func off_need(s, managed: bool) -> float:
+	if s.streak >= 6:
+		return 10.0 + s.streak
+	if managed and s.burnout_warned:
+		return 20.0
+	if managed and s.stress >= 60.0:
+		return 8.0 + s.stress / 10.0
+	if s.streak >= 5:
+		return 5.0 + s.stress / 20.0
+	if managed and s.streak >= 4 and s.stress >= 40.0:
+		return 3.0
+	return 0.0
+
+
+## Off on `day`: a scheduled or asked-for day off, or sick.
+func works_off(s, day: int) -> bool:
+	return s.sched_off == day or s.away_day == day or s.sick_days > 0
+
+
+## Can the rest of their role cover if they're off? Cooks and servers need
+## someone on every shift; other roles just keep one person in.
+func can_spare(s, role_team: Array, day: int, two: bool) -> bool:
+	var others := 0
+	for o in role_team:
+		if o != s and not works_off(o, day):
+			others += 1
+	var need := (2 if two else 1) if s.role in ESSENTIAL else (1 if role_team.size() >= 2 else 0)
+	return others >= need
+
+
+## A manager's finishing touches: trainees work their trainer's shift, and
+## rivals in the same role go on different shifts where someone can swap.
+func _manager_touches(team: Array, day: int) -> void:
+	for s in team:
+		if s.trainer_id > 0 and not s.shift_locked and not works_off(s, day):
+			var tr = Crew.by_id(s.trainer_id)
+			if tr != null and not works_off(tr, day):
+				s.shift = tr.shift
+	for a in team:
+		for b in team:
+			if a.id >= b.id or a.role != b.role or a.shift != b.shift or a.shift == "double":
+				continue
+			if works_off(a, day) or works_off(b, day) or Crew.label(a, b) != "rivals":
+				continue
+			for c in team:
+				if c.role == a.role and c.shift != a.shift and c.shift != "double" and not c.shift_locked and not a.shift_locked \
+						and not works_off(c, day) and Crew.label(c, b) != "rivals":
+					var t: String = c.shift
+					c.shift = a.shift
+					a.shift = t
+					break
+
+
+## "Keisha wrote tomorrow's schedule: 4 on days, 3 on nights, Mei and Tunde off."
+func schedule_text(day: int, boss) -> String:
+	var days := 0
+	var nights := 0
+	var doubles := 0
+	var off: Array = []
+	for s in GameState.staff:
+		if not is_instance_valid(s):
+			continue
+		if works_off(s, day):
+			off.append(s.person_name)
+		elif s.shift == "open":
+			days += 1
+		elif s.shift == "close":
+			nights += 1
+		else:
+			doubles += 1
+	var who: String = ("%s wrote the schedule" % boss.person_name) if boss != null else "The schedule"
+	var bits: Array = []
+	if two_shifts():
+		bits.append("%d on days, %d on nights" % [days, nights])
+		if doubles > 0:
+			bits.append("%d on a double" % doubles)
+	else:
+		bits.append("%d in" % (days + nights + doubles))
+	if not off.is_empty():
+		bits.append("%s off" % Crew.and_list(off))
+	return "%s for day %d: %s." % [who, day, ", ".join(bits)]
+
+
+## People who've worked a week straight because nobody can cover for them.
+func overworked() -> Array:
+	return GameState.staff.filter(func(s): return is_instance_valid(s) and s.streak >= 7)
 
 
 # ------------------------------------------------------------------ the morning
@@ -284,6 +494,8 @@ func closing() -> void:
 			f.stocked = false
 			if not JobBoard.has_open("restock", "furniture", f):
 				JobBoard.post("cook", "restock", {"furniture": f})
+			if f.wear >= Data.SERVICE_AT and not f.broken and not JobBoard.has_open("service", "furniture", f):
+				JobBoard.post("fix", "service", {"furniture": f})
 		elif f.type == "bin" and f.fill > 0.05 and not JobBoard.has_open("trash", "furniture", f):
 			JobBoard.post("clean", "trash", {"furniture": f})
 
@@ -292,7 +504,7 @@ func closing() -> void:
 func closing_left() -> bool:
 	var here: Array = Crew.present()
 	for j in JobBoard.jobs:
-		if j.done or not j.kind in ["restock", "trash"]:
+		if j.done or not j.kind in ["restock", "trash", "service"]:
 			continue
 		if j.claimed_by != null:
 			return true
@@ -316,9 +528,16 @@ func pay_today(s) -> float:
 	var h := hours_today(s)
 	if h <= 0.0:
 		return 0.0
+	return pay_for_hours(s.wage, h)
+
+
+## California pay for a day's hours at this hourly rate: time and a half past 8
+## hours, double time past 12, and at least 4 hours for coming in.
+static func pay_for_hours(rate: float, h: float) -> float:
 	h = maxf(h, Data.MIN_PAID_HOURS)
-	var rate: float = s.wage / Data.SHIFT_HOURS
-	return rate * (minf(h, Data.SHIFT_HOURS) + Data.OVERTIME * maxf(0.0, h - Data.SHIFT_HOURS))
+	var over := clampf(h - Data.SHIFT_HOURS, 0.0, Data.DOUBLE_TIME_AFTER - Data.SHIFT_HOURS)
+	var double := maxf(0.0, h - Data.DOUBLE_TIME_AFTER)
+	return rate * (minf(h, Data.SHIFT_HOURS) + Data.OVERTIME * over + Data.DOUBLE_TIME * double)
 
 
 ## Everyone goes home. Late closers are tired tomorrow; colds spread; training
@@ -332,6 +551,11 @@ func night() -> void:
 			s.left_at = now
 		if s.came_at >= 0.0 and s.left_at > GameState.close_min() + 30.0:
 			s.closed_late = true
+		# days in a row at work; a day off starts the count again
+		if s.came_at >= 0.0:
+			s.streak += 1
+		elif s.away:
+			s.streak = 0
 		today["overtime"] += maxf(0.0, hours_today(s) - Data.SHIFT_HOURS)
 		# sick days count down at home; working through it doesn't help
 		if s.sick_days > 0 and s.away and not s.sick_at_work:
@@ -396,4 +620,9 @@ func report_lines() -> Array:
 		out.append(["money", "#f2c14e", "%d hours of overtime today, paid at time and a half. Opening and closing shifts instead of doubles would save most of it." % int(round(today["overtime"]))])
 	for t in today["trained_done"]:
 		out.append(["school", "#6cc3a0", "[b]%s[/b] finished training." % t])
+	for s in overworked():
+		out.append(["alert", "#f2c14e", "[b]%s[/b] has worked %d days in a row: nobody else can cover as a %s. Hire another so the schedule can give them a day off." % [
+			s.person_name, s.streak, Data.ROLES[s.role]["name"].to_lower()]])
+	if plan_note != "":
+		out.append(["clock", "#6aa6d9", plan_note])
 	return out

@@ -36,8 +36,9 @@ func _ready() -> void:
 	serve_value.text = str(data["service"])
 	cook_bar.tooltip_text = "Cooking %d of 10" % data["cooking"]
 	serve_bar.tooltip_text = "Service %d of 10" % data["service"]
-	wage_label.text = "$%d/shift" % data["wage"]
-	hire_button.tooltip_text = "Hire %s for $%d an 8-hour shift, paid every night (time and a half after 8 hours)." % [data["name"], data["wage"]]
+	wage_label.text = Data.hourly(data["wage"])
+	hire_button.tooltip_text = "Hire %s as a %s for $%.2f an hour, paid every night (time and a half after 8 hours, double time after 12)." % [
+		data["name"], Data.ROLES[data["role"]]["name"].to_lower(), data["wage"]]
 	hire_button.pressed.connect(func(): hire_requested.emit(index))
 	var origin: Dictionary = data.get("origin", {})
 	origin_label.text = "From " + Data.hometown(origin) if not origin.is_empty() else ""

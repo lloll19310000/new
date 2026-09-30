@@ -26,7 +26,8 @@ var chairs: Array = []                  # chairs next to this table
 var reserved = null                     # the booking this table is held for (a Dictionary), or null
 var cash: float = 0.0                   # money a table left behind, waiting to be picked up
 var cash_tip: float = 0.0               # ...and the tip in it, for whoever served them
-var cash_servers: Array = []
+var cash_server = null                 # the table's own server (who took the order)
+var cash_servers: Array = []            # everyone who brought them food
 # chairs
 var table = null
 var occupant = null

@@ -22,7 +22,7 @@ const START_PLATES := 40
 const PLATES_LOW := 6               # fewer clean plates than this and washing up comes first
 const REFUND := 0.5              # share of the price you get back when removing
 const REPAIR_COST := 30.0        # spare parts for fixing a broken station
-const MAX_STAFF := 12
+const MAX_STAFF := 40            # a big diner with day and night crews
 
 const WALK_TILES_PER_SEC := 5.5  # walking speed at 1x
 const TABLE_PATIENCE := 20.0     # minutes a group waits for a table
@@ -32,6 +32,10 @@ const REVIEW_WINDOW := 20        # rating = average of the last N reviews
 
 const DIRT_SHOW := 0.05          # dirt below this is invisible
 const DIRT_JOB := 0.15           # a tile this dirty gets a Sweep job during the day
+## With someone on shift whose job is cleaning (a busser, a porter, or anyone
+## with Clean first), every little spill gets swept right away and only a
+## really dirty floor shows.
+const DIRT_SHOW_CLEANER := 0.3
 
 # staff energy, per game minute
 const ENERGY_WORK := 0.11
@@ -45,9 +49,15 @@ const REST_STANDING := 0.8       # ...and without one
 const XP_BASE := 60.0
 const XP_PER_LEVEL := 20.0
 
-# stations wear out and sometimes break (then someone with Repair fixes them)
-const WEAR_PER_COOK := Vector2(0.01, 0.03)
-const BREAK_CHANCE := 0.08       # times wear, rolled after every batch
+# Stations wear out slowly and now and then break (then someone with Repair
+# fixes them). A busy station reaches full wear in about two weeks; worn
+# equipment is much likelier to break. At closing, someone on Repair services
+# anything past SERVICE_AT, so a looked-after kitchen rarely breaks down.
+const WEAR_PER_COOK := Vector2(0.0005, 0.0015)
+const BREAK_CHANCE := 0.001      # times wear squared, rolled after every batch
+const SERVICE_AT := 0.4          # closers service stations this worn...
+const SERVICE_COST := 12.0       # ...for a few dollars of parts
+const SERVICE_MINUTES := 3.0
 
 const JOBS := ["cook", "serve", "host", "wash", "clean", "fix"]
 const JOB_NAMES := {"cook": "Cook", "serve": "Serve", "host": "Host", "wash": "Wash", "clean": "Clean", "fix": "Repair"}
@@ -83,17 +93,17 @@ const NEW_DINER_RAMP := [0.7, 0.85, 0.95]
 ## kind: what part of a meal it is (main, side, drink, dessert).
 ## prep: can be prepped in the morning (chopped, portioned, mixed) to cook faster later.
 const DISHES := {
-	"burger":    {"name": "Burger",    "station": "grill",   "minutes": 5.0, "needs": {"meat": 1, "bread": 1, "veg": 1}, "price": 12.0, "plate": true,  "kind": "main", "prep": true},
-	"pancakes":  {"name": "Pancakes",  "station": "griddle", "minutes": 4.0, "needs": {"dairy": 1, "bread": 1}, "price": 9.0,  "plate": true,  "kind": "main", "prep": true},
-	"omelette":  {"name": "Omelette",  "station": "griddle", "minutes": 4.0, "needs": {"eggs": 1, "dairy": 1},  "price": 9.0,  "plate": true,  "kind": "main", "prep": true},
-	"meatloaf":  {"name": "Meatloaf",  "station": "oven",    "minutes": 7.0, "needs": {"meat": 1, "bread": 1},  "price": 14.0, "plate": true,  "kind": "main", "prep": true},
-	"fries":     {"name": "Fries",     "station": "fryer",   "minutes": 3.0, "needs": {"potatoes": 1},          "price": 5.0,  "plate": true,  "kind": "side", "prep": true},
-	"pie":       {"name": "Apple pie", "station": "oven",    "minutes": 5.0, "needs": {"fruit": 1, "bread": 1}, "price": 6.0,  "plate": true,  "kind": "dessert", "prep": true},
-	"milkshake": {"name": "Milkshake", "station": "drinks",  "minutes": 2.0, "needs": {"icecream": 1, "dairy": 1}, "price": 6.0, "plate": false, "kind": "drink", "prep": false},
-	"coffee":    {"name": "Coffee",    "station": "drinks",  "minutes": 1.0, "needs": {},                       "price": 3.0,  "plate": false, "kind": "drink", "prep": false},
+	"burger":    {"name": "Burger",    "station": "grill",   "minutes": 5.0, "needs": {"meat": 1, "bread": 1, "veg": 1}, "price": 16.0, "plate": true,  "kind": "main", "prep": true},
+	"pancakes":  {"name": "Pancakes",  "station": "griddle", "minutes": 4.0, "needs": {"dairy": 1, "bread": 1}, "price": 12.0,  "plate": true,  "kind": "main", "prep": true},
+	"omelette":  {"name": "Omelette",  "station": "griddle", "minutes": 4.0, "needs": {"eggs": 1, "dairy": 1},  "price": 13.0,  "plate": true,  "kind": "main", "prep": true},
+	"meatloaf":  {"name": "Meatloaf",  "station": "oven",    "minutes": 7.0, "needs": {"meat": 1, "bread": 1},  "price": 18.0, "plate": true,  "kind": "main", "prep": true},
+	"fries":     {"name": "Fries",     "station": "fryer",   "minutes": 3.0, "needs": {"potatoes": 1},          "price": 6.0,  "plate": true,  "kind": "side", "prep": true},
+	"pie":       {"name": "Apple pie", "station": "oven",    "minutes": 5.0, "needs": {"fruit": 1, "bread": 1}, "price": 7.0,  "plate": true,  "kind": "dessert", "prep": true},
+	"milkshake": {"name": "Milkshake", "station": "drinks",  "minutes": 2.0, "needs": {"icecream": 1, "dairy": 1}, "price": 8.0, "plate": false, "kind": "drink", "prep": false},
+	"coffee":    {"name": "Coffee",    "station": "drinks",  "minutes": 1.0, "needs": {},                       "price": 3.5,  "plate": false, "kind": "drink", "prep": false},
 	## ice: needs an ice machine. The cook scoops the ice on the way to the drinks machine.
-	"soda":      {"name": "Soda",      "station": "drinks",  "minutes": 0.8, "needs": {},                       "price": 3.0,  "plate": false, "kind": "drink", "prep": false, "ice": true},
-	"icedtea":   {"name": "Iced tea",  "station": "drinks",  "minutes": 0.8, "needs": {},                       "price": 3.0,  "plate": false, "kind": "drink", "prep": false, "ice": true},
+	"soda":      {"name": "Soda",      "station": "drinks",  "minutes": 0.8, "needs": {},                       "price": 3.5,  "plate": false, "kind": "drink", "prep": false, "ice": true},
+	"icedtea":   {"name": "Iced tea",  "station": "drinks",  "minutes": 0.8, "needs": {},                       "price": 3.5,  "plate": false, "kind": "drink", "prep": false, "ice": true},
 }
 const DISH_ORDER := ["burger", "pancakes", "omelette", "meatloaf", "fries", "pie", "milkshake", "coffee", "soda", "icedtea"]
 const SPECIAL_PICKS := 3          # customers pick today's special this many times as often
@@ -102,14 +112,14 @@ const SPECIAL_REVIEW := 0.2       # and like getting it this much
 ## store: where it's kept (fridge, freezer or the dry shelves). life: days it
 ## lasts from delivery; it's thrown out the night it goes off.
 const INGREDIENTS := {
-	"meat":     {"name": "Meat",         "cost": 2.0, "store": "fridge",  "life": 3},
-	"veg":      {"name": "Salad veg",    "cost": 0.4, "store": "fridge",  "life": 2},
-	"dairy":    {"name": "Dairy",        "cost": 0.8, "store": "fridge",  "life": 4},
-	"eggs":     {"name": "Eggs",         "cost": 0.5, "store": "fridge",  "life": 10},
-	"fruit":    {"name": "Fruit",        "cost": 0.8, "store": "fridge",  "life": 2},
-	"bread":    {"name": "Bread",        "cost": 0.5, "store": "dry",     "life": 5},
-	"potatoes": {"name": "Frozen fries", "cost": 0.4, "store": "freezer", "life": 30},
-	"icecream": {"name": "Ice cream",    "cost": 0.6, "store": "freezer", "life": 30},
+	"meat":     {"name": "Meat",         "cost": 2.8, "store": "fridge",  "life": 3},
+	"veg":      {"name": "Salad veg",    "cost": 0.5, "store": "fridge",  "life": 2},
+	"dairy":    {"name": "Dairy",        "cost": 1.0, "store": "fridge",  "life": 4},
+	"eggs":     {"name": "Eggs",         "cost": 0.6, "store": "fridge",  "life": 10},
+	"fruit":    {"name": "Fruit",        "cost": 1.0, "store": "fridge",  "life": 2},
+	"bread":    {"name": "Bread",        "cost": 0.6, "store": "dry",     "life": 5},
+	"potatoes": {"name": "Frozen fries", "cost": 0.5, "store": "freezer", "life": 30},
+	"icecream": {"name": "Ice cream",    "cost": 0.8, "store": "freezer", "life": 30},
 }
 const ING_ORDER := ["meat", "veg", "dairy", "eggs", "fruit", "bread", "potatoes", "icecream"]
 ## About a first day's worth. The chilled part fits in one fridge, the frozen part in its freezer box.
@@ -138,9 +148,14 @@ const SUPPLIERS := {
 }
 const SUPPLIER_ORDER := ["budget", "standard", "fresh"]
 
-## Tips: a share of the bill that grows with the review (none below 3 stars).
-const TIP_BASE := 0.08            # at 3 stars
-const TIP_PER_STAR := 0.085       # more per star above 3 (25% at 5 stars)
+## Tips, as a share of the bill: about 15% for an okay visit, up to 20% for
+## a great one, less for a bad one and nothing for a terrible one.
+const TIP_BASE := 0.15            # at 3 stars
+const TIP_PER_STAR := 0.025       # more per star above 3 (20% at 5 stars)
+const TIP_LOW_PER_STAR := 0.075   # less per star below 3 (7.5% at 2 stars, none at 1)
+## The table's own server (who took the order) gets this share of the tip; the
+## rest is split between everyone who ran food to the table.
+const TIP_SERVER_SHARE := 0.75
 ## Prices above the usual ones keep people away; cheaper ones draw a crowd.
 const PRICE_DEMAND := 0.5         # each 10% above usual prices costs 5% of customers
 const PRICE_DEMAND_RANGE := Vector2(0.7, 1.15)
@@ -179,10 +194,16 @@ const BILL_EVERY := 7
 const UTILITIES := {"grill": 25, "fryer": 25, "griddle": 25, "oven": 25, "drinks": 15, "fridge": 20, "freezer": 20,
 	"sink": 8, "ice": 15, "jukebox": 6, "neon": 5, "lamp": 2}
 const UTILITIES_BASE := 40
-## Bank loans: borrow now, pay back a little with every week's bills.
-const LOAN_OPTIONS := [5000, 10000, 20000]
-const LOAN_INTEREST := 0.12       # 12% on top, spread over the weeks
-const LOAN_WEEKS := 10
+## Bank loans: borrow now, pay back a little with every week's bills. Bigger
+## loans run longer. interest: the total added on top, spread over the weeks.
+const LOANS := [
+	{"amount": 5000,   "weeks": 10,  "interest": 0.10},
+	{"amount": 10000,  "weeks": 10,  "interest": 0.12},
+	{"amount": 25000,  "weeks": 26,  "interest": 0.14},
+	{"amount": 50000,  "weeks": 52,  "interest": 0.16},
+	{"amount": 100000, "weeks": 104, "interest": 0.20},
+	{"amount": 250000, "weeks": 156, "interest": 0.26},
+]
 ## What owners aim for, as a share of sales.
 const TARGET_FOOD_COST := 0.30
 const TARGET_STAFF_COST := 0.30
@@ -282,6 +303,8 @@ const BOOKING_NAMES := ["Kowalski", "Nguyen", "Okafor", "Martinez", "Byrne", "Ha
 	"Delgado", "Brennan", "Schultz", "Adeyemi", "Russo", "Lindqvist", "O'Hara", "Castillo", "Weiss", "Abernathy"]
 ## Paying: at the till if there is one, otherwise at the table.
 const PAY_SLOW := 6.0             # minutes waiting to pay before it starts to annoy
+const CASH_ON_TABLE := 0.35       # with a till, chance a table leaves the money on the table instead
+const CASH_KIND := {"regular": 1.3, "trucker": 1.5, "student": 0.6, "tourist": 0.6, "family": 1.0}
 const PAY_GIVE_UP := 12.0         # after this they leave the money on the table
 const DASH_CHANCE := 0.012        # per minute nobody's watching a table that wants to pay
 const DASH_KIND := {"student": 2.5, "regular": 1.0, "family": 0.3, "trucker": 0.6, "tourist": 0.5}
@@ -366,19 +389,58 @@ const MOUSE_REVIEW := 1.0
 const HANDWASH_SKIP := 0.12       # chance they don't bother (more when fed up or in a rush; Tidy people never skip)
 const HANDWASH_MINUTES := 0.3
 
-# ------------------------------------------------------------------ shifts and staff life
-## Wages are per 8-hour shift. Longer days are paid at time and a half.
+# ------------------------------------------------------------------ roles and pay
+## Everyone is hired for a role. The role sets their hourly pay and what they
+## do first (their job priorities, which you can still change by hand), and the
+## schedule puts the right mix of roles on every shift.
+## pay: the hourly range in California, from a beginner to someone with 10 in
+## the role's skill ("cooking", "service" or "both"). tipped: gets tips from tables.
+const ROLES := {
+	"cook":       {"name": "Line cook",  "plural": "Line cooks",  "icon": "cook",  "pay": [19.00, 26.00], "skill": "cooking",
+		"priorities": {"cook": 1, "fix": 2, "wash": 3, "clean": 4, "serve": 0, "host": 0},
+		"desc": "Cooks the orders, preps in the morning and restocks the stations at night."},
+	"server":     {"name": "Server",     "plural": "Servers",     "icon": "serve", "pay": [16.90, 18.50], "skill": "service", "tipped": true,
+		"priorities": {"serve": 1, "host": 2, "clean": 3, "cook": 0, "wash": 0, "fix": 0},
+		"desc": "Takes orders, runs food, brings checks and keeps their tables' tips."},
+	"host":       {"name": "Host",       "plural": "Hosts",       "icon": "host",  "pay": [17.00, 19.50], "skill": "service", "tipped": true,
+		"priorities": {"host": 1, "serve": 2, "clean": 3, "cook": 0, "wash": 0, "fix": 0},
+		"desc": "Greets people at the host stand, keeps the waitlist and bookings, and rings up the till."},
+	"busser":     {"name": "Busser",     "plural": "Bussers",     "icon": "clean", "pay": [16.90, 18.00], "skill": "service",
+		"priorities": {"clean": 1, "wash": 2, "serve": 3, "cook": 0, "host": 0, "fix": 0},
+		"desc": "Clears and wipes tables, sweeps the dining room and picks up money left on tables."},
+	"dishwasher": {"name": "Dishwasher", "plural": "Dishwashers", "icon": "wash",  "pay": [16.90, 18.50], "skill": "both",
+		"priorities": {"wash": 1, "clean": 2, "fix": 3, "cook": 0, "serve": 0, "host": 0},
+		"desc": "Keeps the plates coming: washes up, and takes out the trash."},
+	"porter":     {"name": "Porter",     "plural": "Porters",     "icon": "fix",   "pay": [17.50, 21.00], "skill": "both",
+		"priorities": {"fix": 1, "clean": 1, "wash": 3, "cook": 0, "serve": 0, "host": 0},
+		"desc": "Keeps the place clean and running: floors, restrooms, trash, repairs and servicing the equipment."},
+	"manager":    {"name": "Manager",    "plural": "Managers",    "icon": "star",  "pay": [26.00, 36.00], "skill": "both",
+		"priorities": {"serve": 2, "host": 2, "fix": 2, "cook": 3, "clean": 4, "wash": 4},
+		"desc": "Runs the shift: writes the schedule, handles unhappy tables, settles arguments, checks on stressed staff and pitches in."},
+}
+const ROLE_ORDER := ["manager", "cook", "server", "host", "busser", "dishwasher", "porter"]
+## California's minimum wage. Nobody is paid less, tips or not.
+const MIN_WAGE := 16.90
+## Traits change pay a little: dollars an hour per trait (see TRAITS "wage").
+const TRAIT_PAY := 0.04
+## New people looking for work every morning, and what an extra job ad costs.
+const CANDIDATES_PER_DAY := 8
+const JOB_AD_COST := 60
+const JOB_AD_PEOPLE := 3
+
+## Pay is by the hour. California: past 8 hours in a day it's time and a half,
+## past 12 it's double time. Anyone who comes in is paid for at least 4 hours.
 const SHIFT_HOURS := 8.0
 const OVERTIME := 1.5
-const MIN_PAID_HOURS := 4.0       # anyone who comes in gets at least this
-const WAGE_BASE := 16             # a new hire's wage: this plus 2 per skill point, give or take
-const TRAIT_WAGE_SHARE := 0.6     # trait wage changes are for a full day; a shift gets this share
-## "open": in for prep, out 8 hours later. "close": in 7 hours before closing, stays
-## for closing duties. "double": all day (overtime!).
+const DOUBLE_TIME := 2.0
+const DOUBLE_TIME_AFTER := 12.0
+const MIN_PAID_HOURS := 4.0
+## "open": the day shift, in for prep and home 8 hours later. "close": the night
+## shift, in 8 hours before the last closing jobs are done. "double": all day (overtime!).
 const SHIFTS := {
-	"open":   {"name": "Opening", "desc": "In before the doors open for prep, home 8 hours later."},
-	"close":  {"name": "Closing", "desc": "In for the second half of the day, and stays to close up: mop, restock, trash."},
-	"double": {"name": "Double",  "desc": "The whole day. Anything past 8 hours is paid at time and a half, and long days wear people out."},
+	"open":   {"name": "Day",    "desc": "In before the doors open for prep, home 8 hours later."},
+	"close":  {"name": "Night",  "desc": "The second half of the day, and stays to close up: mop, restock, trash."},
+	"double": {"name": "Double", "desc": "The whole day. Past 8 hours it's time and a half and past 12 double time, and long days wear people out."},
 }
 const SHIFT_ORDER := ["open", "close", "double"]
 const CLOSE_EXTRA := 45           # minutes of closing duties planned after the doors shut
@@ -407,7 +469,12 @@ const SETUP_MINUTES := 3.0
 
 const CRITIC_CHANCE := 0.25       # chance per day (from day 2) that a critic visits
 const TAKEOUT_SHARE := 0.2        # share of arrivals that want takeout, if you have a window
-const INSPECTION_EVERY := 3       # days between health inspections, roughly
+## Health inspections: a first visit soon after you open, then two to four a
+## year (every three to six months), plus a follow-up when someone reports a
+## reaction to the food.
+const FIRST_INSPECTION := Vector2i(3, 10)     # days after opening
+const INSPECTION_DAYS := Vector2i(91, 182)    # days between routine visits
+const FOLLOW_UP_INSPECTION := Vector2i(3, 10) # days after a reported allergic reaction
 const GRADE_EFFECT := {"A": 1.15, "B": 1.0, "C": 0.8}
 
 ## Personality traits a new hire might have. wage is added to their pay
@@ -579,6 +646,7 @@ const REL_EVENTS := {
 	"late":     {"points": -1.5, "reason": "Late again"},
 	"trained":  {"reason": "Showed me the ropes"},
 	"blowup":   {"points": -6.0, "reason": "The big argument"},
+	"mediated": {"reason": "Talked it out"},
 	"meal":     {"points": 1.5,  "reason": "Staff meals together"},
 	"tips_keep":  {"points": -2.0, "reason": "Keeps all the tips"},
 	"tips_share": {"points": 1.0,  "reason": "Shares the tips"},
@@ -605,31 +673,41 @@ const PHONE_REVIEW := 0.2         # stars a table loses when it sees it
 const PHONE_WARN_AFTER := 3       # times you catch someone in a week before a warning
 
 ## Managers still do their jobs, and also keep an eye on the floor.
-const MANAGER_WAGE := 6
 const MANAGER_STRICT := 0.7       # chance to reprimand someone on their phone
 const MANAGER_STRICT_FRIEND := 0.2
 const MANAGER_STRICT_RIVAL := 0.95
 const MANAGER_MOOD := 0.2         # fed up: this much stricter; cheerful: this much softer
 const MANAGER_BREAKUP_TILES := 5.0
+## A manager on shift also settles arguments (they sit the two down and talk
+## it out), checks on anyone who's stressed and sends the worn-out on a break.
+## Having a manager at all takes a little more stress off everyone overnight.
+const MEDIATE_POINTS := 10.0      # opinion each way after a good talk (less from a so-so manager)
+const MEDIATE_STRESS := 10.0
+const CHECKIN_AT := 55.0          # stress that gets a manager's check-in
+const CHECKIN_STRESS := 12.0
+const CHECKIN_EVERY := 30.0       # minutes between one person's check-ins
+const MANAGER_NIGHT_CALM := 6.0
 
 ## Stress, from 0 to 100. It rises in a rush, near rivals, when tired and when
 ## bad things happen, and falls on breaks (fast on a sofa), near friends, when
 ## idle and overnight. It sets the mood; too much for too long and people quit.
-const STRESS_WORK := 0.035        # per minute of work while open
-const STRESS_BUSY := 0.03         # ...more when there are more customers waiting than staff
-const STRESS_SWAMPED := 0.07      # ...and more again when there are twice as many
+const STRESS_WORK := 0.025        # per minute of work while open
+const STRESS_BUSY := 0.02         # ...more when there are more customers waiting than staff
+const STRESS_SWAMPED := 0.05      # ...and more again when there are twice as many
 const STRESS_RIVAL := 0.05        # a rival nearby
 const STRESS_TIRED := 0.05        # energy under 30
 const STRESS_FRIEND := -0.015     # a friend working nearby
 const STRESS_IDLE := -0.04
 const STRESS_REST := -0.12        # on a break with no sofa
 const STRESS_SOFA := -0.35        # on a sofa
-const STRESS_FROM_BAD := 0.8      # stress per opinion point lost in a bad moment
-const STRESS_NIGHT := -25.0       # a night's sleep
+const STRESS_FROM_BAD := 0.5      # stress per opinion point lost in a bad moment
+const STRESS_NIGHT := -30.0       # a night's sleep
 const STRESS_CHEERFUL := 25.0     # mood: at or under this, cheerful
 const STRESS_FED_UP := 60.0       # at or over this, fed up
 const STRESS_MISTAKES := 75.0     # over this: burnt food, dropped plates, 10% slower
-const STRESS_BURNOUT := 80.0      # ending two days in a row over this, they quit
+const STRESS_BURNOUT := 80.0      # ending three days in a row over this, they quit
+const BURNOUT_QUIT_NIGHTS := 3
+const RAISE_REFUSALS_QUIT := 3    # say no to a raise this many times and they find another job
 const STRESS_FRIEND_QUIT := 15.0  # stress for a friend when someone quits
 
 ## Written story moments when two people become friends, best friends or rivals.
@@ -663,7 +741,7 @@ const ELECTRICIAN_COST := 150.0
 const FESTIVAL_CROWD := 1.35
 const BUZZ_DAYS := 3              # a great celebrity review brings more people for this many days
 const BUZZ_CROWD := 1.2
-const RAISE_AMOUNT := Vector2i(3, 8)
+const RAISE_AMOUNT := Vector2(0.50, 2.00)   # dollars an hour
 
 ## Speech bubbles and the staff log.
 const BUBBLE_SECONDS := 2.5
@@ -697,6 +775,8 @@ const LINES := {
 	"slacking": ["Really?", "Slacking?"],
 	"cover": ["I got this."],
 	"breakup": ["Break it up!", "Enough, you two."],
+	"mediate": ["Let's talk.", "Both of you, a minute?", "What's going on?"],
+	"checkin": ["You okay?", "Take five.", "Rough one, huh?"],
 }
 
 const SKIN := [Color("f1c7a5"), Color("e0ac86"), Color("c68863"), Color("a5694a"), Color("7d4a33"), Color("f6d8bf")]
@@ -732,6 +812,31 @@ func item_desc(key: String) -> String:
 	if BUILD.has(key):
 		return BUILD[key]["desc"]
 	return ""
+
+
+## The hourly pay someone would ask for in this role, with these skills and traits.
+func role_pay(role: String, cooking: int, service: int, traits: Array = []) -> float:
+	var r: Dictionary = ROLES.get(role, ROLES["server"])
+	var skill: float = cooking if r["skill"] == "cooking" else (service if r["skill"] == "service" else (cooking + service) / 2.0)
+	var lo: float = r["pay"][0]
+	var hi: float = r["pay"][1]
+	var pay: float = lo + (hi - lo) * clampf((skill - 1.0) / 9.0, 0.0, 1.0)
+	for t in traits:
+		if TRAITS.has(t):
+			pay += TRAITS[t]["wage"] * TRAIT_PAY
+	return maxf(MIN_WAGE, snappedf(pay, 0.25))
+
+
+## "$18.50/hr"
+func hourly(v: float) -> String:
+	return "$%.2f/hr" % v
+
+
+func loan_terms(amount: int) -> Dictionary:
+	for l in LOANS:
+		if l["amount"] == amount:
+			return l
+	return {}
 
 
 func rush_at(minute: float) -> Dictionary:

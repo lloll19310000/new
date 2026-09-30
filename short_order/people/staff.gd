@@ -12,7 +12,9 @@ signal leveled_up(skill: String, level: int)
 const JobClass = preload("res://people/job.gd")
 
 var person_name := ""
-var wage := 80
+var role := "server"            # what they were hired to do (Data.ROLES)
+var wage := 17.0                # dollars an hour
+var raises := 0.0               # raises you've given them, kept if their role changes
 var cooking := 5                # 1-10: faster cooking, better food
 var service := 5                # 1-10: faster walking and serving
 var traits: Array = []          # keys of Data.TRAITS
@@ -32,7 +34,9 @@ var rest_cell := Vector2i(-1, -1)
 var id := 0                     # permanent, used by the Crew opinions
 var origin: Dictionary = {}     # {country, city, dish, place}
 var bio := ""
-var manager := false
+var manager: bool:
+	get:
+		return role == "manager"
 var warnings := 0
 var caught_days: Array = []     # days you caught them on the phone (this week)
 # phones, arguments and mood (see autoload/crew.gd)
@@ -48,11 +52,16 @@ var _friend_factor := 1.0
 var _near_rival := false
 # stress and what's at stake (see autoload/crew.gd and autoload/events.gd)
 var stress := 0.0               # 0-100; sets the mood, causes mistakes, and too much means they quit
-var burnout_warned := false     # ended a day burned out; one more and they quit
+var burnout_warned := false     # ended a day burned out (see burnout_nights)
+var burnout_nights := 0         # nights in a row they ended burned out; at Data.BURNOUT_QUIT_NIGHTS they quit
 var raise_refused := 0          # times you said no to a raise
 var start_skill := 0            # cooking + service when hired (or at their last raise)
 var last_raise_day := 1
-var away_day := -1              # the day they have off
+var away_day := -1              # a day off they asked for
+var sched_off := -1             # a day off the schedule gave them
+var streak := 0                 # days in a row they've worked
+var shift_locked := false       # you set their shift by hand: the schedule leaves it alone
+var break_asked := false        # a manager told them to take a break after this job
 var away := false               # having that day off right now
 var _burnt_day := -1
 # the morning
@@ -88,7 +97,11 @@ var ate_today := false
 func setup(d: Dictionary, lot_ref) -> void:
 	lot = lot_ref
 	person_name = d["name"]
-	wage = d["wage"]
+	role = str(d.get("role", ""))
+	if not Data.ROLES.has(role):
+		role = GameState.guess_role(d.get("priorities", {}), bool(d.get("manager", false)))
+	wage = float(d["wage"])
+	raises = float(d.get("raises", 0.0))
 	cooking = d["cooking"]
 	service = d["service"]
 	skin = d["skin"]
@@ -102,9 +115,12 @@ func setup(d: Dictionary, lot_ref) -> void:
 	bio = d.get("bio", "")
 	if bio == "":
 		bio = Data.write_bio(origin, cooking, service, traits)
-	manager = bool(d.get("manager", false))
 	stress = float(d.get("stress", 0.0))
 	burnout_warned = bool(d.get("burnout_warned", false))
+	burnout_nights = int(d.get("burnout_nights", 1 if burnout_warned else 0))
+	sched_off = int(d.get("sched_off", -1))
+	streak = int(d.get("streak", 0))
+	shift_locked = bool(d.get("shift_locked", false))
 	raise_refused = int(d.get("raise_refused", 0))
 	start_skill = int(d.get("start_skill", cooking + service))
 	last_raise_day = int(d.get("last_raise_day", GameState.day))
@@ -120,7 +136,7 @@ func setup(d: Dictionary, lot_ref) -> void:
 		caught_days.append(int(day))
 	if d.has("xp"):
 		xp = {"cooking": float(d["xp"].get("cooking", 0.0)), "service": float(d["xp"].get("service", 0.0))}
-	priorities = GameState.default_priorities(cooking, service)
+	priorities = GameState.default_priorities(role)
 	if d.has("priorities"):
 		for k in d["priorities"]:
 			priorities[k] = int(d["priorities"][k])
@@ -158,6 +174,11 @@ func stress_factor() -> float:
 
 func add_stress(v: float) -> void:
 	stress = clampf(stress + v, 0.0, 100.0)
+
+
+## Off today: a day they asked for, or one the schedule gave them.
+func day_off_today() -> bool:
+	return away_day == GameState.day or sched_off == GameState.day
 
 
 ## A day off: gone from the diner for the day, back fresh the next morning.
@@ -231,7 +252,8 @@ func tick(dt: float, minutes: float) -> void:
 	if job != null:
 		practice(minutes)
 	if job == null and not on_break:
-		if energy < Data.BREAK_AT and active:
+		if (energy < Data.BREAK_AT or break_asked) and active:
+			break_asked = false
 			start_break()
 		else:
 			think_timer -= dt
@@ -481,6 +503,8 @@ func choose_job() -> void:
 			score += 4000.0   # once the doors are open, orders come before prep
 		elif j.kind in ["till", "check"]:
 			score -= 3000.0   # people waiting to pay come first: it frees tables and brings in the money
+		elif j.kind == "greet":
+			score -= 2000.0   # a quick hello at the door keeps people from walking off
 		elif j.kind == "wash" and GameState.plates_clean < Data.PLATES_LOW and GameState.is_open():
 			score -= 6000.0   # "we need plates!": the kitchen can't send anything out without them
 		if score < best_score:
@@ -502,7 +526,7 @@ func job_priority(j) -> int:
 			if b == 0:
 				return a
 			return mini(a, b)
-		"complaint":
+		"complaint", "mediate", "checkin":
 			return 1 if manager else 0
 	return priorities.get(j.type, 0)
 
@@ -539,6 +563,10 @@ func can_take(j) -> bool:
 			return group_ok(j.group) and j.group.state == "paying" and j.group.table != null
 		"complaint":
 			return manager and group_ok(j.group) and j.group.state == "complaining" and j.group.table != null
+		"mediate":
+			return manager and j.who != self and j.who2 != self and Crew.valid_here(j.who) and Crew.valid_here(j.who2)
+		"checkin":
+			return manager and j.who != self and Crew.valid_here(j.who)
 		"cook":
 			if not group_ok(j.group) or not Events.powered():
 				return false
@@ -572,13 +600,19 @@ func can_take(j) -> bool:
 		"restock":
 			return j.furniture != null and lot.furniture.has(j.furniture) and not j.furniture.stocked and j.furniture.user == null
 		"bus":
-			return j.furniture != null and j.furniture.dirty_plates > 0 and not lot.of_type("sink").is_empty() and lot.furniture.has(j.furniture)
+			return j.furniture != null and lot.furniture.has(j.furniture) and \
+				((j.furniture.dirty_plates > 0 and not lot.of_type("sink").is_empty()) or j.furniture.cash > 0.0)
+		"collect":
+			return j.furniture != null and lot.furniture.has(j.furniture) and j.furniture.cash > 0.0
 		"wash":
 			return j.furniture != null and j.furniture.dirty > 0 and lot.furniture.has(j.furniture)
 		"sweep":
 			return lot.dirt[lot.idx(j.cell)] >= Data.DIRT_SHOW and lot.walkable(j.cell)
 		"repair":
 			return j.furniture != null and j.furniture.broken and lot.furniture.has(j.furniture) and j.furniture.user == null and GameState.can_afford(Data.REPAIR_COST)
+		"service":
+			return j.furniture != null and lot.furniture.has(j.furniture) and not j.furniture.broken and j.furniture.user == null \
+				and j.furniture.wear >= Data.SERVICE_AT * 0.5 and GameState.can_afford(Data.SERVICE_COST)
 	return false
 
 
@@ -595,6 +629,8 @@ func job_cell(j) -> Vector2i:
 	if j.kind == "greet":
 		var hs = nearest("host", lot.entry_inside)
 		return hs.cell if hs != null else lot.entry_inside
+	if j.kind in ["mediate", "checkin"] and Crew.valid_here(j.who):
+		return j.who.current_cell()
 	if j.furniture != null:
 		return j.furniture.cell
 	if group_ok(j.group) and j.group.table != null:
@@ -648,6 +684,8 @@ func start_job(j) -> void:
 		"till": plan_till(j)
 		"check": plan_check(j)
 		"complaint": plan_complaint(j)
+		"mediate": plan_mediate(j)
+		"checkin": plan_checkin(j)
 		"scrub": plan_scrub(j)
 		"trash": plan_trash(j)
 		"restock": plan_restock(j)
@@ -656,6 +694,8 @@ func start_job(j) -> void:
 		"wash": plan_wash(j)
 		"sweep": plan_sweep(j)
 		"repair": plan_repair(j)
+		"service": plan_service(j)
+		"collect": plan_collect(j)
 
 
 func go_step(cells: Array, label: String) -> Dictionary:
@@ -863,6 +903,46 @@ func plan_complaint(j) -> void:
 			else:
 				Crew.say(self, "sorry_table", "chat")
 				g.resolve_complaint("apologise", self)
+			return true),
+	]
+
+
+## A manager sits two people down and gets them to talk it out.
+func plan_mediate(j) -> void:
+	var a = j.who
+	var b = j.who2
+	steps = [
+		go_step(lot.access_cells_near(a.current_cell()), "Going to settle an argument"),
+		call_step(func():
+			if not Crew.valid_here(a) or not Crew.valid_here(b):
+				return false
+			a.pause_left = maxf(a.pause_left, 1.5)
+			b.pause_left = maxf(b.pause_left, 1.5)
+			face_toward(a.position)
+			Crew.say(self, "mediate", "chat")
+			return true),
+		work_step(1.5, "Talking it out with %s and %s" % [a.person_name, b.person_name], false, Vector2.ZERO),
+		call_step(func():
+			if Crew.valid_here(a) and Crew.valid_here(b):
+				Crew.mediate(self, a, b)
+			return true),
+	]
+
+
+## A manager checks on someone having a rough shift, and sends them on a break if they're worn out.
+func plan_checkin(j) -> void:
+	var t = j.who
+	steps = [
+		go_step(lot.access_cells_near(t.current_cell()), "Checking on %s" % t.person_name),
+		call_step(func():
+			if not Crew.valid_here(t):
+				return false
+			face_toward(t.position)
+			return true),
+		work_step(0.8, "Checking on %s" % t.person_name, false, Vector2.ZERO),
+		call_step(func():
+			if Crew.valid_here(t):
+				Crew.check_in(self, t)
 			return true),
 	]
 
@@ -1169,7 +1249,7 @@ func plan_trash(j) -> void:
 ## Every batch wears a station a little. Worn stations sometimes break.
 func wear_out(st) -> void:
 	st.wear = minf(1.0, st.wear + randf_range(Data.WEAR_PER_COOK.x, Data.WEAR_PER_COOK.y) * (Data.PRO_WEAR if st.tier > 0 else 1.0))
-	if randf() < st.wear * Data.BREAK_CHANCE:
+	if randf() < st.wear * st.wear * Data.BREAK_CHANCE:
 		st.broken = true
 		st.broke_by = self
 		GameState.today["breakdowns"] += 1
@@ -1248,15 +1328,29 @@ func plan_deliver(j) -> void:
 	]
 
 
+## A table left the money for the bill on it: go and pick it up.
+func plan_collect(j) -> void:
+	var t = j.furniture
+	steps = [
+		go_step(lot.access_cells(t), "Picking up a check"),
+		work_step(0.25, "Picking up a check", false, t.center_px()),
+		call_step(func(): return Books.collect_table(t, self)),
+	]
+
+
 func plan_bus(j) -> void:
 	var t = j.furniture
 	steps = [
 		go_step(lot.access_cells(t), "Going to clear a table"),
 		work_step(0.8, "Clearing a table", false, t.center_px()),
 		call_step(func():
+			# any money left on the table goes in the till on the way
+			var got: bool = Books.collect_table(t, self)
 			var n: int = t.dirty_plates
 			if n <= 0:
-				return false
+				if got:
+					steps.clear()
+				return got
 			t.dirty_plates = 0
 			carry = []
 			for i in n:
@@ -1322,6 +1416,27 @@ func plan_sweep(j) -> void:
 		call_step(func():
 			lot.clean_cell(j.cell, radius)
 			Sfx.play("sweep", -14.0)
+			return true),
+	]
+
+
+## Closing duty: service a worn station (clean it, tighten it, swap a part) so it doesn't break.
+func plan_service(j) -> void:
+	var st = j.furniture
+	st.user = self
+	reserved["station"] = st
+	var what: String = st.info()["name"].to_lower()
+	steps = [
+		go_step(lot.access_cells(st), "Going to service the " + what),
+		work_step(Data.SERVICE_MINUTES, "Servicing the " + what, false, st.center_px()),
+		call_step(func():
+			if not lot.furniture.has(st) or not GameState.spend(Data.SERVICE_COST):
+				return false
+			st.wear = minf(st.wear, 0.05)
+			st.user = null
+			reserved.erase("station")
+			GameState.today["serviced"] = GameState.today.get("serviced", 0) + 1
+			lot.queue_redraw()
 			return true),
 	]
 

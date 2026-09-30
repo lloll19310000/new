@@ -1,4 +1,5 @@
 extends RefCounted
+const V6 = preload("res://tests/v6_checks.gd")
 ## Automatic tests. Run from a terminal in the project folder:
 ##   godot --headless --path . -- --autotest     plays two days as fast as possible
 ##   godot --path . -- --uitest                  clicks through the interface like a player
@@ -30,7 +31,7 @@ static func build_sample(lot) -> void:
 			lot.place_furniture("chair", c, lot.chair_dir_toward_table(c))
 	# a wall between the dining room and the kitchen, with a door for the staff and the pass in it
 	lot.place_walls(Rect2i(20, 4, 1, 11))
-	lot.place_door(Vector2i(20, 6))
+	lot.place_door(Vector2i(20, 12))
 	lot.place_furniture("pass", Vector2i(20, 8), 1)
 	lot.place_furniture("grill", Vector2i(21, 4), 0)
 	lot.place_furniture("grill", Vector2i(21, 7), 0)
@@ -121,8 +122,12 @@ static func run(main, args: PackedStringArray) -> void:
 	]
 	for i in GameState.staff.size():
 		GameState.staff[i].priorities = pr[i]
+	# these checks play whole days with everyone in all day; the schedule has its own checks
+	Shifts.auto = false
 	for s in GameState.staff:
-		print("AUTOTEST: staff %s cook=%d serve=%d wage=%d traits=%s" % [s.person_name, s.cooking, s.service, s.wage, s.traits])
+		s.shift = "double"
+	for s in GameState.staff:
+		print("AUTOTEST: staff %s (%s) cook=%d serve=%d wage=$%.2f/hr traits=%s" % [s.person_name, s.role, s.cooking, s.service, s.wage, s.traits])
 	check(lot.ready_to_open(), "checklist complete")
 	GameState.special = "meatloaf"
 	GameState.staff_meal = true
@@ -347,7 +352,7 @@ static func run(main, args: PackedStringArray) -> void:
 	for f in lot.of_type("chair"):
 		chair_dirs2.append(f.dir)
 	check(ok and lot.furniture.size() == furn and GameState.staff.size() == team and int(GameState.money) == cash,
-		"load gives back the same diner (furniture %d, staff %d, cash %d)" % [lot.furniture.size(), GameState.staff.size(), int(GameState.money)])
+		"load gives back the same diner (furniture %d/%d, staff %d/%d, cash %d/%d)" % [lot.furniture.size(), furn, GameState.staff.size(), team, int(GameState.money), cash])
 	check(chair_dirs == chair_dirs2, "chairs keep their facing after loading")
 	check(GameState.staff.map(func(s): return s.traits) == traits_before, "staff keep their traits")
 	var crew_after := crew_snapshot()
@@ -391,6 +396,7 @@ static func run(main, args: PackedStringArray) -> void:
 		for i in 6:
 			await main.get_tree().process_frame
 		main.get_viewport().get_texture().get_image().save_png("user://shot_day2.png")
+	await V6.run(main)
 	await flavour_check(main)
 	print("AUTOTEST: done")
 	Sfx.quit_game()
@@ -868,7 +874,7 @@ static func front_checks(main) -> void:
 	# no manager on shift: you're asked
 	var managers: Array = st.filter(func(s): return s.manager)
 	for s in managers:
-		s.manager = false
+		s.role = "server"
 	Events.auto_choice = 0
 	main.spawn_group("regular", 1)
 	g = main.groups[-1]
@@ -879,7 +885,7 @@ static func front_checks(main) -> void:
 	check(g.review_bonus >= 0.5 and g.state != "complaining", "with no manager on shift, you choose: an apology")
 	g.remove_now()
 	for s in managers:
-		s.manager = true
+		s.role = "manager"
 	# a regular's favourite server
 	var r: Dictionary = Front.regulars[0]
 	Front.after_visit(r, 5.0, [st[1]])
@@ -1069,7 +1075,7 @@ static func event_checks(main) -> void:
 	# a raise
 	var c = st[2]
 	c.last_raise_day = GameState.day - 12
-	var wage: int = c.wage
+	var wage: float = c.wage
 	var raise_asked := false
 	for i in 20:
 		if Events.raise_candidate() == c:
@@ -1080,7 +1086,7 @@ static func event_checks(main) -> void:
 		if s != c:
 			s.last_raise_day = GameState.day
 	Events.fire("raise")
-	check(raise_asked and c.wage > wage, "someone who's been here a while asks for a raise, and gets it ($%d to $%d)" % [wage, c.wage])
+	check(raise_asked and c.wage > wage and c.raises > 0.0, "someone who's been here a while asks for a raise, and gets it ($%.2f to $%.2f an hour)" % [wage, c.wage])
 	Events.auto_choice = 1
 	c.last_raise_day = GameState.day - 12
 	var refused_stress: float = c.stress
@@ -1160,9 +1166,12 @@ static func stress_checks(main) -> void:
 	Crew.nightly()
 	check(v.burnout_warned and GameState.staff.size() == n, "burning out gets a warning first")
 	v.stress = 95.0
+	Crew.nightly()
+	check(GameState.staff.has(v) and v.burnout_nights == 2, "a second bad night is another warning, not a quit")
+	v.stress = 95.0
 	pal.stress = 50.0
 	Crew.nightly()
-	check(not GameState.staff.has(v) and GameState.staff.size() == n - 1, "burning out a second night in a row, they quit")
+	check(not GameState.staff.has(v) and GameState.staff.size() == n - 1, "burning out a third night in a row, they quit")
 	check(Crew.report_lines().any(func(l): return l[2].contains("quit")), "the day's report says who quit")
 	check(pal.stress >= 50.0 + Data.STRESS_FRIEND_QUIT + Data.STRESS_NIGHT - 0.01, "a friend quitting is hard on their friends (%d)" % int(pal.stress))
 
@@ -1221,9 +1230,12 @@ static func shift_checks(main) -> void:
 	check(all_stocked and GameState.today.get("restocked", 0) >= 5, "closing duties: every station restocked before the day ends (%d)" % GameState.today.get("restocked", 0))
 	var open_pay := Shifts.pay_today(opener)
 	var dbl_pay := Shifts.pay_today(dbl)
-	check(open_pay >= opener.wage * 0.99 and open_pay <= opener.wage * 1.2, "an opener's 8 hours pay about one shift ($%d of $%d)" % [int(open_pay), opener.wage])
-	check(dbl_pay > dbl.wage * 1.8, "a double pays overtime: $%d for %.1f hours on a $%d shift" % [int(dbl_pay), Shifts.hours_today(dbl), dbl.wage])
-	check(is_equal_approx(Shifts.pay_today(dbl), dbl.wage / 8.0 * (8.0 + 1.5 * (Shifts.hours_today(dbl) - 8.0))), "overtime is time and a half")
+	check(open_pay >= opener.wage * 7.9 and open_pay <= opener.wage * 9.6, "an opener's 8 hours pay about 8 hours at their rate ($%d at $%.2f/hr)" % [int(open_pay), opener.wage])
+	var dh: float = Shifts.hours_today(dbl)
+	check(dbl_pay > dbl.wage * dh * 1.1, "a double pays overtime: $%d for %.1f hours at $%.2f an hour" % [int(dbl_pay), dh, dbl.wage])
+	var expect: float = dbl.wage * (8.0 + 1.5 * clampf(dh - 8.0, 0.0, 4.0) + 2.0 * maxf(0.0, dh - 12.0))
+	check(is_equal_approx(dbl_pay, expect), "California overtime: time and a half past 8 hours, double time past 12 ($%d for %.1f hours)" % [int(dbl_pay), dh])
+	check(is_equal_approx(Shifts.pay_for_hours(20.0, 14.0), 20.0 * (8.0 + 1.5 * 4.0 + 2.0 * 2.0)), "14 hours at $20 is $%d" % int(Shifts.pay_for_hours(20.0, 14.0)))
 	check(closer.closed_late and not opener.closed_late, "the closer stayed late; the opener didn't")
 	check(main.last_report["crew"].any(func(l): return l[2].contains("overtime")), "the report mentions the overtime")
 	# closing then opening: a rough morning. And today someone doesn't show, and someone's late.
@@ -1410,7 +1422,7 @@ static func flavour_check(main) -> void:
 		for i in 4:
 			var o: Dictionary = Data.ORIGINS[(i + variant * 7) % Data.ORIGINS.size()]
 			var origin := {"country": o["country"], "city": o["cities"][0], "dish": o["dishes"][0], "place": o["places"][0]}
-			var sd := {"name": ["Ann", "Ben", "Cat", "Dan"][i], "wage": 80, "cooking": 4 + i, "service": 7 - i,
+			var sd := {"name": ["Ann", "Ben", "Cat", "Dan"][i], "wage": 18.0, "cooking": 4 + i, "service": 7 - i,
 				"skin": Data.SKIN[i], "hair": Data.HAIR[i], "traits": [["tidy"], ["clumsy"], ["chatty"], ["grumpy"]][i],
 				"origin": origin, "bio": "A story."}
 			main.add_staff(sd)
@@ -1508,7 +1520,7 @@ static func run_balance(main, args: PackedStringArray) -> void:
 		GameState.staff[i].priorities = pr[i]
 		GameState.staff[i].shift = letters.get(mix.substr(i, 1), "double")
 	for s in GameState.staff:
-		print("BALANCE: %s (%s) %s cook=%d serve=%d shift=%s $%d" % [s.person_name, Data.hometown(s.origin), s.traits, s.cooking, s.service, s.shift, s.wage])
+		print("BALANCE: %s the %s (%s) %s cook=%d serve=%d shift=%s $%.2f/hr" % [s.person_name, s.role, Data.hometown(s.origin), s.traits, s.cooking, s.service, s.shift, s.wage])
 	var totals := {"bickers": 0, "phones": 0, "friends": 0, "rivals": 0}
 	var start_cash := GameState.money
 	GameState.toast.connect(func(t: String, _k: String):
@@ -1975,7 +1987,7 @@ static func run_ui(main, args: PackedStringArray) -> void:
 	var cash_loan := GameState.money
 	office.loan_buttons[0].pressed.emit()
 	await tree.process_frame
-	check(not Books.loan.is_empty() and GameState.money == cash_loan + Data.LOAN_OPTIONS[0] and office.payoff_button.visible, "a loan from the Office page")
+	check(not Books.loan.is_empty() and GameState.money == cash_loan + Data.LOANS[0]["amount"] and office.payoff_button.visible, "a loan from the Office page")
 	await snap(main, "office", prefix)
 	office.payoff_button.pressed.emit()
 	office.tip_buttons["keep"].pressed.emit()

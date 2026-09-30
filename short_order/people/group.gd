@@ -179,8 +179,11 @@ func tick(minutes: float) -> void:
 			pay_wait += minutes
 			try_dash(minutes)
 			if state == "paying" and pay_wait > Data.PAY_GIVE_UP:
-				# they leave the money on the table and go
-				settle()
+				# they give up waiting: the money goes on the table (or the till's counter) and they go
+				if pay_spot == null:
+					leave_cash()
+				else:
+					settle()
 			redraw_members()
 		"inspecting":
 			inspect_tick(minutes)
@@ -534,7 +537,7 @@ func send_back(wrong: String, right: String, cooks: Array) -> void:
 ## Someone ate what they can't: they're ill, they leave, and it's serious.
 func allergic_reaction(d: String, cooks: Array) -> void:
 	GameState.today["allergies"] += 1
-	GameState.last_allergy_day = GameState.day
+	GameState.report_allergy()
 	var what: String = Data.ALLERGENS[allergy]
 	var how := "It was flagged on the ticket, but there was %s in it anyway." % what if allergy_flagged else "Nobody flagged it on the ticket."
 	GameState.toast.emit("A customer at %s had an allergic reaction to %s in the %s! They left without paying. %s" % [label().to_lower(), what, Data.DISHES[d]["name"].to_lower(), how], "bad")
@@ -588,28 +591,51 @@ func note_trouble(what: String, stars: float) -> void:
 		staff_trouble[what] = stars
 
 
-func pay() -> float:
+## The share of the bill a table tips for this score.
+static func tip_rate(score: float) -> float:
+	if score >= 3.0:
+		return Data.TIP_BASE + Data.TIP_PER_STAR * (score - 3.0)
+	return maxf(0.0, Data.TIP_BASE - Data.TIP_LOW_PER_STAR * (3.0 - score))
+
+
+## The table's own server: whoever wrote the order down, if they still work here.
+func main_server():
+	if order_taker != null and is_instance_valid(order_taker) and GameState.staff.has(order_taker):
+		return order_taker
+	return null
+
+
+## Pays the bill. on_table: they leave the money on the table for the staff to
+## pick up (see leave_cash); otherwise it goes straight in the till.
+func pay(on_table: bool = false) -> float:
 	var result := review()
 	var score: float = result[0]
 	if score >= 4.75:
 		Crew.teamwork(cooked_by, served_by)
 	var charged := 0.0 if comped else bill
-	var tip := 0.0
-	if score >= 3.0:
-		tip = bill * (Data.TIP_BASE + Data.TIP_PER_STAR * (score - 3.0)) * info()["tip"]
-		if regular != null and regular["loyalty"] >= Data.REGULAR_LOYAL:
-			tip *= 1.4
-	# the bill is yours; the tip belongs to the staff
-	GameState.add_money(charged)
-	Books.add_tip(tip, served_by)
-	GameState.today["revenue"] += charged
-	GameState.today["tips"] += tip
+	var tip: float = bill * tip_rate(score) * info()["tip"]
+	if regular != null and regular["loyalty"] >= Data.REGULAR_LOYAL:
+		tip *= 1.4
 	if comped:
 		GameState.today["comped"] += bill
 	GameState.today["served"] += members.size()
 	GameState.totals["served"] += members.size()
-	GameState.totals["earned"] += charged
 	var at: Vector2 = where()
+	if on_table and table != null and not takeout:
+		table.cash += charged + tip
+		table.cash_tip += tip
+		table.cash_server = main_server()
+		table.cash_servers = served_by.duplicate()
+		GameState.today["cash_left"] = GameState.today.get("cash_left", 0) + 1
+		lot.fx.add(at, "Left $%d on the table" % int(round(charged + tip)), Color("8ae596"))
+		if not JobBoard.has_open("collect", "furniture", table):
+			JobBoard.post("serve", "collect", {"furniture": table})
+		return score
+	# the bill is yours; the tip belongs to the staff
+	GameState.add_money(charged)
+	Books.add_tip(tip, served_by, main_server())
+	GameState.today["revenue"] += charged
+	GameState.totals["earned"] += charged
 	lot.fx.add(at, "+$%d" % int(round(charged)) if not comped else "On the house", Color("8ae596"))
 	if tip >= 1.0:
 		lot.fx.add(at + Vector2(0, -12), "tip $%d" % int(round(tip)), Color("f2c14e"))
@@ -696,6 +722,10 @@ func start_paying() -> void:
 	state = "paying"
 	pay_wait = 0.0
 	var till = nearest_till()
+	# some people just leave the money on the table rather than queue at the till
+	if till != null and table != null and not takeout and randf() < Data.CASH_ON_TABLE * Data.CASH_KIND.get(kind, 0.8):
+		leave_cash()
+		return
 	if till != null:
 		pay_spot = till
 		leave_table()
@@ -740,6 +770,26 @@ func settle() -> void:
 	else:
 		GameState.today["paid_at_till"] += 1
 	leave(result[0], result[1], true)
+
+
+## They put the money for the bill (and a tip) on the table and go. Whoever
+## clears the table or comes by picks it up; the tip goes to their servers.
+func leave_cash() -> void:
+	if state in ["leaving", "gone"]:
+		return
+	if table == null or takeout:
+		settle()
+		return
+	if pay_wait > Data.PAY_SLOW:
+		extra_hits["a slow check"] = clampf((pay_wait - Data.PAY_SLOW) / 12.0, 0.0, 0.6)
+	var result := review()
+	var t = table
+	pay(true)
+	leave_table()
+	# they're gone, but the table stays theirs until the money's picked up
+	leave(result[0], result[1], true)
+	if is_instance_valid(t):
+		t.group = null
 
 
 ## Nobody's watching and they've waited a while to pay: some just walk out.

@@ -395,6 +395,13 @@ func start_staff_blowup() -> void:
 	Crew.say(b, "bicker", "storm")
 	for g in Crew.groups_near(a.position, 5.0):
 		g.note_trouble("staff arguing", Data.BICKER_REVIEW)
+	# a manager on shift sorts it out: they sit the two down and talk it through
+	var m = Crew.manager_on_shift([a, b])
+	if m != null:
+		Crew.ask_mediation(a, b)
+		Crew.log_line("%s and %s had a shouting match. %s is stepping in." % [a.person_name, b.person_name, m.person_name], "storm", [a, b, m])
+		note("storm", "#f2c14e", "%s and %s had a shouting match; %s, the manager, sat them down." % [a.person_name, b.person_name, m.person_name])
+		return
 	var gripes := GRIPES.duplicate()
 	gripes.shuffle()
 	ask_player("staff_blowup", "Shouting in the kitchen",
@@ -447,11 +454,11 @@ func can_raise() -> bool:
 func start_raise() -> void:
 	var s = raise_candidate()
 	var better: int = s.cooking + s.service - s.start_skill
-	var amount := clampi(4 + 2 * better, Data.RAISE_AMOUNT.x, Data.RAISE_AMOUNT.y)
+	var amount := snappedf(clampf(0.5 + 0.25 * better, Data.RAISE_AMOUNT.x, Data.RAISE_AMOUNT.y), 0.25)
 	var why := "\"I've gotten a lot better since I started. I think I've earned it.\"" if better >= 2 else "\"I've been here a while now, and rent keeps going up.\""
 	ask_player("raise", "%s wants a raise" % s.person_name,
-		"%s catches you by the fridge. %s They're asking for $%d more a shift (they get $%d now)." % [s.person_name, why, amount, s.wage],
-		[{"label": "Give the raise (+$%d a shift)" % amount, "desc": "They'll be happy, and less stressed."},
+		"%s catches you by the fridge. %s They're asking for $%.2f more an hour (they get $%.2f now)." % [s.person_name, why, amount, s.wage],
+		[{"label": "Give the raise (+$%.2f an hour)" % amount, "desc": "They'll be happy, and less stressed."},
 		{"label": "Not right now", "desc": "They'll be stressed, and say no twice and they'll look for another job."}], {"s": s, "amount": amount})
 
 
@@ -462,18 +469,19 @@ func choose_raise(i: int, d: Dictionary) -> void:
 	s.last_raise_day = GameState.day
 	if i == 0:
 		s.wage += d["amount"]
+		s.raises += d["amount"]
 		s.stress = maxf(0.0, s.stress - 25.0)
 		s.start_skill = s.cooking + s.service
 		s.raise_refused = 0
 		Crew.say(s, "thanks", "heart")
-		Crew.log_line("%s got a raise: $%d a shift now." % [s.person_name, s.wage], "money", [s])
-		note("money", "#6cc3a0", "You gave %s a raise of $%d a shift." % [s.person_name, d["amount"]])
+		Crew.log_line("%s got a raise: $%.2f an hour now." % [s.person_name, s.wage], "money", [s])
+		note("money", "#6cc3a0", "You gave %s a raise of $%.2f an hour." % [s.person_name, d["amount"]])
 	else:
 		s.stress = minf(100.0, s.stress + 20.0)
 		s.raise_refused += 1
 		Crew.log_line("%s asked for a raise and didn't get it." % s.person_name, "money", [s])
 		note("money", "#e75a4e", "%s asked for a raise and you said no." % s.person_name)
-		if s.raise_refused >= 2:
+		if s.raise_refused >= Data.RAISE_REFUSALS_QUIT - 1:
 			GameState.toast.emit("%s is looking for another job." % s.person_name, "bad")
 	GameState.staff_changed.emit()
 

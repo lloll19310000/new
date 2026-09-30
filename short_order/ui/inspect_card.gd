@@ -133,7 +133,7 @@ func refresh() -> void:
 	elif t.get("person_name") != null:
 		portrait.visible = true
 		portrait.show_person(t)
-		title.text = t.person_name + (" (manager)" if t.manager else "")
+		title.text = "%s, %s" % [t.person_name, Data.ROLES[t.role]["name"].to_lower()]
 		sub = "%s · %s" % [Data.hometown(t.origin), t.status]
 		var bits: Array = []
 		for tr in t.traits:
@@ -141,7 +141,7 @@ func refresh() -> void:
 		var mood_col: String = "#" + Crew.MOOD_COLORS.get(t.mood, UiKit.MUTED).to_html(false)
 		text = "[font_size=12][color=#b9a797]%s Signature dish: %s.[/color][/font_size]\n" % [t.bio, t.origin.get("dish", "?")]
 		var stress_col := "#e75a4e" if t.stress >= Data.STRESS_FED_UP else ("#f2c14e" if t.stress > Data.STRESS_CHEERFUL else "#6cc3a0")
-		text += "[color=%s][b]%s[/b][/color] · stress [color=%s][b]%d%%[/b][/color] · cook [b]%d[/b] · serve [b]%d[/b] · energy [b]%d%%[/b] · $%d/shift" % [
+		text += "[color=%s][b]%s[/b][/color] · stress [color=%s][b]%d%%[/b][/color] · cook [b]%d[/b] · serve [b]%d[/b] · energy [b]%d%%[/b] · $%.2f/hr" % [
 			mood_col, Crew.MOOD_NAMES.get(t.mood, "Okay"), stress_col, int(t.stress), t.cooking, t.service, int(t.energy), t.wage]
 		if not bits.is_empty():
 			text += "  ·  " + ", ".join(bits)

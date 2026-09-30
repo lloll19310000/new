@@ -13,7 +13,7 @@ const HudScene = preload("res://ui/hud.tscn")
 const Autotest = preload("res://tests/autotest.gd")
 const ArtPreview = preload("res://tests/art_preview.gd")
 const SAVE_PATH := "user://short_order_save.json"
-const SAVE_VERSION := 5
+const SAVE_VERSION := 6
 
 var lot
 var people: Node2D
@@ -170,6 +170,7 @@ func simulate(real_dt: float) -> void:
 	if prune_timer <= 0.0:
 		prune_timer = 1.0
 		JobBoard.prune(lot)
+		lot.update_cleaners()
 	for s in GameState.staff:
 		if s.at_work and not s.away:
 			s.tick(dt, minutes)
@@ -352,11 +353,10 @@ func open_diner() -> void:
 	var c := GameState.close_min()
 	if GameState.day >= 2 and randf() < Data.CRITIC_CHANCE:
 		critic_at = randf_range(o + 60.0, c - 120.0)
-	var since := GameState.day - GameState.last_inspection_day
-	if GameState.day >= 2 and since >= Data.INSPECTION_EVERY - 1 and (randf() < 0.5 or since >= Data.INSPECTION_EVERY + 1):
-		inspect_at = randf_range(o + 60.0, c - 120.0)
+	if GameState.day >= GameState.next_inspection_day:
+		inspect_at = randf_range(o + 60.0, maxf(o + 90.0, c - 120.0))
 	for s in GameState.staff:
-		s.set_away(s.away_day == GameState.day)
+		s.set_away(s.day_off_today())
 		if s.away:
 			Crew.log_line("%s has the day off." % s.person_name, "sun", [s])
 	_meal_chairs = {}
@@ -453,6 +453,10 @@ func end_day() -> void:
 		p.items.clear()
 	for s in GameState.staff:
 		s.drop_job()
+	# money still sitting on a table is picked up when the lights go off
+	for t in lot.furniture:
+		if t.is_table() and t.cash > 0.0:
+			Books.collect_table(t)
 	for m in Health.mice.duplicate():
 		Health.remove_mouse(m)
 	# everyone clocks out: hours, overtime, colds, training
@@ -483,6 +487,8 @@ func end_day() -> void:
 		s.set_at_work(true)
 	Crew.nightly()
 	Front.nightly()
+	# tomorrow's schedule: days off and who works days or nights
+	Shifts.plan_schedule(GameState.day + 1)
 	var level_up := GameState.check_level_up()
 	if level_up:
 		var lv: Dictionary = GameState.level_info()
@@ -554,7 +560,8 @@ func hire(i: int) -> void:
 	var c: Dictionary = GameState.candidates[i]
 	GameState.candidates.remove_at(i)
 	var s = add_staff(c)
-	GameState.toast.emit("%s joined the team at $%d a shift." % [s.person_name, s.wage], "good")
+	Shifts.replan()
+	GameState.toast.emit("%s joined as a %s at $%.2f an hour." % [s.person_name, Data.ROLES[s.role]["name"].to_lower(), s.wage], "good")
 	Crew.log_line("%s from %s joined the crew." % [s.person_name, Data.hometown(s.origin)], "staff", [s])
 
 
@@ -581,6 +588,7 @@ func lose_staff(s) -> void:
 	Crew.forget(s)
 	GameState.staff.erase(s)
 	s.queue_free()
+	Shifts.replan()
 	GameState.staff_changed.emit()
 	lot.layout_changed.emit()
 
@@ -593,6 +601,7 @@ func fire(s) -> void:
 	Crew.forget(s)
 	GameState.staff.erase(s)
 	s.queue_free()
+	Shifts.replan()
 	GameState.staff_changed.emit()
 	lot.layout_changed.emit()
 	GameState.toast.emit("%s has left the diner." % s.person_name, "")
@@ -606,12 +615,12 @@ func save_game() -> void:
 		furn.append({"type": f.type, "x": f.cell.x, "y": f.cell.y, "dir": f.dir, "wear": f.wear, "broken": f.broken, "tier": f.tier})
 	var team := []
 	for s in GameState.staff:
-		team.append({"name": s.person_name, "wage": s.wage, "cooking": s.cooking, "service": s.service,
+		team.append({"name": s.person_name, "role": s.role, "wage": s.wage, "raises": s.raises, "cooking": s.cooking, "service": s.service,
 			"skin": s.skin.to_html(), "hair": s.hair.to_html(), "priorities": s.priorities,
 			"traits": s.traits, "xp": s.xp, "id": s.id, "origin": s.origin, "bio": s.bio, "manager": s.manager,
 			"warnings": s.warnings, "caught_days": s.caught_days, "stress": s.stress, "burnout_warned": s.burnout_warned,
 			"raise_refused": s.raise_refused, "start_skill": s.start_skill, "last_raise_day": s.last_raise_day, "away_day": s.away_day,
-			"shift": s.shift, "sick_days": s.sick_days, "closed_late": s.closed_late, "trainer_id": s.trainer_id, "training_days": s.training_days})
+			"shift": s.shift, "shift_locked": s.shift_locked, "sched_off": s.sched_off, "streak": s.streak, "burnout_nights": s.burnout_nights, "sick_days": s.sick_days, "closed_late": s.closed_late, "trainer_id": s.trainer_id, "training_days": s.training_days})
 	var plates := GameState.plates_clean
 	for f in lot.furniture:
 		plates += f.dirty_plates + f.dirty
@@ -622,8 +631,8 @@ func save_game() -> void:
 		"plates_total": GameState.plates_total, "plates": plates, "totals": GameState.totals,
 		"grade": GameState.grade, "crew": Crew.save_data(),
 		"supplier": GameState.supplier, "special": GameState.special, "owned": GameState.owned, "rep_level": GameState.rep_level,
-		"buzz_until": Events.buzz_until_day, "last_inspection": GameState.last_inspection_day,
-		"kitchen": Stock.save_data(), "staff_meal": GameState.staff_meal, "books": Books.save_data(), "front": Front.save_data(), "health": Health.save_data(), "hours": GameState.hours,
+		"buzz_until": Events.buzz_until_day, "last_inspection": GameState.last_inspection_day, "next_inspection": GameState.next_inspection_day,
+		"kitchen": Stock.save_data(), "staff_meal": GameState.staff_meal, "books": Books.save_data(), "schedule_auto": Shifts.auto, "front": Front.save_data(), "health": Health.save_data(), "hours": GameState.hours,
 		"floor": Array(lot.floor_type), "wall": Array(lot.wall), "dirt": Array(lot.dirt), "furniture": furn, "staff": team,
 		"candidates": GameState.candidates.map(func(c):
 			var d: Dictionary = c.duplicate()
@@ -670,6 +679,7 @@ func load_game() -> bool:
 	Front.load_data(data.get("front", {}))
 	Stock.reconcile()
 	GameState.staff_meal = bool(data.get("staff_meal", false))
+	Shifts.auto = bool(data.get("schedule_auto", true))
 	for k in data.get("hours", {}):
 		if GameState.hours.has(k):
 			GameState.hours[k] = bool(data["hours"][k])
@@ -690,6 +700,11 @@ func load_game() -> bool:
 	GameState.totals["served"] = int(GameState.totals["served"])
 	GameState.grade = data.get("grade", "")
 	GameState.last_inspection_day = int(data.get("last_inspection", 0))
+	if data.has("next_inspection"):
+		GameState.next_inspection_day = int(data["next_inspection"])
+	elif GameState.last_inspection_day > 0:
+		# older saves: the next routine visit is a few months after the last one
+		GameState.next_inspection_day = GameState.last_inspection_day + randi_range(Data.INSPECTION_DAYS.x, Data.INSPECTION_DAYS.y)
 	# version 1 and 2 saves have no crew yet: everyone gets a hometown and fresh first impressions
 	Crew.load_data(data.get("crew", {}) if version >= 3 else {})
 	for i in lot.floor_type.size():
@@ -713,12 +728,15 @@ func load_game() -> bool:
 		var d: Dictionary = sd.duplicate()
 		d["skin"] = Color(sd["skin"])
 		d["hair"] = Color(sd["hair"])
-		d["wage"] = int(sd["wage"])
+		d["wage"] = float(sd["wage"])
 		if version < 5:
-			# wages used to be for the whole day; now they're for an 8-hour shift,
-			# and a whole day (a double) earns overtime on top
-			d["wage"] = maxi(20, int(round(int(sd["wage"]) * 0.53)))
 			d["shift"] = "double"
+		if version < 6:
+			# pay used to be a made-up amount per shift; now it's California's
+			# going rate by the hour for their role
+			var role: String = GameState.guess_role(sd.get("priorities", {}), bool(sd.get("manager", false)))
+			d["role"] = role
+			d["wage"] = Data.role_pay(role, int(sd["cooking"]), int(sd["service"]), sd.get("traits", []))
 		d["cooking"] = int(sd["cooking"])
 		d["service"] = int(sd["service"])
 		add_staff(d)
@@ -733,10 +751,12 @@ func load_game() -> bool:
 				c["origin"] = Data.random_origin()
 				c["origin"].erase("name")
 				c["bio"] = Data.write_bio(c["origin"], int(cd["cooking"]), int(cd["service"]), c["traits"])
-			for k in ["cooking", "service", "wage"]:
+			for k in ["cooking", "service"]:
 				c[k] = int(cd[k])
-			if version < 5:
-				c["wage"] = maxi(20, int(round(c["wage"] * 0.53)))
+			c["wage"] = float(cd["wage"])
+			if not Data.ROLES.has(str(c.get("role", ""))):
+				c["role"] = "cook" if c["cooking"] >= c["service"] else "server"
+				c["wage"] = Data.role_pay(c["role"], c["cooking"], c["service"], c["traits"])
 			GameState.candidates.append(c)
 	for y in lot.H:
 		for x in lot.W:
@@ -778,5 +798,6 @@ func clear_world() -> void:
 	Books.reset()
 	Front.reset()
 	Health.reset()
+	Shifts.reset()
 	JobBoard.clear()
 	lot.init_grid()

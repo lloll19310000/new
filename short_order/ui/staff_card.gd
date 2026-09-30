@@ -151,11 +151,11 @@ func _process(delta: float) -> void:
 func refresh() -> void:
 	if who == null or not is_instance_valid(who):
 		return
-	wage_label.text = "$%d/shift" % who.wage
+	wage_label.text = Data.hourly(who.wage)
 	if who.tips_today >= 1.0:
-		wage_label.text = "$%d +$%d tips" % [who.wage, int(who.tips_today)]
-	wage_label.tooltip_text = "Paid $%d for an 8-hour shift ($%.2f an hour), and time and a half after that. Tips so far today: $%d (%s)." % [
-		who.wage, who.wage / Data.SHIFT_HOURS, int(who.tips_today), "from the tables they served" if Books.tip_policy == "keep" else "the shared pot is split at night"]
+		wage_label.text = "%s +$%d tips" % [Data.hourly(who.wage), int(who.tips_today)]
+	wage_label.tooltip_text = "Paid $%.2f an hour: time and a half past 8 hours in a day, double time past 12. Tips so far today: $%d (%s)." % [
+		who.wage, int(who.tips_today), "from the tables they served" if Books.tip_policy == "keep" else "the shared pot is split at night"]
 	shift_button.text = Data.SHIFTS[who.shift]["name"]
 	shift_button.tooltip_text = "%s shift: %s\n%s\nClick to change: Opening, Closing or Double." % [Data.SHIFTS[who.shift]["name"], Shifts.hours_text(who), Data.SHIFTS[who.shift]["desc"]]
 	var tr = Crew.by_id(who.trainer_id) if who.trainer_id > 0 else null
@@ -167,7 +167,7 @@ func refresh() -> void:
 		_traits_key = tk
 		UiKit.fill_traits(traits_box, who.traits)
 		if who.manager:
-			traits_box.add_child(UiKit.tag_chip("Manager", "star", UiKit.GOLD, "Keeps an eye on phones and breaks up arguments. +$%d a shift." % Data.MANAGER_WAGE))
+			traits_box.add_child(UiKit.tag_chip("Manager", "star", UiKit.GOLD, Data.ROLES["manager"]["desc"]))
 		if who.warnings > 0:
 			traits_box.add_child(UiKit.tag_chip("%d warning%s" % [who.warnings, "" if who.warnings == 1 else "s"], "alert", UiKit.CHERRY, "Caught on the phone too often, or didn't show up for a shift."))
 		if who.sick_days > 0:
@@ -178,7 +178,7 @@ func refresh() -> void:
 	manager_button.set_pressed_no_signal(who.manager)
 	manager_button.self_modulate = UiKit.GOLD if who.manager else UiKit.FAINT
 	manager_button.tooltip_text = ("%s is a manager. Click to make them regular staff again." % who.person_name) if who.manager else \
-		"Make %s a manager (+$%d a shift). Managers still do their jobs, tell people off for being on their phones and break up arguments." % [who.person_name, Data.MANAGER_WAGE]
+		"Make %s a manager (%s). %s" % [who.person_name, Data.hourly(Data.role_pay("manager", who.cooking, who.service, who.traits) + who.raises), Data.ROLES["manager"]["desc"]]
 	mood_icon.texture = UiKit.icon(Crew.MOOD_ICONS.get(who.mood, "mood_okay"))
 	mood_icon.self_modulate = Crew.MOOD_COLORS.get(who.mood, UiKit.MUTED)
 	mood_icon.tooltip_text = "Mood: %s" % Crew.MOOD_NAMES.get(who.mood, "Okay")
