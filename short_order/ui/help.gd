@@ -39,7 +39,7 @@ func build_text() -> String:
 	t += "%s  [b]Dining[/b] also has [b]booths[/b] (couples and families love them) and a [b]counter with stools[/b] (truckers and regulars on their own sit there).\n" % ic("dining")
 	t += "%s  [b]Decor:[/b] plants, lamps, pictures and more cheer up tables nearby. The [b]employee of the month[/b] frame shows your best worker; a clock, a trophy shelf and a fish tank are rewards from the Goals board.\n" % ic("decor")
 	t += "%s  [b]Staff & office:[/b] a sofa, a break table, staff coffee, a vending machine, a TV and lockers make breaks better; a manager's desk, a filing cabinet and a schedule board help the office run.\n" % ic("staff_room")
-	t += "%s  [b]Waiting:[/b] benches and waiting chairs by the door (or outside) keep people from walking off; when they're full, people line up along the sidewalk. Big parties sit at two tables pushed together.\n" % ic("people")
+	t += "%s  [b]Waiting:[/b] benches and waiting chairs by the door (or outside) keep people from walking off; when they're full, people line up along the sidewalk. Big parties need a long table.\n" % ic("people")
 	t += "%s  [b]Copy area[/b] and [b]Paste[/b] (Structure) copy a whole room as a blueprint. [b]Ctrl+Z[/b] undoes your last change this morning.\n" % ic("structure")
 	t += "%s  [b]Land:[/b] you start on one lot. Click a plot marked For sale (or use [b]Buy land[/b] in Structure) to buy it. More land means more rent.\n" % ic("structure")
 	t += "%s  [b]Upgrades:[/b] click a station and upgrade it to Pro: faster cooking, half the wear.\n\n" % ic("star")

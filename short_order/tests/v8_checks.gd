@@ -1,6 +1,6 @@
 extends RefCounted
-## Checks for version 8: waiting benches and the line outside, tables pushed
-## together for big parties, early birds in the prep hour, meal and rest
+## Checks for version 8: waiting benches and the line outside, long tables
+## for big parties, early birds in the prep hour, meal and rest
 ## breaks, the staff room and office, who's home in the morning, staying on
 ## after a shift, the interface size, 8x speed and everyone's own look.
 ## Called from autotest.gd.
@@ -61,19 +61,20 @@ static func waiting_checks(main) -> void:
 
 static func merge_checks(main) -> void:
 	var lot = main.lot
-	var pairs: Array = lot.merge_pairs()
-	check(pairs.is_empty() or pairs[0][2] >= 5, "tables close together can be pushed together")
-	# two tables side by side for a party of eight
-	lot.place_furniture("table", Vector2i(6, 1), 0)
-	lot.place_furniture("table", Vector2i(9, 1), 0)
-	check(lot.biggest_party() >= 5 or not lot.merge_pairs().is_empty() or true, "big parties fit (biggest %d)" % lot.biggest_party())
+	check(not lot.has_method("merge_pairs"), "tables are never pushed together any more")
+	# a long table with chairs on both sides seats a big party on its own
+	check(lot.place_furniture("long_table", Vector2i(15, 13), 0), "a long table fits in the dining room")
+	for x in range(15, 18):
+		lot.place_furniture("chair", Vector2i(x, 12), 2)
+		lot.place_furniture("chair", Vector2i(x, 14), 0)
+	lot.link_tables()
 	var biggest: int = lot.biggest_party()
-	check(biggest > 4, "a party bigger than any one table can sit at two tables together (%d seats)" % biggest)
+	check(biggest >= 6, "a long table seats a big party (%d seats)" % biggest)
 	var g := Group.new()
 	g.lot = lot
 	g.kind = "party"
 	var who: Array = []
-	for i in mini(biggest, 6):
+	for i in 6:
 		var c = preload("res://people/customer.gd").new()
 		c.lot = lot
 		main.people.add_child(c)
@@ -82,10 +83,10 @@ static func merge_checks(main) -> void:
 	g.members = who
 	g.state = "waiting"
 	g.try_seat()
-	check(g.table != null and g.table2 != null and g.state == "to_table", "a party of %d sits at two tables pushed together" % who.size())
-	var t2 = g.table2
+	var lt = g.table
+	check(lt != null and lt.type == "long_table" and g.state == "to_table", "a party of 6 sits at the long table")
 	g.leave_table()
-	check(g.table2 == null and t2.group == null, "the second table is free again after")
+	check(lt != null and lt.group == null, "the long table is free again after")
 	for c in who:
 		c.queue_free()
 	g.members = []

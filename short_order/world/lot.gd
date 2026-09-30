@@ -376,31 +376,11 @@ func line_cells() -> Array:
 	return out
 
 
-## Two free tables close enough to push together, for a big party: the
-## pairs, each [a, b, seats]. Counters don't move.
-func merge_pairs() -> Array:
-	var ts: Array = tables().filter(func(t): return not t.is_counter())
-	var out: Array = []
-	for i in ts.size():
-		for j in range(i + 1, ts.size()):
-			var a = ts[i]
-			var b = ts[j]
-			var ra: Rect2i = Rect2i(a.cell, Vector2i(a.rect_px().size / Data.TILE))
-			var rb: Rect2i = Rect2i(b.cell, Vector2i(b.rect_px().size / Data.TILE))
-			var gx: int = maxi(0, maxi(ra.position.x - rb.end.x, rb.position.x - ra.end.x))
-			var gy: int = maxi(0, maxi(ra.position.y - rb.end.y, rb.position.y - ra.end.y))
-			if maxi(gx, gy) <= Data.MERGE_GAP:
-				out.append([a, b, a.chairs.size() + b.chairs.size()])
-	return out
-
-
-## The most people one sitting can seat: a table, or two pushed together.
+## The most people one table can seat.
 func biggest_party() -> int:
 	var best := 0
 	for t in tables():
 		best = maxi(best, t.chairs.size())
-	for p in merge_pairs():
-		best = maxi(best, p[2])
 	return best
 
 
@@ -1018,17 +998,6 @@ func _draw() -> void:
 				Art.door_tile(self, c, horizontal)
 	for f in furniture:
 		Art.furniture(self, f, inside_dir(f) if f.on_wall() else -1)
-	# a big party: the two tables pushed together get a tablecloth runner across
-	for f in furniture:
-		var g = f.group if f.is_table() else null
-		if g != null and is_instance_valid(g) and g.table == f and g.table2 != null and is_instance_valid(g.table2):
-			var a: Vector2 = f.center_px()
-			var b: Vector2 = g.table2.center_px()
-			draw_line(a, b, Color("f6f1e6"), 16.0)
-			var n := int(a.distance_to(b) / 8.0)
-			for i in n:
-				if i % 2 == 0:
-					draw_line(a.lerp(b, float(i) / n), a.lerp(b, float(i + 1) / n), Color("d23b30"), 16.0)
 	for f in furniture:
 		if f.is_table():
 			Art.table_food(self, f)

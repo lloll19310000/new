@@ -705,7 +705,7 @@ static func furniture_in(ci: CanvasItem, type: String, r: Rect2, dir: int, f = n
 	var inner := r.grow(-3 * s)
 	var cooking: String = f.cooking if f != null else ""
 	match type:
-		"table":
+		"table", "long_table":
 			rbox(ci, inner, Color("b07a4a"), Color("7a5230"), 5)
 			rbox(ci, inner.grow(-4 * s), Color("c08a58"), Color("c08a58"), 4, 0)
 			if f != null and f.dirty_plates > 0:

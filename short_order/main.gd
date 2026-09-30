@@ -349,8 +349,8 @@ func pick_kind() -> String:
 			continue
 		if GameState.rep_level < c.get("min_level", 0):
 			continue
-		if c.get("min_seats", 0) > 0 and not lot.merge_pairs().any(func(p): return p[2] >= c["min_seats"] and p[0].table_free() and p[1].table_free()):
-			continue   # a big party only comes in if there's somewhere to push tables together now
+		if c.get("min_seats", 0) > 0 and not lot.tables().any(func(t): return t.chairs.size() >= c["min_seats"] and t.table_free()):
+			continue   # a big party only comes in if a long table is free
 		options.append(k)
 		total += c["weight"] * Town.kind_mult(k)
 	var roll := randf() * total

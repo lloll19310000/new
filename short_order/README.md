@@ -39,7 +39,7 @@ Each diner has its own save and saves itself every morning. The main menu can co
 | **Staff who don't vanish** | People off today or due later stay home in the morning instead of walking out when you start; at the end of a shift someone stays on if nobody else in their role is there yet. |
 | **8x speed** | A fifth speed (key 4). |
 | **Waiting benches and lines** | Benches and waiting chairs; when they're full, people line up along the sidewalk. |
-| **Pushed-together tables** | Big parties of 5 to 8 sit at two nearby tables. |
+| **Long tables** | Big parties of 5 to 8 need a long table (seats 8). Tables are never pushed together. |
 | **Early birds** | A few customers come in during the prep hour. |
 | **Breaks** | California meal and rest breaks, staggered so a role is never left empty; a missed meal break costs an hour's pay. |
 | **Staff room and office** | Break table, staff coffee, vending machine, TV, lockers, manager's desk, filing cabinet, schedule board, and more decor. |

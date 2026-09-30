@@ -266,6 +266,7 @@ const REP_LEVELS := [
 ## kitchen, or "wall" = hangs on a wall tile). beauty/radius: how much it cheers up nearby tables.
 const FURNITURE := {
 	"table":    {"name": "Table",          "size": [2, 1], "cost": 150, "solid": true,  "cat": "dining",  "floor": "diner",   "seats": 4, "desc": "Seats up to 4. Put chairs next to it."},
+	"long_table": {"name": "Long table",   "size": [3, 1], "cost": 260, "solid": true,  "cat": "dining",  "floor": "diner",   "seats": 8, "desc": "A banquet table for up to 8. Big parties (birthdays, teams, church groups) only come in when one is free."},
 	"table_small": {"name": "Single table", "size": [1, 1], "cost": 90, "solid": true, "cat": "dining",  "floor": "diner",   "seats": 1, "desc": "A small table for one, with a chair beside it. Solo diners (truckers, regulars, critics) sit here and leave the big tables for groups."},
 	"chair":    {"name": "Chair",          "size": [1, 1], "cost": 45,  "solid": false, "cat": "dining",  "floor": "diner",   "seat": true, "desc": "Place beside a table. It turns to face the table; press R to turn it yourself."},
 	"booth":    {"name": "Booth seat",     "size": [1, 1], "cost": 110, "solid": false, "cat": "dining",  "floor": "diner",   "seat": true, "desc": "A padded bench with a high back. Put booth seats on both sides of a table for a proper booth: couples and families love one, and like their visit a little more."},
@@ -403,8 +404,6 @@ const RADIO := {
 const WAIT_SEAT_PATIENCE := 1.5
 const LINE_RAIN_PATIENCE := 0.7   # lining up outside in the rain
 const LINE_MAX := 10              # the longest line outside
-## Big parties sit at two tables pushed together (tables this close count).
-const MERGE_GAP := 2
 ## A few early birds come in during the prep hour (this share of the usual rate).
 const PREP_WALKINS := 0.2
 const STAY_LATE_MAX := 90.0
@@ -568,7 +567,7 @@ const MAX_BEAUTY := 4           # beauty above this doesn't help any more
 ## The build menu, one list per category, left to right.
 const BUILD_MENU := [
 	{"key": "structure", "name": "Structure", "icon": "structure", "items": ["land", "floor_diner", "floor_kitchen", "wall", "door", "takeout", "stall", "dumpster", "copy", "paste"]},
-	{"key": "dining",    "name": "Dining",    "icon": "dining",    "items": ["table", "table_small", "chair", "booth", "counter", "stool", "bench", "wait_chair", "highchair", "host", "till"]},
+	{"key": "dining",    "name": "Dining",    "icon": "dining",    "items": ["table", "long_table", "table_small", "chair", "booth", "counter", "stool", "bench", "wait_chair", "highchair", "host", "till"]},
 	{"key": "kitchen",   "name": "Kitchen",   "icon": "kitchen",   "items": ["grill", "fryer", "griddle", "drinks", "oven", "ice", "pass", "prep", "fridge", "freezer", "sink", "bin", "trap", "radio"]},
 	{"key": "restroom",  "name": "Restroom",  "icon": "restroom",  "items": ["floor_restroom", "toilet", "handsink"]},
 	{"key": "decor",     "name": "Decor",     "icon": "decor",     "items": ["plant", "flowers", "palm", "lamp", "rug", "wall_art", "tin_sign", "records", "eotm", "neon", "jukebox", "gumball", "clock", "trophy", "aquarium"]},

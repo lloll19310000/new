@@ -271,7 +271,7 @@ func describe_furniture(f) -> Array:
 	var sub := ""
 	var text: String = info["desc"]
 	match f.type:
-		"table", "table_small", "counter":
+		"table", "long_table", "table_small", "counter":
 			sub = "%d chair%s" % [f.chairs.size(), "" if f.chairs.size() == 1 else "s"]
 			if f.chairs.is_empty():
 				text = "Put chairs next to it so customers can sit here."

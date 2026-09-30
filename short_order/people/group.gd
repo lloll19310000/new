@@ -66,7 +66,6 @@ var allergic_items: Array = [] # that person's dishes not served yet
 var restroom_in := -1.0    # minutes until one of them goes to the restroom, or -1
 var saw_mouse := false
 var refill_in := -1.0      # minutes until they'd like a coffee top-up, or -1
-var table2 = null          # a second table pushed together for a big party
 var combo_saving := 0.0    # what their combos take off the bill
 var kids := 0              # little ones in a family
 var crayons := false       # a server brought the crayons
@@ -367,19 +366,6 @@ func try_seat() -> void:
 					(int(likes_seat(t)) > int(likes_seat(best)) or (likes_seat(t) == likes_seat(best) and lot.distance(t.cell, lot.entry_inside) < lot.distance(best.cell, lot.entry_inside)))):
 				best = t
 	var chairs: Array = best.chairs.duplicate() if best != null else []
-	if best == null and members.size() > 1:
-		# a big party: push two free tables together
-		for p in lot.merge_pairs():
-			if p[2] < members.size() or not p[0].table_free() or not p[1].table_free():
-				continue
-			if (p[0].reserved != null and p[0].reserved != booking) or (p[1].reserved != null and p[1].reserved != booking):
-				continue
-			best = p[0]
-			table2 = p[1]
-			table2.group = self
-			chairs = p[0].chairs + p[1].chairs
-			GameState.toast.emit("%s: the staff pushed tables %d and %d together." % [Data.CUSTOMERS[kind]["name"], lot.table_number(p[0]), lot.table_number(p[1])], "")
-			break
 	if best == null:
 		if booking != null and waited > 8.0:
 			extra_hits["our booked table wasn't ready"] = 0.5
@@ -941,26 +927,13 @@ func leave_table() -> void:
 	table.dirty_plates += plates
 	if plates > 0 and not JobBoard.has_open("bus", "furniture", table):
 		JobBoard.post("clean", "bus", {"furniture": table})
-	for ch in table.chairs + (table2.chairs if table2 != null else []):
+	for ch in table.chairs:
 		lot.add_dirt(ch.cell, randf_range(0.05, 0.25))
 		if ch.occupant in members:
 			ch.occupant = null
 	if table.group == self:
 		table.group = null
-	free_table2()
 	lot.queue_redraw()
-
-
-## The second table of a pushed-together pair goes back to normal.
-func free_table2() -> void:
-	if table2 == null:
-		return
-	if table2.group == self:
-		table2.group = null
-	for ch in table2.chairs:
-		if ch.occupant in members:
-			ch.occupant = null
-	table2 = null
 
 
 # ------------------------------------------------------------------ paying
@@ -1298,7 +1271,6 @@ func leave(score: float, complaint: String, paid: bool) -> void:
 	if booking != null:
 		Front.release(booking)
 	release_wait_spots()
-	free_table2()
 	if table != null:
 		if table.group == self:
 			table.group = null
