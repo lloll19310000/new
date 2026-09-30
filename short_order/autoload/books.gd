@@ -176,7 +176,7 @@ func settle_tips() -> Array:
 		return out
 	# good tips make a day better
 	for s in worked:
-		s.add_stress(-minf(Data.TIP_STRESS_MAX, Data.TIP_STRESS * s.tips_today / maxf(1.0, Shifts.pay_today(s))))
+		s.add_stress(-minf(Data.TIP_STRESS_MAX, Data.TIP_STRESS * s.tips_today / maxf(1.0, Shifts.pay_today(s))), "good tips")
 	if tip_policy == "keep":
 		# each server takes home what their tables left them
 		var earners: Array = worked.filter(func(s): return s.tips_today >= 1.0)
@@ -190,7 +190,7 @@ func settle_tips() -> Array:
 			for s in worked:
 				if s.tips_earned < 1.0 and s.tips_today < 1.0:
 					Crew.add(s, top, "tips_keep")
-					s.add_stress(2.0)
+					s.add_stress(2.0, "no tips")
 					grumbles.append(s.person_name)
 		if not grumbles.is_empty():
 			Crew.log_line("%s got no tips today and noticed who did." % Crew.and_list(grumbles), "money", [top])
@@ -200,7 +200,7 @@ func settle_tips() -> Array:
 		var share: float = total / worked.size()
 		for s in worked:
 			if s.tips_earned - share >= 20.0:
-				s.add_stress(2.0)
+				s.add_stress(2.0, "sharing their tips")
 			elif s.tips_earned < share * 0.5:
 				for o in worked:
 					if o != s and o.tips_earned > share:

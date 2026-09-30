@@ -32,6 +32,7 @@ const ADVICE := {
 	"a dirty restroom": "Put someone on Clean: they scrub the restroom when it needs it.",
 	"no restroom": "Build a restroom: Restroom floor, walls, a door, and a toilet.",
 	"a mouse!": "Keep the kitchen floor clean and the bins emptied. Mouse traps help.",
+	"no coffee refill": "Coffee drinkers like a top-up: put more people on Serve. Refilled tables tip better.",
 	"trash carried past tables": "Build a dumpster outside and a back door, so trash doesn't go past your tables.",
 }
 

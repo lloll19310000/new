@@ -12,6 +12,7 @@ const PAGES := {
 	"supplies": {"title": "Supplies", "icon": "supplies"},
 	"crew": {"title": "Crew", "icon": "crew"},
 	"office": {"title": "Office", "icon": "office"},
+	"goals": {"title": "Goals", "icon": "star"},
 }
 const SLIDE := 0.22
 const PANEL_W := 358.0
@@ -37,6 +38,23 @@ func setup(m) -> void:
 
 
 func _ready() -> void:
+	# the Goals board: a page and a rail button, built here
+	var gp := preload("res://ui/goals_page.gd").new()
+	gp.name = "GoalsPage"
+	gp.visible = false
+	pages["office"].get_parent().add_child(gp)
+	pages["goals"] = gp
+	var office_tab: Button = tabs["office"]
+	var gt := office_tab.duplicate() as Button
+	gt.name = "GoalsTab"
+	gt.icon = UiKit.icon("star")
+	gt.tooltip_text = "Goals: milestones for your diner, with rewards"
+	gt.set_pressed_no_signal(false)
+	office_tab.get_parent().add_child(gt)
+	tabs["goals"] = gt
+	Goals.changed.connect(func():
+		if not (is_open and current == "goals"):
+			gt.modulate = Color(1.4, 1.25, 0.8))
 	pages["staff"].hire_requested.connect(func(i: int): hire_requested.emit(i))
 	pages["staff"].fire_requested.connect(func(w): fire_requested.emit(w))
 	for k in tabs:
@@ -66,6 +84,8 @@ func show_page(key: String) -> void:
 	title_icon.texture = UiKit.icon(PAGES[key]["icon"])
 	if key == "crew":
 		crew_badge.visible = false
+	if key == "goals":
+		tabs["goals"].modulate = Color.WHITE
 
 
 func open(key: String) -> void:

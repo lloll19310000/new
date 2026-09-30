@@ -526,6 +526,8 @@ func dir_away_from_wall(c: Vector2i) -> int:
 
 
 func place_furniture(type: String, c: Vector2i, dir: int) -> bool:
+	if not GameState.item_unlocked(type):
+		return false
 	var why := furniture_blocker(type, c, dir)
 	if why != "":
 		GameState.toast.emit(why, "bad")
@@ -867,6 +869,11 @@ func _draw() -> void:
 	for f in furniture:
 		if f.is_table():
 			Art.table_food(self, f)
+	# a birthday: cake in the staff room, on the sofa's arm
+	if Moments.cake_for != "" and GameState.phase != GameState.Phase.REPORT:
+		var sofas: Array = of_type("sofa")
+		if not sofas.is_empty():
+			Art.cake(self, sofas[0].center_px() + Vector2(0, -2), 1.0)
 	if has_entry() and GameState.grade != "":
 		Art.grade_sign(self, entry_door, entry_outside, GameState.grade)
 	if has_entry():

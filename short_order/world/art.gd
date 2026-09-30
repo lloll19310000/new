@@ -226,6 +226,28 @@ static func trash_bag(ci: CanvasItem, p: Vector2, s: float = 1.0) -> void:
 	ci.draw_line(p + Vector2(-2, -7) * s, p + Vector2(2, -9) * s, Color("1d1d22"), 1.4 * s)
 
 
+## A glass coffee pot with a black handle, from above.
+static func coffee_pot(ci: CanvasItem, p: Vector2, s: float = 1.0) -> void:
+	ci.draw_circle(p, 5.0 * s, Color("dfeef6"))
+	ci.draw_circle(p, 4.0 * s, Color("5a3520"))
+	ci.draw_circle(p + Vector2(-1.2, -1.2) * s, 1.1 * s, Color(1, 1, 1, 0.35))
+	ci.draw_line(p + Vector2(4.5, 0) * s, p + Vector2(8.5, 0) * s, Color("222222"), 2.0 * s)
+	ci.draw_colored_polygon(PackedVector2Array([p + Vector2(-4.5, -1.5) * s, p + Vector2(-7.5, 0) * s, p + Vector2(-4.5, 1.5) * s]), Color("dfeef6"))
+
+
+## A birthday cake with candles, from above.
+static func cake(ci: CanvasItem, p: Vector2, s: float = 1.0) -> void:
+	ci.draw_circle(p + Vector2(1, 1.5) * s, 7.5 * s, Color(0, 0, 0, 0.25))
+	ci.draw_circle(p, 7.5 * s, Color("f4f4f4"))
+	ci.draw_circle(p, 6.2 * s, Color("f2a7c3"))
+	ci.draw_circle(p, 4.6 * s, Color("fbe3ec"))
+	for i in 5:
+		var a := TAU * i / 5.0
+		var cp := p + Vector2.from_angle(a) * 3.0 * s
+		ci.draw_circle(cp, 0.8 * s, Color("6aa6d9") if i % 2 == 0 else Color("f2c14e"))
+		ci.draw_circle(cp + Vector2(0, -1.2) * s, 0.5 * s, Color("ffcf5a"))
+
+
 static func bag(ci: CanvasItem, p: Vector2, s: float = 1.0) -> void:
 	rbox(ci, Rect2(p - Vector2(5, 6) * s, Vector2(10, 12) * s), Color("c9a06a"), Color("9c7644"), 2, 1)
 	ci.draw_rect(Rect2(p + Vector2(-5, -6) * s, Vector2(10, 2.5) * s), Color("b38a55"))
@@ -808,6 +830,23 @@ static func furniture_in(ci: CanvasItem, type: String, r: Rect2, dir: int, f = n
 			ci.draw_circle(c, 8.5 * s, Color("f3e3b5"))
 			ci.draw_circle(c, 3.2 * s, Color("fff4c2"))
 			ci.draw_arc(c, 6 * s, 0, TAU, 20, Color("e6d09a"), 1.0 * s, true)
+		"aquarium":
+			# a glass tank on a wooden stand: water, gravel, a plant and goldfish
+			rbox(ci, inner, Color("6a4226"), Color("4a2c18"), 3, 1)
+			var tank := inner.grow(-2.5 * s)
+			rbox(ci, tank, Color("6fb8d9"), Color("d8eef7"), 2, 1)
+			var wide := tank.size.x >= tank.size.y
+			var gr := Rect2(tank.position + Vector2(0, tank.size.y * 0.72), Vector2(tank.size.x, tank.size.y * 0.28)) if wide else Rect2(tank.position + Vector2(tank.size.x * 0.72, 0), Vector2(tank.size.x * 0.28, tank.size.y))
+			ci.draw_rect(gr.grow(-1 * s), Color("c9a870"))
+			var tc := tank.get_center()
+			var ax := Vector2(1, 0) if wide else Vector2(0, 1)
+			for k in 3:
+				var fp := tc + ax * (k - 1) * tank.size[0 if wide else 1] * 0.28 + Vector2(ax.y, ax.x) * (k % 2 * 3.0 - 1.5) * s
+				ellipse(ci, fp, Vector2(2.6, 1.6) * s if wide else Vector2(1.6, 2.6) * s, Color("f2903a"))
+				ci.draw_colored_polygon(PackedVector2Array([fp - ax * 2.2 * s, fp - ax * 4.2 * s + Vector2(ax.y, ax.x) * 1.6 * s, fp - ax * 4.2 * s - Vector2(ax.y, ax.x) * 1.6 * s]), Color("f7b35a"))
+			for k in 3:
+				ci.draw_circle(tank.position + Vector2(tank.size.x * (0.2 + k * 0.07), tank.size.y * (0.25 + k * 0.12)), 0.9 * s, Color(1, 1, 1, 0.6))
+			ci.draw_line(gr.get_center(), gr.get_center() - Vector2(ax.y, ax.x).abs() * 0.0 - (Vector2(0, 1) if wide else Vector2(1, 0)) * 7.0 * s, Color("4f9a45"), 1.6 * s)
 		"jukebox":
 			# the speaker grille at the front, the glowing dome at the back
 			rbox(ci, inner, Color("8c2f2a"), Color("5e1d19"), 8)
@@ -838,6 +877,56 @@ static func furniture_in(ci: CanvasItem, type: String, r: Rect2, dir: int, f = n
 			rbox(ci, back, Color("2f7a72"), Color("2b6a63"), 4, 1)
 			for cr in cushions:
 				rbox(ci, cr, Color("52a89e"), Color("3f8f86"), 4, 1)
+		"clock":
+			# a round chrome diner clock with a red rim, hanging on the wall
+			var dc := Vector2(Data.DIRS[wall_dir if wall_dir >= 0 else 2])
+			var cc := r.get_center() + dc * 6.0 * s
+			ci.draw_circle(cc + Vector2(1, 1.5) * s, 9.5 * s, Color(0, 0, 0, 0.28))
+			ci.draw_circle(cc, 9.5 * s, Color("c9ced6"))
+			ci.draw_circle(cc, 8.2 * s, Color("d23b30"))
+			ci.draw_circle(cc, 6.8 * s, Color("fbfbf5"))
+			for i in 12:
+				var a := TAU * i / 12.0
+				ci.draw_line(cc + Vector2.from_angle(a) * 5.4 * s, cc + Vector2.from_angle(a) * 6.3 * s, Color("3a2e26"), 0.8 * s)
+			var mins := GameState.minute
+			var ha := TAU * fmod(mins / 720.0, 1.0) - PI / 2.0
+			var ma := TAU * fmod(mins / 60.0, 1.0) - PI / 2.0
+			ci.draw_line(cc, cc + Vector2.from_angle(ha) * 3.4 * s, Color("3a2e26"), 1.3 * s)
+			ci.draw_line(cc, cc + Vector2.from_angle(ma) * 5.0 * s, Color("3a2e26"), 0.9 * s)
+			ci.draw_circle(cc, 0.9 * s, Color("d23b30"))
+		"trophy":
+			# a little wooden shelf with a gold cup and two plaques
+			var dt := Vector2(Data.DIRS[wall_dir if wall_dir >= 0 else 2])
+			var tsz := Vector2(12, 26) * s if dt.x != 0 else Vector2(26, 12) * s
+			var tr := Rect2(r.get_center() + dt * 7.0 * s - tsz / 2.0, tsz)
+			rbox(ci, Rect2(tr.position + Vector2(1, 1.5) * s, tr.size), Color(0, 0, 0, 0.28), Color(0, 0, 0, 0), 2, 0)
+			rbox(ci, tr, Color("8a5a36"), Color("6a4226"), 2, 1)
+			var tc := tr.get_center()
+			ci.draw_circle(tc, 4.2 * s, Color("a8801e"))
+			ci.draw_circle(tc, 3.4 * s, Color("f2c14e"))
+			ci.draw_circle(tc + Vector2(-1, -1) * s, 1.2 * s, Color("fff4c2"))
+			var along := Vector2(dt.y, dt.x).abs()
+			for k in [-1.0, 1.0]:
+				var pp: Vector2 = tc + along * k * 8.5 * s
+				ci.draw_rect(Rect2(pp - Vector2(2.2, 2.2) * s, Vector2(4.4, 4.4) * s), Color("c9ced6"))
+				ci.draw_rect(Rect2(pp - Vector2(1.2, 1.2) * s, Vector2(2.4, 2.4) * s), Color("a8801e"))
+		"eotm":
+			# a gold frame with this month's best worker (or an empty silhouette)
+			var de := Vector2(Data.DIRS[wall_dir if wall_dir >= 0 else 2])
+			var esz := Vector2(16, 22) * s if de.x != 0 else Vector2(20, 18) * s
+			var er := Rect2(r.get_center() + de * 6.0 * s - esz / 2.0, esz)
+			rbox(ci, Rect2(er.position + (de * 2.0 + Vector2(1, 1)) * s, er.size), Color(0, 0, 0, 0.28), Color(0, 0, 0, 0), 2, 0)
+			rbox(ci, er, Color("f2c14e"), Color("a8801e"), 2, 2)
+			var ep := er.grow(-2.5 * s)
+			ci.draw_rect(ep, Color("f6f1e6"))
+			var lk: Dictionary = Moments.eotm_look()
+			var pr := Rect2(ep.get_center() - Vector2(1, 1) * minf(ep.size.x, ep.size.y) * 0.45, Vector2(1, 1) * minf(ep.size.x, ep.size.y) * 0.9)
+			if lk.is_empty():
+				ci.draw_circle(pr.get_center() + Vector2(0, -1.5) * s, 3.0 * s, Color("c9bfae"))
+				ci.draw_circle(pr.get_center() + Vector2(0, 4.5) * s, 4.5 * s, Color("c9bfae"))
+			else:
+				portrait(ci, pr, lk["skin"], lk["hair"], lk["shirt"], true, lk["look"])
+			ci.draw_circle(er.position + Vector2(er.size.x / 2.0, er.size.y - 1.5 * s), 2.2 * s, Color("e75a4e"))
 		"wall_art":
 			# a framed landscape hanging on the room side of the wall: wide on the
 			# top and bottom walls, tall on the side walls

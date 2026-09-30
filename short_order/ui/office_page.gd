@@ -238,7 +238,7 @@ func refresh() -> void:
 func refresh_regulars() -> void:
 	var key := ""
 	for r in Front.known():
-		key += "%s%d%d%s|" % [r["name"], int(r["loyalty"]), r["fav"], r["gone"]]
+		key += "%s%d%d%s%d%d|" % [r["name"], int(r["loyalty"]), r["fav"], r["gone"], r.get("beats", 0), Front.days_to_birthday(r)]
 	if key == _regulars_key:
 		return
 	_regulars_key = key
@@ -258,14 +258,30 @@ func refresh_regulars() -> void:
 		var fav = Front.fav_staff(r)
 		var usual: Array = r["usual"].map(func(d): return Data.DISHES[d]["name"].to_lower())
 		var sub := Label.new()
-		sub.text = "Usual: %s%s" % [" and ".join(usual), ("  ·  likes %s" % fav.person_name) if fav != null else ""]
+		var bday: int = Front.days_to_birthday(r)
+		sub.text = "Usual: %s  ·  sits at the %s%s%s" % [" and ".join(usual), r.get("seat", "table"), ("  ·  likes %s" % fav.person_name) if fav != null else "",
+			"  ·  birthday today!" if bday == 0 else ("  ·  birthday in %d day%s" % [bday, "" if bday == 1 else "s"] if bday <= 14 else "")]
 		sub.theme_type_variation = &"SmallLabel"
 		sub.add_theme_color_override("font_color", UiKit.MUTED)
 		sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		sub.custom_minimum_size = Vector2(80, 0)
 		col.add_child(sub)
-		col.tooltip_text = "%s: %s\nComes in about every %d day%s, %s to %s. %d visit%s so far." % [r["name"], r["blurb"], r["every"], "" if r["every"] == 1 else "s",
-			DayTimeline.clock(r["hours"][0] * 60.0), DayTimeline.clock(r["hours"][1] * 60.0), r["visits"], "" if r["visits"] == 1 else "s"]
+		if str(r.get("beat_text", "")) != "":
+			var story := Label.new()
+			story.text = "“%s”" % r["beat_text"]
+			story.theme_type_variation = &"SmallLabel"
+			story.add_theme_color_override("font_color", Color("e27fa8"))
+			story.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			story.custom_minimum_size = Vector2(80, 0)
+			col.add_child(story)
+		var beats: int = r.get("beats", 0)
+		var next_hint := ""
+		if beats < Data.REGULAR_BEAT_AT.size():
+			var need: Array = Data.REGULAR_BEAT_AT[beats]
+			next_hint = "\nTheir story moves on at %d loyalty and %d visits." % [int(need[0]), need[1]]
+		col.tooltip_text = "%s: %s\nComes in about every %d day%s, %s to %s. %d visit%s so far. Story: %d of %d.%s" % [r["name"], r["blurb"], r["every"], "" if r["every"] == 1 else "s",
+			DayTimeline.clock(r["hours"][0] * 60.0), DayTimeline.clock(r["hours"][1] * 60.0), r["visits"], "" if r["visits"] == 1 else "s",
+			beats, Front.stories(r).size(), next_hint]
 		col.mouse_filter = Control.MOUSE_FILTER_PASS
 		row.add_child(col)
 		var hearts := HBoxContainer.new()

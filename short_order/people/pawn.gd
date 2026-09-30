@@ -113,6 +113,8 @@ func _draw() -> void:
 		var p := facing * 10.0 + side * (float(i) - (carry.size() - 1) / 2.0) * 7.0 - Vector2(0, 3)
 		if carry[i] == "trash":
 			Art.trash_bag(self, p, 0.9)
+		elif carry[i] == "pot":
+			Art.coffee_pot(self, p, 0.8)
 		elif carry_bag:
 			Art.bag(self, p, 0.6)
 		elif carry[i] == "dirty":

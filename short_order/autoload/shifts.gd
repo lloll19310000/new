@@ -298,7 +298,7 @@ func morning() -> void:
 			s.energy = Data.CLOSED_LATE_ENERGY
 			if start <= GameState.prep_min() and not s.away and s.sick_days <= 0:
 				s.energy = Data.CLOPEN_ENERGY
-				s.add_stress(Data.CLOPEN_STRESS)
+				s.add_stress(Data.CLOPEN_STRESS, "closed then opened")
 				today["clopen"].append(s.person_name)
 				Crew.log_line("%s closed last night and is opening this morning. Running on empty." % s.person_name, "energy", [s])
 		s.closed_late = false
@@ -384,7 +384,7 @@ func sick_choice(s, come_in: bool) -> void:
 		return
 	if come_in:
 		s.sick_at_work = true
-		s.add_stress(15.0)
+		s.add_stress(15.0, "came in sick")
 		s.arrive_at = maxf(GameState.minute, shift_start(s)) + 20.0
 		today["sick_in"].append(s.person_name)
 		Crew.log_line("%s came in sick." % s.person_name, "sick", [s])
@@ -416,7 +416,7 @@ func tick(minutes: float) -> void:
 			s.clock_out = true
 		# a long day gets harder after 10 hours
 		if s.came_at >= 0.0 and now - s.came_at > 600.0:
-			s.add_stress(Data.LONG_DAY_STRESS * minutes)
+			s.add_stress(Data.LONG_DAY_STRESS * minutes, "a long day")
 		# sick people spread it to whoever's close
 		if s.sick_at_work:
 			for o in Crew.present():

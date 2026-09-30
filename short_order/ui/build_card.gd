@@ -39,3 +39,11 @@ func apply() -> void:
 
 func refresh() -> void:
 	tooltip_text = "%s  ($%d%s)\n%s" % [Data.item_name(key), Data.item_cost(key), " a tile" if key in PER_TILE else "", Data.item_desc(key)]
+	if not GameState.item_unlocked(key):
+		disabled = true
+		modulate = Color(1, 1, 1, 0.45)
+		cost_label.text = "Locked"
+		for g in Data.GOALS:
+			if g["reward"].get("decor", "") == key:
+				tooltip_text += "\nLocked: reach the goal \"%s\" (%s) on the Goals board." % [g["name"], g["desc"].to_lower().trim_suffix(".")]
+		return

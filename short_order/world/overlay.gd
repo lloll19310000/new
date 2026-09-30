@@ -121,6 +121,10 @@ func _draw() -> void:
 				draw_rect(pad, Color("9a8f84"), false, 1.0)
 				for i in 3:
 					draw_line(pad.position + Vector2(2, 3 + i * 3), pad.position + Vector2(8, 3 + i * 3), Color("9a8f84"), 1.0)
+			"eating":
+				if g.wants_refill:
+					var r := Art.bubble(self, tip + Vector2(0, sin(t * 4.0 + g.get_instance_id()) * 1.5), Vector2(22, 20), Color("fbf8f1"), Color("c98a5a"))
+					Art.dish(self, "coffee", r.get_center(), 0.8, false)
 			"ordered":
 				var left: Array = g.waiting_for()
 				if left.is_empty():

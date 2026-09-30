@@ -90,6 +90,12 @@ var tips_today := 0.0           # tips they take home tonight
 var tips_earned := 0.0          # tips from tables they served (before any sharing)
 var worked_today := false
 var jobs_today := 0              # jobs finished today, for the day's MVP
+var stress_log := {}             # today's stress, by reason: why -> points
+var birthday := 0                # day of the year (1..Data.YEAR_DAYS)
+var hired_day := 1
+var shifts_worked := 0
+var jobs_month := 0              # jobs finished these four weeks, for employee of the month
+var eotm_count := 0
 var meal_left := 0.0            # minutes of staff meal left
 var meal_seat = null            # the dining chair they eat at, or null
 var ate_today := false
@@ -132,6 +138,13 @@ func setup(d: Dictionary, lot_ref) -> void:
 	trainer_id = int(d.get("trainer_id", 0))
 	training_days = int(d.get("training_days", 0))
 	warnings = int(d.get("warnings", 0))
+	birthday = int(d.get("birthday", 0))
+	hired_day = int(d.get("hired_day", maxi(1, GameState.day - 7)))
+	shifts_worked = int(d.get("shifts_worked", 0))
+	jobs_month = int(d.get("jobs_month", 0))
+	eotm_count = int(d.get("eotm_count", 0))
+	if birthday <= 0:
+		birthday = randi_range(1, Data.YEAR_DAYS)
 	caught_days = []
 	for day in d.get("caught_days", []):
 		caught_days.append(int(day))
@@ -180,8 +193,30 @@ func stress_factor() -> float:
 	return 0.9 if stress > Data.STRESS_MISTAKES else 1.0
 
 
-func add_stress(v: float) -> void:
+## why: what caused it, kept for today's list of reasons ("a busy shift",
+## "the manager checked in"...). Shown on their card.
+func add_stress(v: float, why: String = "") -> void:
+	var before := stress
 	stress = clampf(stress + v, 0.0, 100.0)
+	var d := stress - before
+	if absf(d) > 0.0001:
+		var k := why if why != "" else "other things"
+		stress_log[k] = stress_log.get(k, 0.0) + d
+
+
+## Today's biggest reasons, largest first: [[why, points], ...].
+func stress_reasons(n: int = 5) -> Array:
+	var out: Array = []
+	for k in stress_log:
+		if absf(stress_log[k]) >= 0.5:
+			out.append([k, stress_log[k]])
+	out.sort_custom(func(a, b): return absf(a[1]) > absf(b[1]))
+	return out.slice(0, n)
+
+
+func stress_reasons_text(n: int = 4) -> String:
+	var bits: Array = stress_reasons(n).map(func(r): return "%+d %s" % [int(round(r[1])), r[0]])
+	return ", ".join(bits)
 
 
 ## Off today: a day they asked for, or one the schedule gave them.
@@ -451,7 +486,7 @@ func meal_tick(minutes: float) -> void:
 	if meal_left <= 0.0:
 		meal_left = 0.0
 		meal_seat = null
-		add_stress(Data.STAFF_MEAL_STRESS)
+		add_stress(Data.STAFF_MEAL_STRESS, "the staff meal")
 		if Crew.main != null:
 			Crew.main.end_staff_meal(self)
 		end_break()
@@ -612,6 +647,8 @@ func can_take(j) -> bool:
 				((j.furniture.dirty_plates > 0 and not lot.of_type("sink").is_empty()) or j.furniture.cash > 0.0)
 		"collect":
 			return j.furniture != null and lot.furniture.has(j.furniture) and j.furniture.cash > 0.0
+		"refill":
+			return group_ok(j.group) and j.group.state == "eating" and j.group.wants_refill and j.group.table != null and not lot.of_type("drinks").is_empty()
 		"wash":
 			return j.furniture != null and j.furniture.dirty > 0 and lot.furniture.has(j.furniture)
 		"sweep":
@@ -709,6 +746,7 @@ func start_job(j) -> void:
 		"repair": plan_repair(j)
 		"service": plan_service(j)
 		"collect": plan_collect(j)
+		"refill": plan_refill(j)
 
 
 func go_step(cells: Array, label: String) -> Dictionary:
@@ -909,7 +947,7 @@ func plan_complaint(j) -> void:
 				return false
 			if mood == "fed_up" and randf() < 0.5:
 				Crew.say(self, "argue", "storm")
-				add_stress(5.0)
+				add_stress(5.0, "argued with a customer")
 				g.resolve_complaint("argue", self)
 			elif g.complaint_what in Data.FOOD_COMPLAINTS:
 				Crew.say(self, "sorry_table", "heart")
@@ -1370,6 +1408,31 @@ func plan_collect(j) -> void:
 		go_step(lot.access_cells(t), "Picking up a check"),
 		work_step(0.25, "Picking up a check", false, t.center_px()),
 		call_step(func(): return Books.collect_table(t, self)),
+	]
+
+
+## Coffee pot from the drinks machine, round to the table, a top-up.
+func plan_refill(j) -> void:
+	var g = j.group
+	var m = nearest("drinks", current_cell())
+	if m == null:
+		abort()
+		return
+	steps = [
+		go_step(lot.access_cells(m), "Getting the coffee pot"),
+		work_step(0.15, "Getting the coffee pot", false, m.center_px()),
+		call_step(func():
+			carry = ["pot"]
+			queue_redraw()
+			return true),
+		go_step(lot.access_cells(g.table), "Topping up coffee"),
+		work_step(0.25, "Topping up coffee", false, g.table.center_px()),
+		call_step(func():
+			carry = []
+			queue_redraw()
+			if group_ok(g):
+				g.got_refill(self)
+			return true),
 	]
 
 

@@ -266,6 +266,10 @@ const FURNITURE := {
 	"sink":     {"name": "Sink",           "size": [1, 1], "cost": 300, "solid": true,  "cat": "kitchen", "floor": "kitchen", "desc": "Dirty plates are washed here."},
 	"plant":    {"name": "Potted plant",   "size": [1, 1], "cost": 60,  "solid": true,  "cat": "decor",   "floor": "any",     "beauty": 1, "radius": 3, "desc": "Cheers up tables nearby."},
 	"lamp":     {"name": "Floor lamp",     "size": [1, 1], "cost": 90,  "solid": true,  "cat": "decor",   "floor": "any",     "beauty": 1, "radius": 3, "glow": true, "desc": "Cheers up tables nearby and glows in the evening."},
+	"eotm":     {"name": "Employee of the month", "size": [1, 1], "cost": 80, "solid": true, "cat": "decor", "floor": "wall", "beauty": 1, "radius": 3, "desc": "A frame on the wall with this month's best worker (picked every four weeks). Cheers up tables nearby."},
+	"trophy":   {"name": "Trophy shelf",   "size": [1, 1], "cost": 150, "solid": true,  "cat": "decor",   "floor": "wall",    "beauty": 2, "radius": 5, "locked": true, "desc": "Your diner's trophies, on the wall. Customers love it. A reward from the Goals board."},
+	"aquarium": {"name": "Fish tank",      "size": [2, 1], "cost": 600, "solid": true,  "cat": "decor",   "floor": "diner",   "beauty": 3, "radius": 6, "locked": true, "desc": "A bubbling tank of goldfish. Very calming. A reward from the Goals board."},
+	"clock":    {"name": "Chrome clock",   "size": [1, 1], "cost": 120, "solid": true,  "cat": "decor",   "floor": "wall",    "beauty": 2, "radius": 5, "locked": true, "desc": "A classic chrome diner clock. A reward from the Goals board."},
 	"wall_art": {"name": "Framed picture", "size": [1, 1], "cost": 120, "solid": true,  "cat": "decor",   "floor": "wall",    "beauty": 1, "radius": 4, "desc": "Hangs on a wall. Cheers up tables nearby."},
 	"neon":     {"name": "Neon sign",      "size": [1, 1], "cost": 400, "solid": true,  "cat": "decor",   "floor": "wall",    "beauty": 2, "radius": 6, "glow": true, "desc": "Hangs on a wall and glows. Customers love it."},
 	"jukebox":  {"name": "Jukebox",        "size": [1, 1], "cost": 700, "solid": true,  "cat": "decor",   "floor": "diner",   "beauty": 2, "radius": 7, "music": true, "desc": "Plays tunes while you're open. Tables nearby enjoy the music."},
@@ -281,6 +285,39 @@ const FURNITURE := {
 }
 const STATIONS := ["grill", "fryer", "griddle", "drinks", "oven"]
 ## Where people like to sit: two or more at a booth, solo diners of these kinds at the counter.
+## The Goals board (see Goals): optional milestones, each with a reward.
+const GOALS := [
+	{"key": "first_week", "name": "Open for a week", "desc": "Keep the lights on for seven days.", "reward": {"money": 500}},
+	{"key": "breakfast", "name": "Breakfast club", "desc": "Serve 60 customers before 11:00.", "reward": {"dish": "waffles"}},
+	{"key": "regular_heart", "name": "Part of the family", "desc": "Fill a regular's heart meter (loyalty 100).", "reward": {"dish": "chili"}},
+	{"key": "critic_all", "name": "Critic's tour", "desc": "Serve every dish on the standard menu to food critics.", "reward": {"decor": "trophy"}},
+	{"key": "no_quit", "name": "A crew that stays", "desc": "30 days in a row with nobody quitting.", "reward": {"decor": "aquarium"}},
+	{"key": "health_a", "name": "Spotless", "desc": "Keep a health grade A for a whole year.", "reward": {"decor": "clock"}},
+	{"key": "served", "name": "A thousand plates", "desc": "Serve 1,000 customers.", "reward": {"money": 1500}},
+	{"key": "five_star", "name": "Five-star night", "desc": "End a day with your rating at 4.8 or better.", "reward": {"money": 1000}},
+	{"key": "eotm", "name": "Wall of fame", "desc": "Name three employees of the month.", "reward": {"money": 600}},
+	{"key": "crew12", "name": "Full crew", "desc": "Have 12 people on staff.", "reward": {"money": 400}},
+]
+
+## Crew moments (see Moments).
+const YEAR_DAYS := 364
+const SHIFT_MILESTONES := [10, 50, 100, 250]
+const BIRTHDAY_STRESS := 10.0
+const MILESTONE_STRESS := 6.0
+const TEACH_AFTER_DAYS := 7       # a cook must have been here this long to teach their dish
+const TEACH_CHANCE := 0.12        # each night, if someone could
+const EOTM_EVERY := 28            # days in a "month"
+const EOTM_RAISE := 0.5
+const EOTM_STRESS := 15.0
+const JEALOUS_STRESS := 4.0
+
+## Coffee refills: a table with coffee wants a top-up a few minutes into the
+## meal. Each refill lifts the review and the tip a little; none is a small grumble.
+const REFILL_AFTER := Vector2(5.0, 9.0)
+const REFILL_MAX := 2
+const REFILL_REVIEW := 0.12
+const REFILL_TIP := 0.08
+const REFILL_MISSED := 0.1
 const COUNTER_KINDS := ["trucker", "regular", "critic", "takeout"]
 const SEAT_LIKED_REVIEW := 0.15
 ## Busy walkways get scuffed (just for looks); it fades a little each night.
@@ -302,7 +339,7 @@ const BUILD_MENU := [
 	{"key": "dining",    "name": "Dining",    "icon": "dining",    "items": ["table", "table_small", "chair", "booth", "counter", "stool", "host", "till"]},
 	{"key": "kitchen",   "name": "Kitchen",   "icon": "kitchen",   "items": ["grill", "fryer", "griddle", "drinks", "oven", "ice", "pass", "prep", "fridge", "freezer", "sink", "bin", "trap"]},
 	{"key": "restroom",  "name": "Restroom",  "icon": "restroom",  "items": ["floor_restroom", "toilet", "handsink"]},
-	{"key": "decor",     "name": "Decor",     "icon": "decor",     "items": ["plant", "lamp", "wall_art", "neon", "jukebox"]},
+	{"key": "decor",     "name": "Decor",     "icon": "decor",     "items": ["plant", "lamp", "wall_art", "eotm", "neon", "jukebox", "clock", "trophy", "aquarium"]},
 	{"key": "staff",     "name": "Staff room", "icon": "staff_room", "items": ["floor_staff", "sofa"]},
 ]
 
@@ -359,7 +396,7 @@ const REGULARS := [
 	{"name": "Deputy Ray", "blurb": "The sheriff's deputy. Sits facing the door.", "usual": ["omelette", "coffee"], "hours": [9, 12], "party": 1, "every": 2},
 	{"name": "The Hendersons", "blurb": "Twins, and their mum who never gets a moment.", "usual": ["pancakes", "milkshake"], "hours": [12, 18], "party": 3, "every": 3},
 	{"name": "Walt", "blurb": "Fixes watches down the street. Knows everyone's business.", "usual": ["meatloaf", "coffee"], "hours": [17, 20], "party": 1, "every": 2},
-	{"name": "Priya and Sam", "blurb": "Newlyweds. Friday is their date night.", "usual": ["meatloaf", "pie"], "hours": [18, 21], "party": 2, "every": 3},
+	{"name": "Priya and Sam", "blurb": "Dating for two years. Friday is their date night.", "usual": ["meatloaf", "pie"], "hours": [18, 21], "party": 2, "every": 3},
 	{"name": "Coach Barnes", "blurb": "Runs the high school team. Loud, kind, always late.", "usual": ["burger", "fries"], "hours": [15, 19], "party": 1, "every": 2},
 	{"name": "Mrs. Albright", "blurb": "Ninety-one. Has had the same pie for thirty years.", "usual": ["pie", "coffee"], "hours": [14, 17], "party": 1, "every": 2},
 	{"name": "Luis", "blurb": "Night-shift nurse, just off work. Too tired to talk.", "usual": ["omelette", "coffee"], "hours": [7, 10], "party": 1, "every": 1},
@@ -371,6 +408,43 @@ const REGULARS := [
 	{"name": "June", "blurb": "Writes a novel at the corner table. Very slowly.", "usual": ["coffee", "pie"], "hours": [10, 16], "party": 1, "every": 1},
 	{"name": "Mayor Pruitt", "blurb": "Shakes every hand in the room. Expects the best table.", "usual": ["meatloaf", "milkshake"], "hours": [12, 14], "party": 2, "every": 4},
 ]
+## Where each regular likes to sit: "booth", "counter" or "table".
+const REGULAR_SEATS := {"Dolores": "counter", "Big Jim": "counter", "Deputy Ray": "counter", "The Hendersons": "booth",
+	"Walt": "counter", "Priya and Sam": "booth", "Coach Barnes": "table", "Mrs. Albright": "booth", "Luis": "counter",
+	"The book club": "booth", "Tammy": "counter", "Father Tom": "table", "Hank": "counter", "The night crew": "booth",
+	"June": "booth", "Mayor Pruitt": "table"}
+## Story beats: as a regular warms to you (hearts and visits), little things
+## happen. "party" makes their group bigger from then on; "gift" is money
+## (a big booking, a tip jar); "rep" counts as a great review.
+const REGULAR_BEAT_AT := [[60.0, 3], [75.0, 6], [90.0, 10]]   # [loyalty, visits] for beat 1, 2, 3
+const REGULAR_STORIES := {
+	"Priya and Sam": [{"text": "Sam slipped {s} a ring to hide in Priya's pie. She said yes: Priya and Sam are engaged!"},
+		{"text": "Priya and Sam held their engagement party here.", "gift": 450.0},
+		{"text": "Priya and Sam came back from the honeymoon with a postcard for the wall. They bring friends now.", "party": 4}],
+	"Mrs. Albright": [{"text": "Mrs. Albright told {s} her late husband proposed in that very booth, in 1958."},
+		{"text": "Mrs. Albright brought her grandkids in for pie.", "party": 3},
+		{"text": "Mrs. Albright knitted {s} a scarf in the diner's colours.", "rep": true}],
+	"Big Jim": [{"text": "Big Jim calls {s} by name now and asks how their weekend was."},
+		{"text": "Big Jim told the whole CB radio about the burgers. Truckers are pulling in.", "rep": true},
+		{"text": "Big Jim brought his daughter for her first trucker breakfast.", "party": 2}],
+	"The Hendersons": [{"text": "The Henderson twins drew {s} a picture. It's on the fridge now."},
+		{"text": "Mrs. Henderson finally finished a whole cup of coffee while it was hot. She nearly cried."},
+		{"text": "The Hendersons had the twins' birthday party here.", "gift": 300.0, "party": 5}],
+	"June": [{"text": "June read {s} the first page of her novel. It's set in a diner."},
+		{"text": "June's novel has a character who's a lot like {s}."},
+		{"text": "June's book came out! There's a signed copy by the till, and fans come to see the corner table.", "rep": true}],
+	"Coach Barnes": [{"text": "Coach Barnes gave {s} a team cap."},
+		{"text": "The team won the county final, and Coach Barnes brought them all in.", "gift": 350.0},
+		{"text": "Coach Barnes brings his assistant coach every time now.", "party": 2}],
+	"Deputy Ray": [{"text": "Deputy Ray keeps an eye on the lot at night now. Fewer dine-and-dashers try it."},
+		{"text": "Deputy Ray brought the sheriff for lunch.", "party": 2},
+		{"text": "Deputy Ray put the diner in the county newsletter.", "rep": true}],
+}
+const REGULAR_STORY_GENERIC := [{"text": "{r} learned {s}'s name and asks for them now."},
+	{"text": "{r} brought a friend along today, and the friend's coming back.", "party": 1},
+	{"text": "{r} left a thank-you card for the whole crew.", "rep": true}]
+const REGULAR_BIRTHDAY_BONUS := 0.3
+
 const REGULAR_LINES := {
 	"great": ["{r} got their usual from {s}, just how they like it.", "{r} told {s} this place is the best in town.", "{r} left {s} a note on a napkin: \"Perfect, as always.\""],
 	"bad": ["{r} left unhappy. That's not like them.", "{r} grumbled on the way out and didn't say goodbye.", "{r} pushed the plate away half-eaten."],
@@ -689,6 +763,10 @@ const REL_EVENTS := {
 	"meal":     {"points": 1.5,  "reason": "Staff meals together"},
 	"tips_keep":  {"points": -2.0, "reason": "Keeps all the tips"},
 	"tips_share": {"points": 1.0,  "reason": "Shares the tips"},
+	"cake":     {"points": 3.0,  "reason": "Birthday cake"},
+	"taught_dish": {"points": 4.0, "reason": "Taught us their hometown dish"},
+	"jealous":  {"points": -4.0, "reason": "Employee of the month? Really?"},
+	"proud":    {"points": 2.0,  "reason": "Proud of them"},
 }
 
 ## First impressions from traits (from = the one who has the opinion, "*" = anyone).

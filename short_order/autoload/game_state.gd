@@ -238,6 +238,17 @@ func unlock_dish(dish: String, why: String = "") -> bool:
 	return true
 
 
+## Decor from the Goals board: locked in the build menu until then.
+func unlock_decor(key: String) -> void:
+	if not unlocked.has(key):
+		unlocked.append(key)
+		menu_changed.emit()
+
+
+func item_unlocked(key: String) -> bool:
+	return not (Data.FURNITURE.has(key) and Data.FURNITURE[key].get("locked", false)) or unlocked.has(key)
+
+
 ## The recipes your reputation has earned so far.
 func unlock_by_rep() -> void:
 	for d in Data.RECIPES:
@@ -446,6 +457,10 @@ func set_grade(g: String) -> void:
 	today["inspection"] = g
 	if g == "A":
 		totals["grade_a"] += 1
+		if int(totals.get("a_since", -1)) < 0:
+			totals["a_since"] = day
+	else:
+		totals["a_since"] = -1
 	grade_changed.emit(g)
 
 

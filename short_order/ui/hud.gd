@@ -157,6 +157,7 @@ func refresh_all() -> void:
 	side_panel.pages["supplies"].refresh()
 	side_panel.pages["crew"].refresh()
 	side_panel.pages["office"].refresh()
+	side_panel.pages["goals"].refresh()
 
 
 func set_speed(v: int) -> void:
@@ -178,6 +179,7 @@ func _overlay_bar() -> HBoxContainer:
 		b.icon = UiKit.icon(icons[m])
 		b.theme_type_variation = &"SmallButton"
 		b.custom_minimum_size = Vector2(30, 28)
+		b.size_flags_vertical = Control.SIZE_SHRINK_END
 		b.tooltip_text = "Show %s on the map (V cycles).\n%s" % [main.heatmap.NAMES[m].to_lower(), main.heatmap.LEGENDS[m]]
 		b.toggled.connect(func(on: bool):
 			if on:
@@ -196,7 +198,10 @@ func _overlay_bar() -> HBoxContainer:
 	st.content_margin_bottom = 3
 	overlay_legend.add_theme_stylebox_override("normal", st)
 	overlay_legend.visible = false
+	overlay_legend.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	overlay_legend.custom_minimum_size = Vector2(300, 0)
 	bar.add_child(overlay_legend)
+	bar.move_child(overlay_legend, 0)
 	return bar
 
 
@@ -209,14 +214,28 @@ func show_overlay(m: String) -> void:
 	overlay_legend.visible = mode != ""
 	if mode != "":
 		overlay_legend.text = "%s: %s" % [main.heatmap.NAMES[mode], main.heatmap.LEGENDS[mode]]
+	_place_overlay_bar.call_deferred()
 
 
+## Right above the right end of the build bar, clear of the cards on the left.
 func _place_overlay_bar() -> void:
-	overlay_bar.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
-	overlay_bar.offset_left = 10.0
+	overlay_bar.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	var right: float = build_menu.position.x + build_menu.size.x
+	# ...and left of the side panel when it's out
+	if side_panel.is_open and side_panel.panel.visible:
+		right = minf(right, side_panel.panel.global_position.x - 10.0)
+	overlay_bar.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	overlay_bar.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	overlay_bar.offset_right = right
+	overlay_bar.offset_left = right - overlay_bar.get_combined_minimum_size().x
 	overlay_bar.offset_bottom = -(build_menu.size.y + 16.0)
 	overlay_bar.offset_top = overlay_bar.offset_bottom - 28.0
-	overlay_bar.grow_vertical = Control.GROW_DIRECTION_BEGIN
+
+
+func _process(_delta: float) -> void:
+	# the side panel slides in and out: keep the overlay buttons beside it
+	if overlay_bar != null and Engine.get_process_frames() % 10 == 0:
+		_place_overlay_bar()
 
 
 func _unhandled_key_input(event: InputEvent) -> void:

@@ -248,10 +248,10 @@ func add(a, b, ev: String, pts: float = INF, cap: float = 0.0) -> float:
 	rec["hist"][ev] = rec["hist"].get(ev, 0.0) + pts
 	if pts < 0.0:
 		a.last_bad = now()
-		a.add_stress(-pts * Data.STRESS_FROM_BAD)
+		a.add_stress(-pts * Data.STRESS_FROM_BAD, "a clash with %s" % b.person_name.split(" ")[0])
 	elif ev != "work":
 		a.last_good = now()
-		a.add_stress(-pts * 0.5)
+		a.add_stress(-pts * 0.5, "good moments with coworkers")
 	return pts
 
 
@@ -294,8 +294,8 @@ func announce(a, b, was: String, now_label: String) -> void:
 		log_line("%s are best friends now. %s" % [names, story("best", a, b)], "heart", [a, b])
 		GameState.toast.emit("%s are best friends now! %s" % [names, story("best", a, b)], "crew")
 		today["new_friends"].append(names)
-		a.add_stress(-10.0)
-		b.add_stress(-10.0)
+		a.add_stress(-10.0, "a new friend")
+		b.add_stress(-10.0, "a new friend")
 		say(a, "", "heart")
 		say(b, "", "heart")
 		big_moment.emit()
@@ -304,8 +304,8 @@ func announce(a, b, was: String, now_label: String) -> void:
 		log_line("%s are friends now. %s" % [names, line], "heart", [a, b])
 		GameState.toast.emit("%s are friends now. %s" % [names, line], "crew")
 		today["new_friends"].append(names)
-		a.add_stress(-10.0)
-		b.add_stress(-10.0)
+		a.add_stress(-10.0, "a new friend")
+		b.add_stress(-10.0, "a new friend")
 		say(a, "", "heart")
 		big_moment.emit()
 	elif now_label == "rivals":
@@ -517,27 +517,31 @@ func customers_waiting() -> int:
 ## A minute of stress: work, a rush, rivals and tiredness push it up; breaks,
 ## friends and quiet moments bring it down.
 func update_stress(s, rush: float) -> void:
-	var d := 0.0
+	var parts: Array = []
 	if s.on_break:
-		d = Data.STRESS_SOFA if (s.rest_sofa != null and s.sitting) else Data.STRESS_REST
+		parts.append([Data.STRESS_SOFA if (s.rest_sofa != null and s.sitting) else Data.STRESS_REST, "breaks"])
 	else:
 		if s.is_working() and GameState.phase == GameState.Phase.SERVICE:
-			d += Data.STRESS_WORK
+			parts.append([Data.STRESS_WORK, "work"])
 		if rush >= 2.0:
-			d += Data.STRESS_SWAMPED
+			parts.append([Data.STRESS_SWAMPED, "being swamped"])
 		elif rush >= 1.0:
-			d += Data.STRESS_BUSY
+			parts.append([Data.STRESS_BUSY, "a busy floor"])
 		if s._near_rival:
-			d += Data.STRESS_RIVAL
+			parts.append([Data.STRESS_RIVAL, "working near a rival"])
 		if s.energy < Data.SNAP_ENERGY:
-			d += Data.STRESS_TIRED
+			parts.append([Data.STRESS_TIRED, "being tired"])
 		if s._friend_factor > 1.0:
-			d += Data.STRESS_FRIEND
+			parts.append([Data.STRESS_FRIEND, "friends on shift"])
 		if s.is_idle():
-			d += Data.STRESS_IDLE
-	if d > 0.0 and s.has_trait("grumpy"):
-		d *= 1.25
-	s.add_stress(d)
+			parts.append([Data.STRESS_IDLE, "quiet moments"])
+	var total := 0.0
+	for p in parts:
+		total += p[0]
+	# grumpy people take the bad minutes harder
+	var g: float = 1.25 if total > 0.0 and s.has_trait("grumpy") else 1.0
+	for p in parts:
+		s.add_stress(p[0] * (g if p[0] > 0.0 else 1.0), p[1])
 
 
 ## Mood follows stress: calm people are cheerful, stressed people fed up.
@@ -598,8 +602,8 @@ func bicker(a, b) -> void:
 			today["breakups"] += 1
 			return
 	both(a, b, "bicker")
-	a.add_stress(4.0)
-	b.add_stress(4.0)
+	a.add_stress(4.0, "an argument")
+	b.add_stress(4.0, "an argument")
 	a.pause_left = Data.BICKER_MINUTES
 	b.pause_left = Data.BICKER_MINUTES
 	say(a, "bicker", "storm")
@@ -629,8 +633,8 @@ func ask_mediation(a, b) -> bool:
 func mediate(m, a, b) -> void:
 	var q: float = clampf(0.5 + 0.05 * m.service, 0.5, 1.0) * (0.7 if m.mood == "okay" else 1.0)
 	both(a, b, "mediated", Data.MEDIATE_POINTS * q)
-	a.add_stress(-Data.MEDIATE_STRESS * q)
-	b.add_stress(-Data.MEDIATE_STRESS * q)
+	a.add_stress(-Data.MEDIATE_STRESS * q, "the manager talked it out")
+	b.add_stress(-Data.MEDIATE_STRESS * q, "the manager talked it out")
 	a.pause_left = 0.0
 	b.pause_left = 0.0
 	Events.calm[pair_key(a, b)] = true
@@ -662,7 +666,7 @@ func post_checkins(t: Array) -> void:
 
 func check_in(m, s) -> void:
 	var q: float = clampf(0.5 + 0.05 * m.service, 0.5, 1.0)
-	s.add_stress(-Data.CHECKIN_STRESS * q)
+	s.add_stress(-Data.CHECKIN_STRESS * q, "the manager checked in")
 	if s.energy < 60.0 or s.stress >= Data.STRESS_FED_UP:
 		s.break_asked = true
 	say(m, "checkin", "heart")
@@ -778,7 +782,7 @@ func watch_phone(s, t: Array) -> void:
 func reprimand(m, s) -> void:
 	s.end_phone()
 	add(s, m, "told_off", -6.0 if s.has_trait("grumpy") else Data.REL_EVENTS["told_off"]["points"])
-	s.add_stress(4.0)
+	s.add_stress(4.0, "told off")
 	say(m, "reprimand", "alert")
 	say(s, "sorry", "phone")
 	today["reprimands"] += 1
@@ -791,7 +795,7 @@ func owner_caught(s) -> void:
 		return
 	s.end_phone()
 	say(s, "sorry", "phone")
-	s.add_stress(4.0)
+	s.add_stress(4.0, "caught on the phone")
 	today["caught"] += 1
 	s.caught_days = s.caught_days.filter(func(d): return d > GameState.day - 7)
 	s.caught_days.append(GameState.day)
@@ -858,7 +862,7 @@ func nightly() -> void:
 			s.burnout_nights = 0
 	var calm: float = Data.MANAGER_NIGHT_CALM if team().any(func(s): return s.manager) else 0.0
 	for s in team():
-		s.add_stress(Data.STRESS_NIGHT - calm)
+		s.add_stress(Data.STRESS_NIGHT - calm, "a night's rest")
 	var worked: Array = []
 	for pk in today["work"]:
 		if today["work"][pk] >= 180:
@@ -890,11 +894,12 @@ func nightly() -> void:
 ## Someone has had enough and leaves. Their friends take it hard.
 func quit(s, text: String) -> void:
 	today["quits"].append(s.person_name)
+	GameState.totals["last_quit_day"] = GameState.day
 	log_line(text, "walkout", [s])
 	GameState.toast.emit(text, "bad")
 	for o in team():
 		if o != s and is_friend(o, s):
-			o.add_stress(Data.STRESS_FRIEND_QUIT)
+			o.add_stress(Data.STRESS_FRIEND_QUIT, "a friend quit")
 	if main != null:
 		main.lose_staff(s)
 

@@ -64,6 +64,9 @@ var allergic_items: Array = [] # that person's dishes not served yet
 # health
 var restroom_in := -1.0    # minutes until one of them goes to the restroom, or -1
 var saw_mouse := false
+var refill_in := -1.0      # minutes until they'd like a coffee top-up, or -1
+var wants_refill := false
+var refills := 0
 
 
 func info() -> Dictionary:
@@ -101,6 +104,10 @@ func start(lot_ref, size: int, parent: Node, kind_: String = "regular", window =
 		GameState.today["types"][kind] = GameState.today["types"].get(kind, 0) + 1
 		if regular != null:
 			GameState.today["regulars"] += 1
+			if Front.is_birthday(regular):
+				review_bonus += Data.REGULAR_BIRTHDAY_BONUS
+				GameState.toast.emit("It's %s's birthday! The crew will sing." % regular["name"], "crew")
+				Crew.log_line("%s came in on their birthday. The crew sang, badly." % regular["name"], "heart")
 		if booking != null:
 			GameState.today["bookings"] += 1
 	var goal: Vector2i = lot.entry_inside
@@ -167,7 +174,9 @@ func tick(minutes: float) -> void:
 		"eating":
 			eat_left -= minutes
 			restroom_tick(minutes)
+			refill_tick(minutes)
 			if eat_left <= 0.0:
+				miss_refill()
 				finish_meal()
 		"complaining":
 			complaint_wait += minutes
@@ -325,6 +334,20 @@ func try_seat() -> void:
 func likes_seat(t) -> bool:
 	if t == null:
 		return false
+	if regular != null:
+		# a regular has their spot
+		var booths := 0
+		for ch in t.chairs:
+			if ch.type == "booth":
+				booths += 1
+		match str(regular.get("seat", "table")):
+			"counter":
+				if members.size() == 1:
+					return t.is_counter()
+			"booth":
+				return booths > 0 and booths >= mini(members.size(), t.chairs.size())
+			_:
+				return not t.is_counter() and booths == 0
 	if members.size() == 1 and kind in Data.COUNTER_KINDS:
 		return t.is_counter()
 	if members.size() >= 2:
@@ -571,10 +594,10 @@ func allergic_reaction(d: String, cooks: Array) -> void:
 	Crew.log_line("Allergic reaction at %s: %s in the %s. %s" % [label().to_lower(), what, Data.DISHES[d]["name"].to_lower(), how], "alert")
 	Sfx.play("bad_review")
 	if order_taker != null and is_instance_valid(order_taker):
-		order_taker.add_stress(15.0)
+		order_taker.add_stress(15.0, "an allergic reaction")
 	for c in cooks:
 		if c != null and is_instance_valid(c):
-			c.add_stress(10.0)
+			c.add_stress(10.0, "an allergic reaction")
 	GameState.add_review(1.0, "an allergic reaction", 2)
 	leave(0.0, "", false)
 
@@ -601,6 +624,40 @@ func check_all_served() -> void:
 			return
 		eat_left = randf_range(15.0, 25.0)
 		state = "eating"
+		if received.has("coffee"):
+			refill_in = randf_range(Data.REFILL_AFTER.x, Data.REFILL_AFTER.y)
+
+
+## Coffee drinkers hold their cup up for a top-up a few minutes in.
+func refill_tick(minutes: float) -> void:
+	if refill_in < 0.0 or wants_refill or refills >= Data.REFILL_MAX:
+		return
+	refill_in -= minutes
+	if refill_in <= 0.0 and eat_left > 3.0:
+		wants_refill = true
+		if not JobBoard.has_open("refill", "group", self):
+			JobBoard.post("serve", "refill", {"group": self})
+
+
+## The meal's over and nobody came with the pot.
+func miss_refill() -> void:
+	if wants_refill:
+		extra_hits["no coffee refill"] = Data.REFILL_MISSED
+		wants_refill = false
+
+
+## A server topped up the coffee.
+func got_refill(by) -> void:
+	if not wants_refill:
+		return
+	wants_refill = false
+	refills += 1
+	review_bonus += Data.REFILL_REVIEW
+	refill_in = randf_range(Data.REFILL_AFTER.x + 2.0, Data.REFILL_AFTER.y + 3.0)
+	GameState.today["refills"] = GameState.today.get("refills", 0) + 1
+	if by != null and not served_by.has(by):
+		served_by.append(by)
+	lot.fx.add(where() + Vector2(0, -14), "Refill", Color("c98a5a"))
 
 
 ## Asked to leave (a rowdy table): they go without paying or reviewing,
@@ -640,13 +697,15 @@ func pay(on_table: bool = false) -> float:
 	if score >= 4.75:
 		Crew.teamwork(cooked_by, served_by)
 	var charged := 0.0 if comped else bill
-	var tip: float = bill * tip_rate(score) * info()["tip"]
+	var tip: float = bill * tip_rate(score) * info()["tip"] * (1.0 + Data.REFILL_TIP * refills)
 	if regular != null and regular["loyalty"] >= Data.REGULAR_LOYAL:
 		tip *= 1.4
 	if comped:
 		GameState.today["comped"] += bill
 	GameState.today["served"] += members.size()
 	GameState.totals["served"] += members.size()
+	if GameState.minute < 11.0 * 60.0:
+		GameState.totals["breakfast_served"] = int(GameState.totals.get("breakfast_served", 0)) + members.size()
 	var at: Vector2 = where()
 	if on_table and table != null and not takeout:
 		table.cash += charged + tip
@@ -1039,6 +1098,11 @@ func leave(score: float, complaint: String, paid: bool) -> void:
 			Events.celebrity_review(score)
 		if kind == "critic":
 			GameState.today["critic"] = score
+			var cd: Array = GameState.totals.get("critic_dishes", [])
+			for d in received:
+				if not cd.has(d):
+					cd.append(d)
+			GameState.totals["critic_dishes"] = cd
 			if score >= 4.0:
 				GameState.totals["critic"] = GameState.totals.get("critic", 0) + 1
 				GameState.toast.emit("The food critic loved it: %.1f stars! That review counts five times." % score, "good")

@@ -24,6 +24,8 @@ Books="*res://autoload/books.gd"
 Front="*res://autoload/front.gd"
 Health="*res://autoload/health.gd"
 Shifts="*res://autoload/shifts.gd"
+Moments="*res://autoload/moments.gd"
+Goals="*res://autoload/goals.gd"
 
 [display]
 

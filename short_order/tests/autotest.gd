@@ -1,5 +1,6 @@
 extends RefCounted
 const V6 = preload("res://tests/v6_checks.gd")
+const V7 = preload("res://tests/v7_checks.gd")
 ## Automatic tests. Run from a terminal in the project folder:
 ##   godot --headless --path . -- --autotest     plays two days as fast as possible
 ##   godot --path . -- --uitest                  clicks through the interface like a player
@@ -68,6 +69,8 @@ static func build_sample(lot) -> void:
 
 
 static func run(main, args: PackedStringArray) -> void:
+	# a fixed seed, so a run's customers and mishaps are the same every time
+	seed(20260930)
 	var lot = main.lot
 	var shot := "--shot" in args
 	print("AUTOTEST: start")
@@ -397,6 +400,7 @@ static func run(main, args: PackedStringArray) -> void:
 			await main.get_tree().process_frame
 		main.get_viewport().get_texture().get_image().save_png("user://shot_day2.png")
 	await V6.run(main)
+	await V7.run(main)
 	await flavour_check(main)
 	print("AUTOTEST: done")
 	Sfx.quit_game()
@@ -2065,6 +2069,11 @@ static func run_ui(main, args: PackedStringArray) -> void:
 	office.scroll_vertical = 100000
 	await tree.process_frame
 	await snap(main, "office_front", prefix)
+	hud.side_panel.open("goals")
+	await tree.process_frame
+	check(hud.side_panel.pages["goals"].visible and hud.side_panel.pages["goals"].cards.size() == Data.GOALS.size(), "the Goals tab shows the board")
+	await snap(main, "goals", prefix)
+	check_fits(main, "with the Goals tab open")
 	office.scroll_vertical = 0
 	hud.side_panel.tabs["crew"].pressed.emit()
 	await tree.process_frame

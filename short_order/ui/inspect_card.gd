@@ -188,6 +188,9 @@ func refresh() -> void:
 			op_bits.append("%s [color=%s]%s[/color]" % [o[0].person_name, col, OpinionGrid.signed(v)])
 		if not op_bits.is_empty():
 			text += "\nThinks of: " + ", ".join(op_bits)
+		var why: String = t.stress_reasons_text(3)
+		if why != "":
+			text += "\n[font_size=12][color=#b9a797]Stress today: %s[/color][/font_size]" % why
 		if t.on_phone:
 			text += "\n[color=#6aa6d9]On the phone. Click them to catch them.[/color]"
 		elif t.job != null:

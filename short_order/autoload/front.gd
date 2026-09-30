@@ -37,7 +37,8 @@ func reset() -> void:
 			"party": t["party"], "every": t["every"], "loyalty": 50.0, "fav": 0, "fav_counts": {}, "visits": 0,
 			"next_day": 1 + rng.randi_range(0, t["every"] - 1), "known": i < Data.REGULAR_START, "gone": false,
 			"skin": Data.SKIN[rng.randi() % Data.SKIN.size()], "hair": Data.HAIR[rng.randi() % Data.HAIR.size()],
-			"shirt": Data.CLOTHES[rng.randi() % Data.CLOTHES.size()]})
+			"shirt": Data.CLOTHES[rng.randi() % Data.CLOTHES.size()],
+			"seat": Data.REGULAR_SEATS.get(t["name"], "table"), "birthday": 1 + rng.randi_range(0, Data.YEAR_DAYS - 1), "beats": 0, "beat_text": ""})
 
 
 func valid_group(g) -> bool:
@@ -104,7 +105,8 @@ func tick(minutes: float) -> void:
 		if now >= v["at"]:
 			visits.erase(v)
 			if now < GameState.last_seat_min() and main.lot.has_entry() and not main.lot.tables().is_empty():
-				main.spawn_group("regular", v["r"]["party"], null, {"regular": v["r"]})
+				var size: int = v["r"]["party"] + (1 if is_birthday(v["r"]) else 0)
+				main.spawn_group("regular", mini(size, 6), null, {"regular": v["r"]})
 	for b in bookings:
 		match b["state"]:
 			"booked", "held":
@@ -192,6 +194,46 @@ func known() -> Array:
 	return regulars.filter(func(r): return r["known"])
 
 
+## Their story so far: the beats they've reached.
+func stories(r: Dictionary) -> Array:
+	return Data.REGULAR_STORIES.get(r["name"], Data.REGULAR_STORY_GENERIC)
+
+
+func is_birthday(r: Dictionary) -> bool:
+	return r.get("birthday", 0) == Moments.day_of_year(GameState.day)
+
+
+func days_to_birthday(r: Dictionary) -> int:
+	return posmod(int(r.get("birthday", 1)) - Moments.day_of_year(GameState.day), Data.YEAR_DAYS)
+
+
+## A regular who's warmed up enough reaches the next beat of their story.
+func check_story(r: Dictionary, server) -> void:
+	var i: int = r.get("beats", 0)
+	var list: Array = stories(r)
+	if i >= list.size() or i >= Data.REGULAR_BEAT_AT.size():
+		return
+	var need: Array = Data.REGULAR_BEAT_AT[i]
+	if r["loyalty"] < need[0] or r["visits"] < need[1]:
+		return
+	var beat: Dictionary = list[i]
+	r["beats"] = i + 1
+	var text: String = str(beat["text"]).replace("{r}", r["name"]).replace("{s}", server.person_name if server != null else "the crew")
+	r["beat_text"] = text
+	if beat.has("party"):
+		r["party"] = maxi(int(r["party"]), int(beat["party"]))
+	if beat.has("gift"):
+		GameState.add_money(float(beat["gift"]))
+		GameState.today["revenue"] += float(beat["gift"])
+		text += " (+$%d)" % int(beat["gift"])
+	if beat.get("rep", false):
+		GameState.add_review(5.0, "")
+	Crew.log_line(text, "heart", [server] if server != null else [])
+	GameState.toast.emit(text, "crew")
+	if server != null:
+		server.add_stress(-4.0, "a regular's story")
+
+
 ## After a regular's visit: loyalty, their favourite server, and a line in the log.
 func after_visit(r: Dictionary, score: float, servers: Array) -> void:
 	r["visits"] += 1
@@ -220,9 +262,13 @@ func after_visit(r: Dictionary, score: float, servers: Array) -> void:
 	elif score >= 4.5 and server != null:
 		if randf() < 0.5:
 			Crew.log_line(line("great", r, server), "heart", who)
-		server.add_stress(-3.0)
+		server.add_stress(-3.0, "a happy regular")
 	elif score < 2.5:
 		Crew.log_line(line("bad", r, server), "alert", who)
+	if not r["gone"] and score >= 3.5:
+		check_story(r, server)
+	if r["loyalty"] >= 100.0 and not GameState.totals.get("heart_full", false):
+		GameState.totals["heart_full"] = true
 
 
 func line(kind: String, r: Dictionary, s = null) -> String:
@@ -255,7 +301,7 @@ func save_data() -> Dictionary:
 	var regs: Array = []
 	for r in regulars:
 		regs.append({"name": r["name"], "loyalty": r["loyalty"], "fav": r["fav"], "fav_counts": r["fav_counts"], "visits": r["visits"],
-			"next_day": r["next_day"], "known": r["known"], "gone": r["gone"]})
+			"next_day": r["next_day"], "known": r["known"], "gone": r["gone"], "beats": r["beats"], "beat_text": r["beat_text"], "party": r["party"]})
 	return {"take_bookings": take_bookings, "apps_on": apps_on, "regulars": regs}
 
 
@@ -276,6 +322,9 @@ func load_data(d: Dictionary) -> void:
 		r["next_day"] = int(rd.get("next_day", 1))
 		r["known"] = bool(rd.get("known", false))
 		r["gone"] = bool(rd.get("gone", false))
+		r["beats"] = int(rd.get("beats", 0))
+		r["beat_text"] = str(rd.get("beat_text", ""))
+		r["party"] = int(rd.get("party", r["party"]))
 	if not d.has("regulars"):
 		# an older diner: its regulars start coming from tomorrow
 		for r in regulars:

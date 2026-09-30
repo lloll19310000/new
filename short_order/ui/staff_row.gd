@@ -10,6 +10,7 @@ signal opened(row)
 
 const NORMAL := Color("2a221d")
 
+var stress_why: Label
 var who = null
 var is_open := false
 var _hover := false
@@ -365,6 +366,19 @@ func refresh() -> void:
 	bars["stress"][0].theme_type_variation = &"WarnBar" if who.stress >= Data.STRESS_FED_UP else &"SkillBar"
 	var rel := Crew.summary(who)
 	relations.text = rel if rel != "" else "Gets on fine with everyone."
+	# why their stress moved today, biggest first
+	if stress_why == null:
+		stress_why = Label.new()
+		stress_why.theme_type_variation = &"SmallLabel"
+		stress_why.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		stress_why.custom_minimum_size = Vector2(100, 0)
+		relations.get_parent().add_child(stress_why)
+		relations.get_parent().move_child(stress_why, relations.get_index() + 1)
+	var why: String = who.stress_reasons_text(4)
+	stress_why.visible = why != ""
+	stress_why.text = "Stress today: " + why
+	stress_why.add_theme_color_override("font_color", UiKit.CHERRY.lightened(0.2) if who.stress >= Data.STRESS_FED_UP else UiKit.MUTED)
+	bars["stress"][2].tooltip_text += ("\nToday: " + why) if why != "" else ""
 	role_button.select(Data.ROLE_ORDER.find(who.role))
 	manager_button.set_pressed_no_signal(who.manager)
 	manager_button.text = "Manager" if who.manager else "Make manager"

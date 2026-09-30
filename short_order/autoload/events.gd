@@ -351,7 +351,7 @@ func start_grease_fire() -> void:
 	GameState.today["breakdowns"] += 1
 	if not JobBoard.has_open("repair", "furniture", f):
 		JobBoard.post("fix", "repair", {"furniture": f})
-	cook.stress = minf(100.0, cook.stress + 15.0)
+	cook.add_stress(15.0, "a station broke on them")
 	for y in range(-1, 2):
 		for x in range(-1, 3):
 			if main.lot.in_lot(f.cell + Vector2i(x, y)):
@@ -418,16 +418,16 @@ func choose_staff_blowup(i: int, d: Dictionary) -> void:
 	if not valid_staff(a) or not valid_staff(b):
 		return
 	if i == 2:
-		a.stress = minf(100.0, a.stress + 5.0)
-		b.stress = minf(100.0, b.stress + 5.0)
+		a.add_stress(5.0, "a shouting match")
+		b.add_stress(5.0, "a shouting match")
 		calm[Crew.pair_key(a, b)] = true
 		Crew.log_line("You told %s and %s to cool off." % [a.person_name, b.person_name], "storm", [a, b])
 		note("storm", "#f2c14e", "%s and %s had a shouting match. You told them to cool off." % [a.person_name, b.person_name])
 		return
 	var won = a if i == 0 else b
 	var lost = b if i == 0 else a
-	won.stress = maxf(0.0, won.stress - 15.0)
-	lost.stress = minf(100.0, lost.stress + 20.0)
+	won.add_stress(-15.0, "you took their side")
+	lost.add_stress(20.0, "you took the other side")
 	Crew.add(lost, won, "blowup")
 	Crew.say(lost, "bicker", "storm")
 	Crew.log_line("%s and %s had a shouting match. You took %s's side, and %s is fuming." % [a.person_name, b.person_name, won.person_name, lost.person_name], "storm", [a, b])
@@ -470,14 +470,14 @@ func choose_raise(i: int, d: Dictionary) -> void:
 	if i == 0:
 		s.wage += d["amount"]
 		s.raises += d["amount"]
-		s.stress = maxf(0.0, s.stress - 25.0)
+		s.add_stress(-25.0, "a raise")
 		s.start_skill = s.cooking + s.service
 		s.raise_refused = 0
 		Crew.say(s, "thanks", "heart")
 		Crew.log_line("%s got a raise: $%.2f an hour now." % [s.person_name, s.wage], "money", [s])
 		note("money", "#6cc3a0", "You gave %s a raise of $%.2f an hour." % [s.person_name, d["amount"]])
 	else:
-		s.stress = minf(100.0, s.stress + 20.0)
+		s.add_stress(20.0, "no raise")
 		s.raise_refused += 1
 		Crew.log_line("%s asked for a raise and didn't get it." % s.person_name, "money", [s])
 		note("money", "#e75a4e", "%s asked for a raise and you said no." % s.person_name)
@@ -519,12 +519,12 @@ func choose_day_off(i: int, d: Dictionary) -> void:
 		return
 	if i == 0:
 		s.away_day = GameState.day + 1
-		s.stress = maxf(0.0, s.stress - 10.0)
+		s.add_stress(-10.0, "a day off coming")
 		Crew.say(s, "thanks", "heart")
 		Crew.log_line("%s has tomorrow off." % s.person_name, "sun", [s])
 		note("sun", "#6cc3a0", "You gave %s tomorrow off." % s.person_name)
 	else:
-		s.stress = minf(100.0, s.stress + 25.0)
+		s.add_stress(25.0, "day off refused")
 		Crew.log_line("%s asked for a day off and didn't get it." % s.person_name, "sun", [s])
 		note("sun", "#e75a4e", "%s asked for a day off and you said no." % s.person_name)
 	GameState.staff_changed.emit()

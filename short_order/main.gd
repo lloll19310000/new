@@ -370,6 +370,9 @@ func open_diner() -> void:
 		GameState.toast.emit("Not ready yet: " + item[0].to_lower() + ".", "bad")
 		Sfx.play("error")
 		return
+	# a new day's list of what stressed people (last night's is kept until now)
+	for s in GameState.staff:
+		s.stress_log = {}
 	GameState.minute = GameState.prep_min()
 	spawn_acc = 0.0
 	next_spawn = 3.0
@@ -502,6 +505,8 @@ func end_day() -> void:
 	Stock.used_yesterday = GameState.today["used"].duplicate()
 	var t: Dictionary = GameState.today
 	GameState.totals["best_sales"] = maxf(GameState.totals.get("best_sales", 0.0), t["revenue"])
+	if t["scores"].size() >= 5:
+		GameState.totals["best_end_rating"] = maxf(float(GameState.totals.get("best_end_rating", 0.0)), GameState.rating)
 	for s in GameState.staff.duplicate():
 		if s.away:
 			if s.away_day == GameState.day:
@@ -514,6 +519,8 @@ func end_day() -> void:
 		s.set_at_work(true)
 	Crew.nightly()
 	Front.nightly()
+	Moments.nightly()
+	Goals.check()
 	lot.fade_scuffs()
 	# tomorrow's schedule: days off and who works days or nights
 	Shifts.plan_schedule(GameState.day + 1)
@@ -552,7 +559,7 @@ func end_day() -> void:
 		"waste": t["waste"], "waste_items": t["waste_items"].duplicate(), "food_used": t["food_used"],
 		"prepped": t["prepped"], "prep_used": t["prep_used"], "sold_out": t["sold_out"].duplicate(),
 		"avg": avg, "reviews": scores.size(), "rating": GameState.rating, "complaint": worst, "money": GameState.money,
-		"takeout": t["takeout"], "critic": t["critic"], "inspection": t["inspection"], "crew": Crew.report_lines() + Shifts.report_lines(), "events": Events.today.duplicate(),
+		"takeout": t["takeout"], "critic": t["critic"], "inspection": t["inspection"], "crew": Crew.report_lines() + Shifts.report_lines() + Moments.today_lines, "events": Events.today.duplicate(),
 		"overtime": Shifts.today["overtime"],
 		"level_up": GameState.level_info()["name"] if level_up else "",
 		"breakdowns": t["breakdowns"], "types": t["types"].duplicate(),
@@ -584,6 +591,7 @@ func start_next_day() -> void:
 	GameState.minute = GameState.prep_min()
 	GameState.reset_today()
 	Crew.reset_today()
+	Moments.morning()
 	for s in GameState.staff:
 		s.energy = 100.0
 		s.jobs_today = 0
@@ -606,6 +614,7 @@ func hire(i: int) -> void:
 	var c: Dictionary = GameState.candidates[i]
 	GameState.candidates.remove_at(i)
 	var s = add_staff(c)
+	Moments.welcome(s)
 	Shifts.replan()
 	GameState.toast.emit("%s joined as a %s at $%.2f an hour." % [s.person_name, Data.ROLES[s.role]["name"].to_lower(), s.wage], "good")
 	Crew.log_line("%s from %s joined the crew." % [s.person_name, Data.hometown(s.origin)], "staff", [s])
@@ -734,7 +743,8 @@ func save_game(to: String = "") -> bool:
 			"traits": s.traits, "xp": s.xp, "id": s.id, "origin": s.origin, "bio": s.bio, "manager": s.manager,
 			"warnings": s.warnings, "caught_days": s.caught_days, "stress": s.stress, "burnout_warned": s.burnout_warned,
 			"raise_refused": s.raise_refused, "start_skill": s.start_skill, "last_raise_day": s.last_raise_day, "away_day": s.away_day,
-			"shift": s.shift, "shift_locked": s.shift_locked, "sched_off": s.sched_off, "streak": s.streak, "burnout_nights": s.burnout_nights, "sick_days": s.sick_days, "closed_late": s.closed_late, "trainer_id": s.trainer_id, "training_days": s.training_days})
+			"shift": s.shift, "shift_locked": s.shift_locked, "sched_off": s.sched_off, "streak": s.streak, "burnout_nights": s.burnout_nights, "sick_days": s.sick_days, "closed_late": s.closed_late, "trainer_id": s.trainer_id, "training_days": s.training_days,
+			"birthday": s.birthday, "hired_day": s.hired_day, "shifts_worked": s.shifts_worked, "jobs_month": s.jobs_month, "eotm_count": s.eotm_count})
 	var plates := GameState.plates_clean
 	for f in lot.furniture:
 		plates += f.dirty_plates + f.dirty
@@ -742,7 +752,7 @@ func save_game(to: String = "") -> bool:
 		"version": SAVE_VERSION, "name": GameState.diner_name, "saved_at": Time.get_datetime_string_from_system(false, true), "day": GameState.day, "money": GameState.money, "reviews": GameState.reviews,
 		"review_count": GameState.review_count,
 		"menu": GameState.menu, "stock": GameState.stock, "target": GameState.target,
-		"unlocked": GameState.unlocked, "hometown": GameState.hometown,
+		"unlocked": GameState.unlocked, "hometown": GameState.hometown, "moments": Moments.save_data(), "goals": Goals.save_data(),
 		"plates_total": GameState.plates_total, "plates": plates, "totals": GameState.totals,
 		"grade": GameState.grade, "crew": Crew.save_data(),
 		"supplier": GameState.supplier, "special": GameState.special, "owned": GameState.owned, "rep_level": GameState.rep_level,
@@ -808,6 +818,10 @@ func load_game(from: String = "") -> bool:
 	Stock.load_data(data.get("kitchen", {}))
 	Books.load_data(data.get("books", {}))
 	Front.load_data(data.get("front", {}))
+	Moments.load_data(data.get("moments", {}))
+	# very old saves kept a list of tutorial goals under "goals": ignore that
+	var gd = data.get("goals", {})
+	Goals.load_data(gd if gd is Dictionary else {})
 	Stock.reconcile()
 	GameState.staff_meal = bool(data.get("staff_meal", false))
 	Shifts.auto = bool(data.get("schedule_auto", true))
@@ -935,5 +949,7 @@ func clear_world() -> void:
 	Front.reset()
 	Health.reset()
 	Shifts.reset()
+	Moments.reset()
+	Goals.reset()
 	JobBoard.clear()
 	lot.init_grid()

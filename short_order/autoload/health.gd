@@ -224,7 +224,7 @@ func mouse_minute(m) -> void:
 			return
 		if d <= Data.MOUSE_SEEN_TILES and s.has_trait("tidy") and not m.seen_by.has(s.id):
 			m.seen_by[s.id] = true
-			s.add_stress(5.0)
+			s.add_stress(5.0, "saw a mouse")
 			Crew.say(s, "mouse", "alert")
 	for g in main.groups:
 		if not is_instance_valid(g) or g.takeout or g.kind == "inspector" or g.saw_mouse:
